@@ -33,10 +33,112 @@ type TextSelState = {
   selection: { start: number; end: number };
 };
 
-type TextApi = {
-  replaceSelection: (text: string) => void;
-  setSelectionRange: (range: { start: number; end: number }) => TextSelState;
-};
+function selectWord(params: {
+  text: string;
+  selection: { start: number; end: number };
+  prefix: string;
+  suffix?: string;
+}) {
+  const { text, selection, prefix } = params;
+  const suffix = params.suffix ?? prefix;
+  const result = { ...selection };
+
+  if (text && text.length && selection.start === selection.end) {
+    const isWordDelimiter = (c: string) => c === ' ' || c.charCodeAt(0) === 10;
+    let start = 0;
+    let end = text.length;
+    for (let i = selection.start; i - 1 > -1; i--) {
+      if (isWordDelimiter(text[i - 1])) {
+        start = i;
+        break;
+      }
+    }
+    for (let i = selection.start; i < text.length; i++) {
+      if (isWordDelimiter(text[i])) {
+        end = i;
+        break;
+      }
+    }
+    result.start = start;
+    result.end = end;
+  }
+
+  if (result.start >= prefix.length && result.end <= text.length - suffix.length) {
+    const wrapped = text.slice(result.start - prefix.length, result.end + suffix.length);
+    if (wrapped.startsWith(prefix) && wrapped.endsWith(suffix)) {
+      return {
+        start: result.start - prefix.length,
+        end: result.end + suffix.length,
+      };
+    }
+  }
+  return result;
+}
+
+function executeMarkdownToggle(params: {
+  api: { replaceSelection: (text: string) => void; setSelectionRange: (r: { start: number; end: number }) => void };
+  selectedText: string;
+  selection: { start: number; end: number };
+  prefix: string;
+  suffix?: string;
+}) {
+  const { api, selectedText, selection, prefix } = params;
+  const suffix = params.suffix ?? prefix;
+  const leading = selectedText.match(/^\s*/u)?.[0] ?? '';
+  const trailing = selectedText.match(/\s*$/u)?.[0] ?? '';
+  const core = selectedText.slice(leading.length, selectedText.length - trailing.length);
+
+  if (core.startsWith(prefix) && core.endsWith(suffix) && core.length >= prefix.length + suffix.length) {
+    const unwrapped = core.slice(prefix.length, suffix.length ? -suffix.length : undefined);
+    const next = `${leading}${unwrapped}${trailing}`;
+    api.replaceSelection(next);
+    api.setSelectionRange({
+      start: selection.start + leading.length,
+      end: selection.start + leading.length + unwrapped.length,
+    });
+    return;
+  }
+
+  const safeCore = core || 'text';
+  const next = `${leading}${prefix}${safeCore}${suffix}${trailing}`;
+  api.replaceSelection(next);
+  api.setSelectionRange({
+    start: selection.start + leading.length + prefix.length,
+    end: selection.start + leading.length + prefix.length + safeCore.length,
+  });
+}
+
+function executeHtmlToggle(params: {
+  api: { replaceSelection: (text: string) => void; setSelectionRange: (r: { start: number; end: number }) => void };
+  selectedText: string;
+  selection: { start: number; end: number };
+  openTag: string;
+  closeTag: string;
+}) {
+  const { api, selectedText, selection, openTag, closeTag } = params;
+  const leading = selectedText.match(/^\s*/u)?.[0] ?? '';
+  const trailing = selectedText.match(/\s*$/u)?.[0] ?? '';
+  const core = selectedText.slice(leading.length, selectedText.length - trailing.length);
+
+  if (core.startsWith(openTag) && core.endsWith(closeTag) && core.length >= openTag.length + closeTag.length) {
+    const unwrapped = core.slice(openTag.length, -closeTag.length);
+    const next = `${leading}${unwrapped}${trailing}`;
+    api.replaceSelection(next);
+    api.setSelectionRange({
+      start: selection.start + leading.length,
+      end: selection.start + leading.length + unwrapped.length,
+    });
+    return;
+  }
+
+  const safeCore = core || 'text';
+  const next = `${leading}${openTag}${safeCore}${closeTag}${trailing}`;
+  api.replaceSelection(next);
+  api.setSelectionRange({
+    start: selection.start + leading.length + openTag.length,
+    end: selection.start + leading.length + openTag.length + safeCore.length,
+  });
+}
 
 type ActiveMarks = {
   bold: boolean;
@@ -69,18 +171,6 @@ function isWrappedSelection(state: TextSelState, prefix: string, suffix = prefix
   );
 }
 
-function toggleWrapSelection(state: TextSelState, api: TextApi, prefix: string, suffix = prefix) {
-  if (isWrappedSelection(state, prefix, suffix)) {
-    const start = state.selection.start - prefix.length;
-    const end = state.selection.end + suffix.length;
-    api.setSelectionRange({ start, end });
-    api.replaceSelection(state.selectedText);
-    return;
-  }
-  const content = state.selectedText || 'текст';
-  api.replaceSelection(`${prefix}${content}${suffix}`);
-}
-
 function getActiveMarksFromState(state: TextSelState): ActiveMarks {
   const sample = state.selectedText.length > 0
     ? state.selectedText
@@ -89,8 +179,12 @@ function getActiveMarksFromState(state: TextSelState): ActiveMarks {
     bold: isWrappedSelection(state, '**') || /\*\*[\s\S]+?\*\*/.test(sample),
     italic: isWrappedSelection(state, '*') || /\*[\s\S]+?\*/.test(sample),
     strike: isWrappedSelection(state, '~~') || /~~[\s\S]+?~~/.test(sample),
-    underline: isWrappedSelection(state, '++') || /\+\+[\s\S]+?\+\+/.test(sample),
-    doubleUnderline: isWrappedSelection(state, '==') || /==[\s\S]+?==/.test(sample),
+    underline:
+      isWrappedSelection(state, '<u>', '</u>')
+      || /<u>[\s\S]+?<\/u>/.test(sample),
+    doubleUnderline:
+      isWrappedSelection(state, '<ins class="du">', '</ins>')
+      || /<ins class="du">[\s\S]+?<\/ins>/.test(sample),
   };
 }
 
@@ -101,9 +195,9 @@ function commandButtonClass(active: boolean) {
 function makeToggleCommand(
   name: string,
   keyCommand: string,
-  label: string,
+  icon: JSX.Element,
   title: string,
-  prefix: string,
+  style: { kind: 'markdown'; prefix: string; suffix?: string } | { kind: 'html'; openTag: string; closeTag: string },
   active: boolean,
 ): ICommand {
   return {
@@ -113,9 +207,38 @@ function makeToggleCommand(
       'aria-label': title,
       title,
       className: commandButtonClass(active),
+      style: active ? { backgroundColor: '#e2e8f0' } : undefined,
     },
-    icon: <span style={{ fontSize: 12 }}>{label}</span>,
-    execute: (state, api) => toggleWrapSelection(state as TextSelState, api as TextApi, prefix),
+    icon,
+    prefix: style.kind === 'markdown' ? style.prefix : undefined,
+    suffix: style.kind === 'markdown' ? (style.suffix ?? style.prefix) : undefined,
+    value: 'text',
+    execute: (state, api) => {
+      const range = selectWord({
+        text: state.text,
+        selection: state.selection,
+        prefix: style.kind === 'markdown' ? style.prefix : style.openTag,
+        suffix: style.kind === 'markdown' ? (style.suffix ?? style.prefix) : style.closeTag,
+      });
+      const state1 = api.setSelectionRange(range);
+      if (style.kind === 'markdown') {
+        executeMarkdownToggle({
+          api,
+          selectedText: state1.selectedText,
+          selection: state.selection,
+          prefix: style.prefix,
+          suffix: style.suffix ?? style.prefix,
+        });
+      } else {
+        executeHtmlToggle({
+          api,
+          selectedText: state1.selectedText,
+          selection: state.selection,
+          openTag: style.openTag,
+          closeTag: style.closeTag,
+        });
+      }
+    },
   };
 }
 
@@ -605,6 +728,8 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isSeedRegenerateArmed, setIsSeedRegenerateArmed] = useState(false);
   const [showSeedRegenerateModal, setShowSeedRegenerateModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showFloatingSave, setShowFloatingSave] = useState(false);
   const [listQuery, setListQuery] = useState('');
   const [listTypeFilter, setListTypeFilter] = useState<string>('all');
   const [listStatusFilter, setListStatusFilter] = useState<string>('all');
@@ -620,14 +745,16 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   const suppressHistoryRef = useRef(false);
   const lastSnapshotRef = useRef('');
   const initializedFromUrlRef = useRef(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
   const [activeMarks, setActiveMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
 
   const markdownCommands = useMemo<ICommand[]>(() => ([
-    makeToggleCommand('bold', 'bold', 'B', 'Жирный', '**', activeMarks.bold),
-    makeToggleCommand('italic', 'italic', 'I', 'Курсив', '*', activeMarks.italic),
-    makeToggleCommand('strikethrough', 'strikethrough', 'S', 'Зачёркнутый', '~~', activeMarks.strike),
-    makeToggleCommand('underline', 'underline', 'U', 'Подчёркнутый', '++', activeMarks.underline),
-    makeToggleCommand('doubleUnderline', 'doubleUnderline', 'UU', 'Двойное подчёркивание', '==', activeMarks.doubleUnderline),
+    makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, activeMarks.bold),
+    makeToggleCommand('italic', 'italic', <span style={{ fontSize: 14, fontStyle: 'italic' }}>I</span>, 'Курсив', { kind: 'markdown', prefix: '*' }, activeMarks.italic),
+    makeToggleCommand('strikethrough', 'strikethrough', <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый', { kind: 'markdown', prefix: '~~' }, activeMarks.strike),
+    makeToggleCommand('underline', 'underline', <span style={{ fontSize: 14, textDecoration: 'underline' }}>U</span>, 'Подчёркнутый', { kind: 'html', openTag: '<u>', closeTag: '</u>' }, activeMarks.underline),
+    makeToggleCommand('doubleUnderline', 'doubleUnderline', <span style={{ fontSize: 14, textDecoration: 'underline double' }}>U</span>, 'Двойное подчёркивание', { kind: 'html', openTag: '<ins class="du">', closeTag: '</ins>' }, activeMarks.doubleUnderline),
     commands.hr,
     commands.divider,
     commands.link,
@@ -682,9 +809,6 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     if (form.id) {
       url.searchParams.set('id', String(form.id));
       url.searchParams.set('slug', slugFromPrompt(form.prompt));
-    } else {
-      url.searchParams.delete('id');
-      url.searchParams.delete('slug');
     }
     const nextUrl = `${url.pathname}${url.search}${url.hash}`;
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -739,6 +863,34 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     };
     setActiveMarks(getActiveMarksFromState(nextState));
   }
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLTextAreaElement)) return;
+      if (!active.className.includes('w-md-editor-text-input')) return;
+      updateActiveMarksFromTarget(active);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, []);
+
+  useEffect(() => {
+    const anchor = mainSaveAnchorRef.current;
+    if (!anchor || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowFloatingSave(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0.05,
+      },
+    );
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, []);
 
   function examTypeOf(item: ListItem) {
     for (const tag of item.skillTags ?? []) {
@@ -1219,11 +1371,20 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     initializedFromUrlRef.current = true;
     const params = new URLSearchParams(window.location.search);
     const rawId = params.get('id');
-    const id = rawId ? Number(rawId) : NaN;
+    const fallbackId = localStorage.getItem('admin_last_selected_id');
+    const id = Number(rawId ?? fallbackId ?? NaN);
     if (Number.isInteger(id) && id > 0) {
       void loadExercise(id);
     }
   }, [isDraftLoaded]);
+
+  useEffect(() => {
+    if (selectedId) {
+      localStorage.setItem('admin_last_selected_id', String(selectedId));
+      return;
+    }
+    localStorage.removeItem('admin_last_selected_id');
+  }, [selectedId]);
 
   async function loadExercise(id: number) {
     const res = await getExerciseByIdAction(id);
@@ -1509,12 +1670,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
 
   async function handleDeleteExercise() {
     if (!isEdit || deleting) return;
-    const label = form.seedKey.trim() || `#${form.id}`;
-    const confirmed = window.confirm(
-      `Удалить упражнение ${label}? Это действие также удалит связанные попытки и не может быть отменено.`,
-    );
-    if (!confirmed) return;
-
+    setShowDeleteConfirmModal(false);
     setDeleting(true);
     setMessage('');
     setIsError(false);
@@ -1528,6 +1684,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
       setPreviewCheckResult(null);
       setIsSeedRegenerateArmed(false);
       setShowSeedRegenerateModal(false);
+      setShowDeleteConfirmModal(false);
       await refreshList();
     } else {
       setIsError(true);
@@ -1689,6 +1846,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
 
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <form
+            ref={formRef}
             onSubmit={onSubmit}
             onMouseUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
             onKeyUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
@@ -2155,7 +2313,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
               </Input>
             </div>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <button
                 disabled={saving || deleting}
                 className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
@@ -2170,7 +2328,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
                 <button
                   type="button"
                   disabled={saving || deleting}
-                  onClick={() => void handleDeleteExercise()}
+                  onClick={() => setShowDeleteConfirmModal(true)}
                   className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {deleting ? 'Удаление...' : 'Удалить'}
@@ -2256,6 +2414,27 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
         </div>
       </div>
 
+      <div
+        className={`fixed right-6 bottom-6 z-40 hidden xl:block transition-all duration-200 ${
+          showFloatingSave ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => formRef.current?.requestSubmit()}
+          disabled={!showFloatingSave || saving || deleting}
+          className={`rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 ${
+            showFloatingSave ? 'pointer-events-auto' : 'pointer-events-none'
+          }`}
+        >
+          {saving
+            ? 'Сохранение...'
+            : isEdit
+              ? 'Сохранить изменения'
+              : 'Создать задание'}
+        </button>
+      </div>
+
       {showSeedRegenerateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
@@ -2280,6 +2459,35 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
                 }}
               >
                 Перегенерировать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h4 className="text-base font-semibold text-slate-900">Подтверждение удаления</h4>
+            <p className="mt-2 text-sm text-slate-700">
+              Удалить упражнение {form.seedKey.trim() || `#${form.id}`}? Это действие также удалит связанные попытки и не может быть отменено.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowDeleteConfirmModal(false)}
+                disabled={deleting}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void handleDeleteExercise()}
+                disabled={deleting}
+              >
+                {deleting ? 'Удаление...' : 'Удалить'}
               </button>
             </div>
           </div>
