@@ -207,15 +207,12 @@ function normalizeMorphemeMarkdownSpacing(value: string) {
     .replace(/([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1**$2**')
     .replace(/([\p{L}])\*\*([\p{L}])\*\*\s+(?=[\p{L}])/gu, '$1**$2**')
     .replace(/(^|[^\p{L}])([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1$2**$3**')
-    .replace(/((?=[\p{L}*]{1,24}\*\*)[\p{L}*]{1,24})\s+(?=\p{Ll})/gu, '$1')
+    .replace(/(^|[^\p{L}*])([\p{L}]+(?:\*\*[\p{L}]+\*\*)+)\s+(?=\p{Ll})/gu, '$1$2')
     .replace(/\s+(?:\*\s*)+$/u, '');
   const parts = value.split(/\s+—\s+/u).map(normalizeMarked);
   if (parts.length < 2) return joinPrefixSpaces(normalizeMarked(value));
-  parts[0] = parts[0].replace(
-    /\b(рас|раз|без|бес|нис|низ|воз|вос|из|ис|под|пред|пре|при|сверх)\s+(?=\p{Ll})/giu,
-    '$1',
-  );
-  return parts.map(joinPrefixSpaces).join(' — ');
+  parts[0] = joinPrefixSpaces(parts[0]);
+  return parts.join(' — ');
 }
 
 function normalizeAnswerWord(value: string) {
@@ -1319,8 +1316,8 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1400px] gap-5 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
-      <aside className="flex max-h-[calc(100vh-2rem)] sticky top-4 flex-col rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
+    <div className="mx-auto grid w-full max-w-[1400px] gap-5 items-start xl:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm max-h-[60vh] xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)]">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold">Задания · {totalItems}</h3>
           <button

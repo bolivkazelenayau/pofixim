@@ -62,15 +62,12 @@ function normalizeMorphemeMarkdownSpacing(value) {
     .replace(/([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1**$2**')
     .replace(/([\p{L}])\*\*([\p{L}])\*\*\s+(?=[\p{L}])/gu, '$1**$2**')
     .replace(/(^|[^\p{L}])([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1$2**$3**')
-    .replace(/((?=[\p{L}*]{1,24}\*\*)[\p{L}*]{1,24})\s+(?=\p{Ll})/gu, '$1')
+    .replace(/(^|[^\p{L}*])([\p{L}]+(?:\*\*[\p{L}]+\*\*)+)\s+(?=\p{Ll})/gu, '$1$2')
     .replace(/\s+(?:\*\s*)+$/u, '');
   const parts = String(value ?? '').split(/\s+—\s+/u).map(normalizeMarked);
   if (parts.length < 2) return joinPrefixSpaces(normalizeMarked(String(value ?? '')));
-  parts[0] = parts[0].replace(
-    /\b(рас|раз|без|бес|нис|низ|воз|вос|из|ис|под|пред|пре|при|сверх)\s+(?=\p{Ll})/giu,
-    '$1',
-  );
-  return parts.map(joinPrefixSpaces).join(' — ');
+  parts[0] = joinPrefixSpaces(parts[0]);
+  return parts.join(' — ');
 }
 
 function escapeRegExpLiteral(value) {
