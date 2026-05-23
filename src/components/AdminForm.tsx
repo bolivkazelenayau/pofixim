@@ -465,6 +465,11 @@ function getDraftKey(id?: number | string | null) {
 }
 
 function loadFormState(targetId: number | null, baseForm: Form) {
+  // For existing exercises, prefer fresh server data to avoid stale local drafts
+  // masking updates made from another machine/user.
+  if (targetId != null) {
+    return normalizeFormForEditor(baseForm);
+  }
   const key = getDraftKey(targetId);
   const draft = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
   if (draft) {
@@ -511,6 +516,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   } | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(loadFormState(null, EMPTY));
     setIsDraftLoaded(true);
   }, []);
@@ -522,6 +528,16 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     }, 1000);
     return () => clearTimeout(timer);
   }, [form, isDraftLoaded]);
+
+  useEffect(() => {
+    const baseTitle = 'Админка ЕГЭ';
+    if (!form.id) {
+      document.title = baseTitle;
+      return;
+    }
+    const slug = slugFromPrompt(form.prompt);
+    document.title = `${baseTitle} · #${form.id} · ${slug}`;
+  }, [form.id, form.prompt]);
 
   useEffect(() => {
     if (message) {

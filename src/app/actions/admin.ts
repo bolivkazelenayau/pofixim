@@ -620,7 +620,8 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
       })
       .returning({ id: exercises.id });
 
-    revalidatePath('/', 'layout');
+    revalidatePath('/admin');
+    revalidatePath('/');
     return { success: true, id: inserted[0]?.id };
   } catch (error) {
     console.error('Failed to create exercise:', error);
@@ -703,7 +704,8 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
       return { success: false, error: 'Exercise not found' };
     }
 
-    revalidatePath('/', 'layout');
+    revalidatePath('/admin');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Failed to update exercise:', error);
@@ -726,7 +728,8 @@ export async function deleteExerciseAction(id: number) {
       return { success: false, error: 'Exercise not found' };
     }
 
-    revalidatePath('/', 'layout');
+    revalidatePath('/admin');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Failed to delete exercise:', error);
