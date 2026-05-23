@@ -47,10 +47,10 @@ function buildFeedbackText(
   ) {
     const correctAnswerLabel = '\u041f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u044b\u0439 \u043e\u0442\u0432\u0435\u0442';
     const explanationLabel = '\u041e\u0431\u044a\u044f\u0441\u043d\u0435\u043d\u0438\u0435';
-    return `${prefix}${correctAnswerLabel}:\n${result.feedback.correctAnswer}\n\n${explanationLabel}:\n${result.feedback.detailedExplanation}`;
+    return `${prefix}\n\n${correctAnswerLabel}:\n${result.feedback.correctAnswer}\n\n${explanationLabel}:\n${result.feedback.detailedExplanation}`;
   }
 
-  return `${prefix}${result.feedback.explanation}${buildStepFeedbackText(result, exerciseType)}`;
+  return `${prefix}\n\n${result.feedback.explanation}${buildStepFeedbackText(result, exerciseType)}`;
 }
 
 function buildStepFeedbackText(

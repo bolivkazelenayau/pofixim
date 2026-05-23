@@ -52,13 +52,13 @@ function compactCorrectAnswerLine(line) {
 
 function normalizeMorphemeMarkdownSpacing(value) {
   const joinPrefixSpaces = (part) => part
-    .replace(/(^|[^\p{L}])не\s+с\s+(?=\p{Ll})/giu, '$1нес')
     .replace(
       /(^|[^\p{L}])(рас|раз|без|бес|нис|низ|нес|нез|вз|вс|воз|вос|из|ис|под|пред|пре|при|пра|про|транс|контр|суб|супер|сверх)\s+(?=\p{Ll}|\*\*)/giu,
       '$1$2',
     );
   const normalizeMarked = (part) => part
     .replace(/(?<!\p{L})рас\s+ч[её]т(?!\p{L})/giu, 'расчёт')
+    .replace(/\*\*([\p{L}])\s+\*\*(?=[\p{L}])/gu, '**$1**')
     .replace(/([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1**$2**')
     .replace(/([\p{L}])\*\*([\p{L}])\*\*\s+(?=[\p{L}])/gu, '$1**$2**')
     .replace(/(^|[^\p{L}])([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1$2**$3**')
@@ -71,6 +71,10 @@ function normalizeMorphemeMarkdownSpacing(value) {
     '$1',
   );
   return parts.map(joinPrefixSpaces).join(' — ');
+}
+
+function escapeRegExpLiteral(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 }
 
 function fillOptionBlanksFromLine(optionLine, explanationLine) {
@@ -89,8 +93,8 @@ function fillOptionBlanksFromLine(optionLine, explanationLine) {
     const parts = cleanOpt.split(/\.\.+/);
     if (parts.length !== 2) return opt;
     const [prefix, suffix] = parts;
-    const escapedPrefix = prefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const escapedSuffix = suffix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedPrefix = escapeRegExpLiteral(prefix);
+    const escapedSuffix = escapeRegExpLiteral(suffix);
     
     const regex = new RegExp(escapedPrefix + '([а-яёА-ЯЁ*A-Za-z]*?)' + escapedSuffix, 'i');
     const match = cleanLine.match(regex);
@@ -205,12 +209,13 @@ function splitFeedbackFromExplanation(explanation, options) {
 }
 
 function buildCorrectAnswerLinesFromOptions(options, targetSet, explanationLines = []) {
+  const mergedExplanation = explanationLines.join(' ');
   return [...new Set(targetSet)]
     .sort((a, b) => a - b)
     .map((idx) => {
       const option = String(options[idx - 1] ?? '').trim();
       if (!option) return '';
-      const explanationLine = explanationLines[idx - 1];
+      const explanationLine = explanationLines[idx - 1] ?? mergedExplanation;
       return explanationLine
         ? fillOptionBlanksFromLine(option, explanationLine)
         : option;
@@ -233,16 +238,20 @@ async function main() {
     const options = payload.options ?? [];
     const normalizedExplanation = normalizeMorphemeMarkdownSpacing(row.explanation);
     const feedback = splitFeedbackFromExplanation(normalizedExplanation, options);
-    if (!feedback) continue;
     const correctAnswer = Array.isArray(answer.targetSet)
-      ? buildCorrectAnswerLinesFromOptions(options, answer.targetSet, feedback.explanation)
+      ? buildCorrectAnswerLinesFromOptions(options, answer.targetSet, feedback?.explanation ?? [])
       : [];
     if (!correctAnswer.length) continue;
-    feedback.correctAnswer = correctAnswer;
+    const nextFeedback = {
+      correctAnswer,
+      explanation: feedback?.explanation.length
+        ? feedback.explanation
+        : [normalizedExplanation],
+    };
 
     const prev = payload.feedback ?? null;
-    const normalizedEditorExplanation = feedback.explanation.join('\n');
-    const feedbackChanged = !sameFeedback(prev, feedback);
+    const normalizedEditorExplanation = nextFeedback.explanation.join('\n');
+    const feedbackChanged = !sameFeedback(prev, nextFeedback);
     const explanationChanged = String(row.explanation ?? '') !== normalizedEditorExplanation;
     const changed = feedbackChanged || explanationChanged;
     if (!changed) continue;
@@ -250,7 +259,7 @@ async function main() {
     updates.push({
       id: row.id,
       seedKey: row.seed_key,
-      payload: { ...payload, feedback },
+      payload: { ...payload, feedback: nextFeedback },
       explanation: normalizedEditorExplanation,
     });
   }

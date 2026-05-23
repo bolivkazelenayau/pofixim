@@ -197,13 +197,13 @@ function compactCorrectAnswerLine(line: string) {
 
 function normalizeMorphemeMarkdownSpacing(value: string) {
   const joinPrefixSpaces = (part: string) => part
-    .replace(/(^|[^\p{L}])не\s+с\s+(?=\p{Ll})/giu, '$1нес')
     .replace(
       /(^|[^\p{L}])(рас|раз|без|бес|нис|низ|нес|нез|вз|вс|воз|вос|из|ис|под|пред|пре|при|пра|про|транс|контр|суб|супер|сверх)\s+(?=\p{Ll}|\*\*)/giu,
       '$1$2',
     );
   const normalizeMarked = (part: string) => part
     .replace(/(?<!\p{L})рас\s+ч[её]т(?!\p{L})/giu, 'расчёт')
+    .replace(/\*\*([\p{L}])\s+\*\*(?=[\p{L}])/gu, '**$1**')
     .replace(/([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1**$2**')
     .replace(/([\p{L}])\*\*([\p{L}])\*\*\s+(?=[\p{L}])/gu, '$1**$2**')
     .replace(/(^|[^\p{L}])([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1$2**$3**')
@@ -226,6 +226,10 @@ function normalizeAnswerWord(value: string) {
     .replace(/\s+/g, '');
 }
 
+function escapeRegExpLiteral(value: string) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
 function fillOptionBlanks(optionLine: string, correctLine: string) {
   const optionParts = optionLine.split(',').map(s => s.trim());
   const correctWords = correctLine.split(',').map(s => s.trim());
@@ -237,8 +241,8 @@ function fillOptionBlanks(optionLine: string, correctLine: string) {
     const parts = cleanOpt.split(/\.\.+/);
     if (parts.length !== 2) return normalizeAnswerWord(correctWords[i]); 
     const [prefix, suffix] = parts;
-    const escapedPrefix = prefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const escapedSuffix = suffix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedPrefix = escapeRegExpLiteral(prefix);
+    const escapedSuffix = escapeRegExpLiteral(suffix);
     const match = word.match(new RegExp('^' + escapedPrefix + '(.*?)' + escapedSuffix + '$', 'i'));
     if (match) {
       return opt.replace(/\.\.+/, match[1]); 
@@ -256,8 +260,8 @@ function fillOptionBlanksFromLine(optionLine: string, explanationLine: string) {
     const parts = cleanOpt.split(/\.\.+/);
     if (parts.length !== 2) return opt;
     const [prefix, suffix] = parts;
-    const escapedPrefix = prefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const escapedSuffix = suffix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedPrefix = escapeRegExpLiteral(prefix);
+    const escapedSuffix = escapeRegExpLiteral(suffix);
     const match = cleanLine.match(new RegExp(escapedPrefix + '([\\p{L}]*?)' + escapedSuffix, 'iu'));
     return match ? opt.replace(/\.\.+/, match[1]) : opt;
   });
@@ -394,12 +398,13 @@ function buildCorrectAnswerLinesFromOptions(
   targetSet: number[],
   explanationRows: string[] = [],
 ) {
+  const mergedExplanation = explanationRows.join(' ');
   return [...new Set(targetSet)]
     .sort((a, b) => a - b)
     .map((idx) => {
       const option = options[idx - 1]?.trim();
       if (!option) return '';
-      const explanationRow = explanationRows[idx - 1];
+      const explanationRow = explanationRows[idx - 1] ?? mergedExplanation;
       return explanationRow
         ? fillOptionBlanksFromLine(option, explanationRow)
         : option;
@@ -421,8 +426,13 @@ function buildEgeMultiSelectFeedback(
     targetSet,
     rows.answerRows,
   );
-  if (!correctAnswer.length || !rows.explanationRows.length) return null;
-  return { correctAnswer, explanation: rows.explanationRows };
+  if (!correctAnswer.length) return null;
+  return {
+    correctAnswer,
+    explanation: rows.explanationRows.length
+      ? rows.explanationRows
+      : [normalizeMorphemeMarkdownSpacing(explanation)],
+  };
 }
 
 function shouldNormalizeEge10Form(form: Pick<Form, 'type' | 'skillTags'>) {
@@ -451,6 +461,26 @@ function normalizeFormForEditor(form: Form): Form {
 
 function escapeMarkdownParenListMarkers(value: string) {
   return value.replace(/(^|\n)(\s*)(\d+)\)/gu, '$1$2$3\\)');
+}
+
+function getDraftKey(id?: number | string | null) {
+  return id ? `admin_form_draft_${id}` : 'admin_form_draft_new';
+}
+
+function loadFormState(targetId: number | null, baseForm: Form) {
+  const key = getDraftKey(targetId);
+  const draft = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+  if (draft) {
+    try {
+      const parsed = JSON.parse(draft);
+      if (parsed && typeof parsed === 'object') {
+        return normalizeFormForEditor(parsed as Form);
+      }
+    } catch (e) {
+      console.error(`Failed to parse ${key}`, e);
+    }
+  }
+  return normalizeFormForEditor(baseForm);
 }
 
 export default function AdminForm({ initialItems }: AdminFormProps) {
@@ -484,26 +514,16 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   } | null>(null);
 
   useEffect(() => {
-    const draft = localStorage.getItem('admin_form_draft');
-    if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        if (parsed && typeof parsed === 'object') {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setForm(normalizeFormForEditor(parsed as Form));
-          setSelectedId(parsed.id ?? null);
-        }
-      } catch (e) {
-        console.error('Failed to parse admin_form_draft', e);
-      }
-    }
+    setForm(loadFormState(null, EMPTY));
     setIsDraftLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isDraftLoaded) {
-      localStorage.setItem('admin_form_draft', JSON.stringify(form));
-    }
+    if (!isDraftLoaded) return;
+    const timer = setTimeout(() => {
+      localStorage.setItem(getDraftKey(form.id), JSON.stringify(form));
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [form, isDraftLoaded]);
 
   useEffect(() => {
@@ -613,14 +633,19 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
         .filter((v) => Number.isInteger(v) && v > 0 && v <= safeOptions.length);
       const signature = [...new Set(targetSet)].sort((a, b) => a - b).join('');
       const safeTargetSet = targetSet.length ? targetSet : [1];
-      const feedback = buildEgeMultiSelectFeedback(
-        safeOptions,
-        safeTargetSet,
-        base.explanation,
-      );
+      const isEge10 = parsedSkillTags.includes('ege.10');
+      const feedback = isEge10
+        ? buildEgeMultiSelectFeedback(
+            safeOptions,
+            safeTargetSet,
+            base.explanation,
+          )
+        : null;
       candidate = {
         ...base,
-        explanation: normalizeMorphemeMarkdownSpacing(base.explanation),
+        explanation: isEge10
+          ? normalizeMorphemeMarkdownSpacing(base.explanation)
+          : base.explanation,
         payload: {
           options: safeOptions,
           ...(feedback ? { feedback } : {}),
@@ -828,7 +853,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   }, [form, parsedSkillTags, parsedSteps]);
   const previewFeedbackSections = useMemo(() => {
     if (!previewCheckResult) return null;
-    if (form.type === 'ege_multi_select') {
+    if (form.type === 'ege_multi_select' && parsedSkillTags.includes('ege.10')) {
       const previewOptions = form.options.map((v) => v.trim()).filter(Boolean);
       const targetSet = parseIndexCsv(form.multiCorrectOptionIndexes).filter(
         (idx) => idx <= previewOptions.length,
@@ -861,6 +886,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     form.type,
     form.multiCorrectOptionIndexes,
     form.explanation,
+    parsedSkillTags,
   ]);
 
   function answerFeedbackPrefix(isCorrect: boolean) {
@@ -890,7 +916,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
         : undefined;
     setPreviewCheckResult({
       isCorrect: result.isCorrect,
-      text: `${answerFeedbackPrefix(result.isCorrect)}${result.feedback.explanation}${buildStepFeedbackText(
+      text: `${answerFeedbackPrefix(result.isCorrect)}\n\n${result.feedback.explanation}${buildStepFeedbackText(
         result,
         preview.exercise.type,
       )}`,
@@ -1091,7 +1117,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
         ? (item.ege21TargetSet as number[]).join(', ')
         : '',
     };
-    setForm(normalizeFormForEditor(nextForm));
+    setForm(loadFormState(id, nextForm));
     setSelectedId(id);
     setMessage('');
     setIsSeedRegenerateArmed(false);
@@ -1251,7 +1277,8 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
 
     if (res.success) {
       setMessage(isEdit ? 'Изменения сохранены.' : 'Задание создано.');
-      setForm(isEdit ? form : EMPTY);
+      localStorage.removeItem(getDraftKey(form.id));
+      setForm(isEdit ? form : loadFormState(null, EMPTY));
       await refreshList();
     } else {
       setIsError(true);
@@ -1276,7 +1303,8 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     const res = await deleteExerciseAction(form.id!);
     if (res.success) {
       setMessage('Задание удалено.');
-      setForm(EMPTY);
+      localStorage.removeItem(getDraftKey(form.id));
+      setForm(loadFormState(null, EMPTY));
       setSelectedId(null);
       setPreviewCheckResult(null);
       setIsSeedRegenerateArmed(false);
@@ -1291,8 +1319,8 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1400px] gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
+    <div className="mx-auto grid w-full max-w-[1400px] gap-5 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
+      <aside className="flex max-h-[calc(100vh-2rem)] sticky top-4 flex-col rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold">Задания · {totalItems}</h3>
           <button
@@ -1348,7 +1376,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
             </select>
           </div>
         </div>
-        <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
           {groupedItems.map(([type, typeItems]) => (
             <div key={type} className="space-y-2">
               <div className="sticky top-0 z-10 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
@@ -1399,7 +1427,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
             type="button"
             className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
             onClick={() => {
-              setForm(EMPTY);
+              setForm(loadFormState(null, EMPTY));
               setSelectedId(null);
               setMessage('');
               setIsSeedRegenerateArmed(false);
