@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 type MessageBubbleProps = {
   content: string;
@@ -38,6 +39,12 @@ function escapeMarkdownParenListMarkers(value: string) {
   return value.replace(/(^|\n)(\s*)(\d+)\)/gu, '$1$2$3\\)');
 }
 
+function renderEditorMarkdown(value: string) {
+  return value
+    .replace(/==([\s\S]+?)==/g, '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>')
+    .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
+}
+
 export default function MessageBubble({ content, isBot, isQuestion }: MessageBubbleProps) {
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
   const sections = useMemo(
@@ -66,22 +73,22 @@ export default function MessageBubble({ content, isBot, isQuestion }: MessageBub
       >
         {sections ? (
           <div className="space-y-3">
-            {sections.lead ? <ReactMarkdown>{sections.lead}</ReactMarkdown> : null}
+            {sections.lead ? <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.lead)}</ReactMarkdown> : null}
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
                 Правильный ответ
               </div>
-              <ReactMarkdown>{sections.correctAnswer}</ReactMarkdown>
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.correctAnswer)}</ReactMarkdown>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
                 Объяснение
               </div>
-              <ReactMarkdown>{escapeMarkdownParenListMarkers(sections.explanation)}</ReactMarkdown>
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(escapeMarkdownParenListMarkers(sections.explanation))}</ReactMarkdown>
             </div>
           </div>
         ) : (
-          <ReactMarkdown>{markdownContent}</ReactMarkdown>
+          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(markdownContent)}</ReactMarkdown>
         )}
       </div>
     </motion.div>

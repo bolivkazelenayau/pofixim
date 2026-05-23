@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
+import { commands, type ICommand } from '@uiw/react-md-editor';
+import rehypeRaw from 'rehype-raw';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
 import {
@@ -24,6 +26,105 @@ import {
 import { EXERCISE_TYPES, type ExerciseCategory } from '@/features/exercises/types';
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
+
+type TextSelState = {
+  selectedText: string;
+  text: string;
+  selection: { start: number; end: number };
+};
+
+type TextApi = {
+  replaceSelection: (text: string) => void;
+  setSelectionRange: (range: { start: number; end: number }) => TextSelState;
+};
+
+type ActiveMarks = {
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+  underline: boolean;
+  doubleUnderline: boolean;
+};
+
+const EMPTY_ACTIVE_MARKS: ActiveMarks = {
+  bold: false,
+  italic: false,
+  strike: false,
+  underline: false,
+  doubleUnderline: false,
+};
+
+function renderEditorMarkdown(value: string) {
+  return value
+    .replace(/==([\s\S]+?)==/g, '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>')
+    .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
+}
+
+function isWrappedSelection(state: TextSelState, prefix: string, suffix = prefix) {
+  const { start, end } = state.selection;
+  if (start < prefix.length || end + suffix.length > state.text.length) return false;
+  return (
+    state.text.slice(start - prefix.length, start) === prefix
+    && state.text.slice(end, end + suffix.length) === suffix
+  );
+}
+
+function toggleWrapSelection(state: TextSelState, api: TextApi, prefix: string, suffix = prefix) {
+  if (isWrappedSelection(state, prefix, suffix)) {
+    const start = state.selection.start - prefix.length;
+    const end = state.selection.end + suffix.length;
+    api.setSelectionRange({ start, end });
+    api.replaceSelection(state.selectedText);
+    return;
+  }
+  const content = state.selectedText || 'текст';
+  api.replaceSelection(`${prefix}${content}${suffix}`);
+}
+
+function getActiveMarksFromState(state: TextSelState): ActiveMarks {
+  const sample = state.selectedText.length > 0
+    ? state.selectedText
+    : state.text.slice(Math.max(0, state.selection.start - 24), Math.min(state.text.length, state.selection.end + 24));
+  return {
+    bold: isWrappedSelection(state, '**') || /\*\*[\s\S]+?\*\*/.test(sample),
+    italic: isWrappedSelection(state, '*') || /\*[\s\S]+?\*/.test(sample),
+    strike: isWrappedSelection(state, '~~') || /~~[\s\S]+?~~/.test(sample),
+    underline: isWrappedSelection(state, '++') || /\+\+[\s\S]+?\+\+/.test(sample),
+    doubleUnderline: isWrappedSelection(state, '==') || /==[\s\S]+?==/.test(sample),
+  };
+}
+
+function commandButtonClass(active: boolean) {
+  return active ? 'wmde-markdown-active' : undefined;
+}
+
+function makeToggleCommand(
+  name: string,
+  keyCommand: string,
+  label: string,
+  title: string,
+  prefix: string,
+  active: boolean,
+): ICommand {
+  return {
+    name,
+    keyCommand,
+    buttonProps: {
+      'aria-label': title,
+      title,
+      className: commandButtonClass(active),
+    },
+    icon: <span style={{ fontSize: 12 }}>{label}</span>,
+    execute: (state, api) => toggleWrapSelection(state as TextSelState, api as TextApi, prefix),
+  };
+}
+
+const markdownExtraCommands = [
+  commands.codeEdit,
+  commands.codeLive,
+  commands.codePreview,
+  commands.fullscreen,
+];
 
 const categories: ExerciseCategory[] = ['orthography', 'punctuation', 'mixed'];
 const qualityStatuses = ['draft', 'review', 'approved', 'archived'] as const;
@@ -514,6 +615,30 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     correctAnswer?: string;
     detailedExplanation?: string;
   } | null>(null);
+  const historyPastRef = useRef<Form[]>([]);
+  const historyFutureRef = useRef<Form[]>([]);
+  const suppressHistoryRef = useRef(false);
+  const lastSnapshotRef = useRef('');
+  const initializedFromUrlRef = useRef(false);
+  const [activeMarks, setActiveMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
+
+  const markdownCommands = useMemo<ICommand[]>(() => ([
+    makeToggleCommand('bold', 'bold', 'B', 'Жирный', '**', activeMarks.bold),
+    makeToggleCommand('italic', 'italic', 'I', 'Курсив', '*', activeMarks.italic),
+    makeToggleCommand('strikethrough', 'strikethrough', 'S', 'Зачёркнутый', '~~', activeMarks.strike),
+    makeToggleCommand('underline', 'underline', 'U', 'Подчёркнутый', '++', activeMarks.underline),
+    makeToggleCommand('doubleUnderline', 'doubleUnderline', 'UU', 'Двойное подчёркивание', '==', activeMarks.doubleUnderline),
+    commands.hr,
+    commands.divider,
+    commands.link,
+    commands.quote,
+    commands.code,
+    commands.image,
+    commands.divider,
+    commands.unorderedListCommand,
+    commands.orderedListCommand,
+    commands.checkedListCommand,
+  ]), [activeMarks]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -528,6 +653,45 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     }, 1000);
     return () => clearTimeout(timer);
   }, [form, isDraftLoaded]);
+
+  useEffect(() => {
+    if (!isDraftLoaded) return;
+    const snapshot = JSON.stringify(form);
+    if (!lastSnapshotRef.current) {
+      lastSnapshotRef.current = snapshot;
+      historyPastRef.current = [JSON.parse(snapshot) as Form];
+      historyFutureRef.current = [];
+      return;
+    }
+    if (suppressHistoryRef.current) {
+      suppressHistoryRef.current = false;
+      lastSnapshotRef.current = snapshot;
+      return;
+    }
+    if (snapshot === lastSnapshotRef.current) return;
+    historyPastRef.current.push(JSON.parse(snapshot) as Form);
+    if (historyPastRef.current.length > 120) {
+      historyPastRef.current.shift();
+    }
+    historyFutureRef.current = [];
+    lastSnapshotRef.current = snapshot;
+  }, [form, isDraftLoaded]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (form.id) {
+      url.searchParams.set('id', String(form.id));
+      url.searchParams.set('slug', slugFromPrompt(form.prompt));
+    } else {
+      url.searchParams.delete('id');
+      url.searchParams.delete('slug');
+    }
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState(window.history.state, '', nextUrl);
+    }
+  }, [form.id, form.prompt]);
 
   useEffect(() => {
     const baseTitle = 'Админка ЕГЭ';
@@ -565,6 +729,16 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     () => ['all', ...Array.from({ length: 13 }, (_, i) => String(i + 9))],
     [],
   );
+
+  function updateActiveMarksFromTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLTextAreaElement)) return;
+    const nextState: TextSelState = {
+      text: target.value,
+      selectedText: target.value.slice(target.selectionStart, target.selectionEnd),
+      selection: { start: target.selectionStart, end: target.selectionEnd },
+    };
+    setActiveMarks(getActiveMarksFromState(nextState));
+  }
 
   function examTypeOf(item: ListItem) {
     for (const tag of item.skillTags ?? []) {
@@ -1040,6 +1214,17 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isDraftLoaded || initializedFromUrlRef.current) return;
+    initializedFromUrlRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const rawId = params.get('id');
+    const id = rawId ? Number(rawId) : NaN;
+    if (Number.isInteger(id) && id > 0) {
+      void loadExercise(id);
+    }
+  }, [isDraftLoaded]);
+
   async function loadExercise(id: number) {
     const res = await getExerciseByIdAction(id);
     if (!res.success || !res.item) return;
@@ -1155,6 +1340,27 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
           v.afterTokenIndex >= 0 &&
           v.mark.length > 0,
       );
+  }
+
+  function applyHistoryState(next: Form) {
+    suppressHistoryRef.current = true;
+    setForm(next);
+  }
+
+  function undoForm() {
+    if (historyPastRef.current.length <= 1) return;
+    const current = historyPastRef.current.pop();
+    if (!current) return;
+    historyFutureRef.current.unshift(current);
+    const previous = historyPastRef.current[historyPastRef.current.length - 1];
+    if (previous) applyHistoryState(previous);
+  }
+
+  function redoForm() {
+    const next = historyFutureRef.current.shift();
+    if (!next) return;
+    historyPastRef.current.push(next);
+    applyHistoryState(next);
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -1436,19 +1642,37 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
           <h2 className="text-xl font-semibold text-slate-900">
             {isEdit ? 'Редактирование задания' : 'Создание задания'}
           </h2>
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-            onClick={() => {
-              setForm(loadFormState(null, EMPTY));
-              setSelectedId(null);
-              setMessage('');
-              setIsSeedRegenerateArmed(false);
-              setShowSeedRegenerateModal(false);
-            }}
-          >
-            Новый черновик
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              onClick={undoForm}
+              title="Undo"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              onClick={redoForm}
+              title="Redo"
+            >
+              Redo
+            </button>
+            <button
+              type="button"
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              onClick={() => {
+                setForm(loadFormState(null, EMPTY));
+                setSelectedId(null);
+                setMessage('');
+                setIsSeedRegenerateArmed(false);
+                setShowSeedRegenerateModal(false);
+              }}
+            >
+              Новый черновик
+            </button>
+          </div>
         </div>
 
         {message && (
@@ -1464,7 +1688,11 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
         )}
 
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
-          <form onSubmit={onSubmit}>
+          <form
+            onSubmit={onSubmit}
+            onMouseUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
+            onKeyUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
+          >
             <div className="grid gap-3 sm:grid-cols-3">
               <Input label="Тип">
                 <select
@@ -1546,18 +1774,28 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
               <div className="mb-1 text-sm font-medium text-slate-700">Формулировка</div>
               <MDEditor
                 value={form.prompt}
-                onChange={(val) => setForm((f) => ({ ...f, prompt: val || '' }))}
+                onChange={(val, event) => {
+                  setForm((f) => ({ ...f, prompt: val || '' }));
+                  updateActiveMarksFromTarget(event?.target ?? null);
+                }}
                 data-color-mode="light"
                 className="w-full"
+                commands={markdownCommands}
+                extraCommands={markdownExtraCommands}
               />
             </div>
             <div className="mt-3">
               <div className="mb-1 text-sm font-medium text-slate-700">Объяснение</div>
               <MDEditor
                 value={form.explanation}
-                onChange={(val) => setForm((f) => ({ ...f, explanation: val || '' }))}
+                onChange={(val, event) => {
+                  setForm((f) => ({ ...f, explanation: val || '' }));
+                  updateActiveMarksFromTarget(event?.target ?? null);
+                }}
                 data-color-mode="light"
                 className="w-full"
+                commands={markdownCommands}
+                extraCommands={markdownExtraCommands}
               />
             </div>
 
@@ -1974,7 +2212,7 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
             ) : preview.exercise ? (
               <div className={previewMode === 'mobile' ? 'mx-auto w-[320px] max-w-full' : 'w-full'}>
                 <div className="mb-2 rounded-xl bg-white px-4 py-3 text-sm text-slate-800 shadow-sm [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0">
-                  <ReactMarkdown>{preview.exercise.prompt}</ReactMarkdown>
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(preview.exercise.prompt)}</ReactMarkdown>
                 </div>
                 <ExerciseRenderer exercise={preview.exercise} onSubmit={handlePreviewSubmit} />
                 {previewCheckResult && (
@@ -1988,25 +2226,25 @@ export default function AdminForm({ initialItems }: AdminFormProps) {
                     {previewFeedbackSections ? (
                       <div className="space-y-3">
                         {previewFeedbackSections.lead ? (
-                          <ReactMarkdown>{previewFeedbackSections.lead}</ReactMarkdown>
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.lead)}</ReactMarkdown>
                         ) : null}
                         <div className="rounded-xl border border-emerald-200 bg-emerald-100/60 px-3 py-2">
                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
                             Правильный ответ
                           </div>
-                          <ReactMarkdown>{previewFeedbackSections.correctAnswer}</ReactMarkdown>
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.correctAnswer)}</ReactMarkdown>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
                             Объяснение
                           </div>
-                          <ReactMarkdown>
-                            {escapeMarkdownParenListMarkers(previewFeedbackSections.explanation)}
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                            {renderEditorMarkdown(escapeMarkdownParenListMarkers(previewFeedbackSections.explanation))}
                           </ReactMarkdown>
                         </div>
                       </div>
                     ) : (
-                      <ReactMarkdown>{previewCheckResult.text}</ReactMarkdown>
+                      <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewCheckResult.text)}</ReactMarkdown>
                     )}
                   </div>
                 )}
@@ -2108,4 +2346,5 @@ function parseEge21SentencesText(raw: string): Array<{ index: number; text: stri
 
   return out.sort((a, b) => a.index - b.index);
 }
+
 

@@ -43,3 +43,7 @@ body {
   background-clip: padding-box;
   background-color: rgba(61, 83, 128, 0.32);
 }
+u,
+span[style*='text-decoration'] {
+  text-decoration-skip-ink: none;
+}
