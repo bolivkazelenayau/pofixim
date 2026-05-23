@@ -1,0 +1,34 @@
+{
+  "taskType": 10,
+  "source": "ege_2026_orthography_for_codex.md",
+  "sourceSections": [
+    "4.1",
+    "4.2",
+    "4.3",
+    "9",
+    "10"
+  ],
+  "requiredThemePatterns": [
+    "пристав",
+    "пре",
+    "при",
+    "ы/и",
+    "ъ",
+    "ь",
+    "з/с"
+  ],
+  "forbiddenOptionPatterns": [
+    "привед",
+    "ответ:",
+    "правило:",
+    "источник:",
+    "—",
+    "_"
+  ],
+  "constraints": {
+    "expectedOptionsCount": 5,
+    "minPromptLength": 40,
+    "minExplanationLength": 80
+  }
+}
+

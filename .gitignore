@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local test data and scratch files
+test-regex.js
+test_sources/**/*.log
+test_sources/raw_live/
+test_sources/parsed_live/
+
+# editors
+.vscode/
+.idea/

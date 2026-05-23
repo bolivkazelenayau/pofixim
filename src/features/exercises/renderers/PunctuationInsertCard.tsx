@@ -1,0 +1,114 @@
+'use client';
+
+import { useState } from 'react';
+import { motion } from 'motion/react';
+import type { PunctuationInsertExercise, SubmittedAnswer } from '../schemas';
+import type { PunctuationMark } from '../types';
+
+type PunctuationInsertCardProps = {
+  exercise: PunctuationInsertExercise;
+  disabled?: boolean;
+  onSubmit: (answer: SubmittedAnswer, answerLabel: string) => void;
+};
+
+type PlacedMark = {
+  afterTokenIndex: number;
+  mark: PunctuationMark;
+};
+
+export default function PunctuationInsertCard({
+  exercise,
+  disabled,
+  onSubmit,
+}: PunctuationInsertCardProps) {
+  const [marks, setMarks] = useState<PlacedMark[]>([]);
+  const primaryMark = exercise.payload.allowedMarks[0] ?? ',';
+
+  const toggleMark = (afterTokenIndex: number) => {
+    if (disabled) return;
+
+    setMarks((current) => {
+      const alreadyPlaced = current.some(
+        (mark) =>
+          mark.afterTokenIndex === afterTokenIndex && mark.mark === primaryMark,
+      );
+
+      if (alreadyPlaced) {
+        return current.filter(
+          (mark) =>
+            !(
+              mark.afterTokenIndex === afterTokenIndex &&
+              mark.mark === primaryMark
+            ),
+        );
+      }
+
+      return [...current, { afterTokenIndex, mark: primaryMark }];
+    });
+  };
+
+  const sortedMarks = [...marks].sort(
+    (a, b) => a.afterTokenIndex - b.afterTokenIndex,
+  );
+
+  return (
+    <div className="mt-2 mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
+        Выбери место для знака препинания
+      </p>
+
+      <div className="flex flex-wrap items-center gap-y-1.5 text-[17px] font-semibold leading-7 text-slate-800">
+        {exercise.payload.tokens.map((token, idx) => {
+          const hasMark = marks.some(
+            (mark) =>
+              mark.afterTokenIndex === idx && mark.mark === primaryMark,
+          );
+          const isLast = idx === exercise.payload.tokens.length - 1;
+
+          return (
+            <span key={`${token}-${idx}`} className="inline-flex items-center">
+              <span>{token}</span>
+              {!isLast && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => toggleMark(idx)}
+                  className={`mx-1 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-sm font-black transition ${
+                    hasMark
+                      ? 'border-amber-400 bg-amber-100 text-amber-800 shadow-inner'
+                      : 'border-dashed border-slate-300 bg-slate-50 text-slate-300 hover:border-amber-300 hover:text-amber-500'
+                  } disabled:opacity-60`}
+                  aria-label={`Поставить знак после слова ${token}`}
+                >
+                  {hasMark ? primaryMark : '·'}
+                </button>
+              )}
+            </span>
+          );
+        })}
+      </div>
+
+      <motion.button
+        whileTap={!disabled ? { scale: 0.98 } : {}}
+        disabled={disabled}
+        onClick={() => {
+          let label = '';
+          exercise.payload.tokens.forEach((token, idx) => {
+            label += token;
+            const mark = sortedMarks.find((m) => m.afterTokenIndex === idx);
+            if (mark) {
+              label += mark.mark;
+            }
+            if (idx < exercise.payload.tokens.length - 1) {
+              label += ' ';
+            }
+          });
+          onSubmit({ type: 'punctuation_insert', marks: sortedMarks }, label);
+        }}
+        className="mt-5 w-full rounded-xl bg-[#3390EC] px-5 py-3 font-bold text-white shadow-sm transition hover:bg-[#2A7BCA] disabled:cursor-not-allowed disabled:bg-slate-300"
+      >
+        Проверить пунктуацию
+      </motion.button>
+    </div>
+  );
+}

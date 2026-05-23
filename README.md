@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PoFixim: Платформа подготовки к ЕГЭ
 
-## Getting Started
+PoFixim — это платформа для хранения, парсинга, валидации и адаптивной выдачи заданий ЕГЭ (с акцентом на типы 9–21). Проект поддерживает автоматический харвестинг (ingest) заданий как из локальных Markdown-файлов, так и напрямую с live-источников (например, РешуЕГЭ), с последующей нормализацией, дедупликацией и умной выдачей пользователю.
 
-First, run the development server:
+Стек технологий:
+- **Next.js** (App Router, Server Actions, UI)
+- **PostgreSQL + Drizzle ORM** (База данных)
+- **Zod** (Строгая валидация домена)
+- **Zustand** (Клиентское состояние)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Архитектура проекта
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Доменные типы заданий
+Поддерживаются сложные форматы заданий:
+- `multiple_choice`, `ege_multi_select`, `fill_blank`, `punctuation_insert`, `ege20_complex_sentence_punctuation`, `ege21_punctuation_analysis`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. База данных и целостность
+Ключевые таблицы: `exercises`, `exercise_attempts`, `learning_sessions`, `skill_progress`.
+- **Дедупликация:** Импорт идет через `ON CONFLICT (seed_key) DO UPDATE`.
+- **In-batch дедуп:** По семантическому fingerprint.
+- **Anti-repeat:** Алгоритм выдачи исключает недавно виденные задания и их семантические дубли.
 
-## Learn More
+### 3. Выдача заданий (Matchmaking)
+Алгоритм учитывает сложность, тип и историю попыток ученика. 
+Полностью исключает повторения на основе `exerciseId` и семантического `exerciseFingerprint`.
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Проверка ответов
+Централизованный чекер (`CheckResult`) возвращает нормализованный ответ, список ошибок, подробный фидбек (feedback) и изменение рейтинга (score delta).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5. Ingest / Harvest Pipeline (2-этапный сбор данных)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Этап A: Harvest + Parse + Validation**
+- Сбор сырого HTML с live-источников через автоматизированный headless браузер.
+- Парсинг HTML с помощью детерминированного обхода дерева (учет вложенных `<div>` и сохранение параграфов).
+- Выгрузка в валидированные JSONL форматы (со строгим режимом: при невалидных данных процесс падает).
 
-## Deploy on Vercel
+**Этап B: Validated JSON -> Exercises (Seed)**
+- Маппинг валидированных JSONL в доменную структуру БД.
+- Автоматическое извлечение ответов из текстовых объяснений на основе вариантов с помощью Regex.
+- Upsert в базу данных с защитой от дублей.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 6. Админка и DX
+Встроенная админ-панель позволяет:
+- Создавать и редактировать задачи.
+- Просматривать Live Preview.
+- Управлять статусом качества (Quality Gate) и активностью (`isActive`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## CLI Команды
+
+- `npm run harvest:ege -- --types 15 --source live --count 1` — собрать сырые данные.
+- `npm run harvest:ege:parse-live` — распарсить собранные данные.
+- `npm run db:seed:ege-live` — загрузить распарсенные данные в БД.
+- `npm run db:seed:ege9-21` — загрузка локальных заданий из Markdown.
+
+Отладочные переменные:
+- `HARVEST_HEADLESS=false`
+- `HARVEST_DEBUG_FILL_ONLY=true`
