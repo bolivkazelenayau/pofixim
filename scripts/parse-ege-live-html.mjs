@@ -80,7 +80,9 @@ const BLOCK_TAGS = new Set([
 
 function normalizeTextChars(value) {
   return value
-    .replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '')
+    // Preserve soft hyphen as marker for safe line-wrap joins in normalizeBlockText.
+    .replace(/\u00ad/g, '\ue000')
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
     .replace(/[\u00a0\u202f]/g, ' ');
 }
 
@@ -96,7 +98,10 @@ function normalizeBlockText(value) {
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t\f]+/g, ' ')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
-    .replace(/([A-Za-zА-Яа-яЁё])\n([a-zа-яё])/g, '$1$2')
+    // Safe joins only: explicit hyphenation markers at line boundary.
+    .replace(/([A-Za-zА-Яа-яЁё])\ue000\n([A-Za-zА-Яа-яЁё])/g, '$1$2')
+    .replace(/([A-Za-zА-Яа-яЁё])-\n([A-Za-zА-Яа-яЁё])/g, '$1$2')
+    .replace(/\ue000/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+([.,;:!?])/g, '$1')
     .trim();

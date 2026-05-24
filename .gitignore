@@ -45,6 +45,7 @@ test-regex.js
 test_sources/**/*.log
 test_sources/raw_live/
 test_sources/parsed_live/
+/backups/
 
 # editors
 .vscode/

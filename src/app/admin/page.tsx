@@ -20,6 +20,7 @@ const getAdminInitialListCached = unstable_cache(
         skillTags: exercises.skillTags,
         seedKey: exercises.seedKey,
         prompt: exercises.prompt,
+        explanation: exercises.explanation,
         qualityStatus: exercises.qualityStatus,
         updatedAt: exercises.updatedAt,
         isActive: exercises.isActive,
@@ -54,6 +55,7 @@ async function fetchAdminInitialListDirect() {
       skillTags: exercises.skillTags,
       seedKey: exercises.seedKey,
       prompt: exercises.prompt,
+      explanation: exercises.explanation,
       qualityStatus: exercises.qualityStatus,
       updatedAt: exercises.updatedAt,
       isActive: exercises.isActive,
@@ -76,6 +78,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     skillTags: string[];
     seedKey: string | null;
     prompt: string;
+    explanation: string;
     qualityStatus: string;
     updatedAt: Date | string;
     isActive: boolean;
@@ -103,6 +106,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     skillTags: row.skillTags,
     seedKey: row.seedKey,
     prompt: row.prompt,
+    explanation: row.explanation,
     qualityStatus: row.qualityStatus,
     updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : new Date(row.updatedAt).toISOString(),
     isActive: row.isActive,

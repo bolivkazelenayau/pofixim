@@ -14,6 +14,7 @@ import {
  deleteExerciseAction,
  getExerciseByIdAction,
   listExercisesAction,
+ previewRawNormalizationAction,
  updateExerciseAction,
  type ExerciseEditorInput,
 } from '@/app/actions/admin';
@@ -274,9 +275,29 @@ type ListItem = {
  skillTags: string[];
  seedKey: string | null;
  prompt: string;
+ explanation: string;
  qualityStatus: string;
  updatedAt: string;
- isActive: boolean;
+  isActive: boolean;
+};
+
+type RawPreviewItem = {
+  file: string;
+  beforeIssues: {
+    spacesBeforePunct: number;
+    softHyphen: number;
+    zeroWidth: number;
+    tripleBreaks: number;
+  };
+  afterIssues: {
+    spacesBeforePunct: number;
+    softHyphen: number;
+    zeroWidth: number;
+    tripleBreaks: number;
+  };
+  changed: boolean;
+  beforeSnippet: string;
+  afterSnippet: string;
 };
 
 type AdminFormProps = {
@@ -857,16 +878,20 @@ const [listTypeFilter, setListTypeFilter] = useState<string>('all');
 const [listStatusFilter, setListStatusFilter] = useState<string>('all');
 const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
 const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>('id');
-const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>('asc');
+const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>('desc');
 const [sortPrefsReady, setSortPrefsReady] = useState(false);
  const [multiSelectedIds, setMultiSelectedIds] = useState<number[]>([]);
  const [lastMultiSelectedId, setLastMultiSelectedId] = useState<number | null>(null);
  const [selectionMode, setSelectionMode] = useState(false);
  const [showMoreBatchActions, setShowMoreBatchActions] = useState(false);
- const [batchStatus, setBatchStatus] = useState<(typeof qualityStatuses)[number]>('review');
- const [batchIsActive, setBatchIsActive] = useState<'active' | 'inactive'>('active');
- const [batchSaving, setBatchSaving] = useState(false);
- const [previewCheckResult, setPreviewCheckResult] = useState<{
+const [batchStatus, setBatchStatus] = useState<(typeof qualityStatuses)[number]>('review');
+const [batchIsActive, setBatchIsActive] = useState<'active' | 'inactive'>('active');
+const [batchSaving, setBatchSaving] = useState(false);
+const [rawPreviewFilter, setRawPreviewFilter] = useState('');
+const [rawPreviewLimit, setRawPreviewLimit] = useState(3);
+const [rawPreviewLoading, setRawPreviewLoading] = useState(false);
+const [rawPreviewItems, setRawPreviewItems] = useState<RawPreviewItem[]>([]);
+const [previewCheckResult, setPreviewCheckResult] = useState<{
  isCorrect: boolean;
  text: string;
  correctAnswer?: string;
@@ -882,7 +907,7 @@ const [sortPrefsReady, setSortPrefsReady] = useState(false);
 const autosaveRetryTimerRef = useRef<number | null>(null);
 const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
 const initialTargetIdRef = useRef<number | null>(initialSelectedId);
-const skipInitialListRefreshRef = useRef(initialItems.length > 0);
+const skipInitialListRefreshRef = useRef(false);
 const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
@@ -1085,16 +1110,20 @@ useEffect(() => {
  }
 
  const filteredItems = useMemo(() => {
- const q = listQuery.trim().toLowerCase();
+ const q = normalizeSearchText(listQuery);
  const filtered = items.filter((item) => {
  if (listTypeFilter !== 'all' && item.type !== listTypeFilter) return false;
  if (listStatusFilter !== 'all' && item.qualityStatus !== listStatusFilter) return false;
  if (listExamTypeFilter !== 'all' && examTypeOf(item) !== listExamTypeFilter) return false;
  if (!q) return true;
+ const seedNorm = normalizeSearchText(item.seedKey ?? '');
+ const promptNorm = normalizeSearchText(item.prompt);
+ const explanationNorm = normalizeSearchText(item.explanation ?? '');
  return (
  String(item.id).includes(q) ||
- (item.seedKey ?? '').toLowerCase().includes(q) ||
- item.prompt.toLowerCase().includes(q)
+ seedNorm.includes(q) ||
+ promptNorm.includes(q) ||
+ explanationNorm.includes(q)
  );
  });
  return [...filtered].sort((a, b) => {
@@ -1518,6 +1547,7 @@ useEffect(() => {
  async function loadMore() {
  if (!hasMore || loadingMore) return;
  setLoadingMore(true);
+ try {
  const res = await listExercisesAction({
  limit: 150,
  offset: nextOffset,
@@ -1551,7 +1581,9 @@ useEffect(() => {
  setIsError(true);
  setMessage(res.error || 'Ошибка подгрузки списка.');
  }
+ } finally {
  setLoadingMore(false);
+ }
  }
 
 useEffect(() => {
@@ -1673,6 +1705,24 @@ useEffect(() => {
  setMessage(res.error || 'Ошибка массового обновления.');
  }
  setBatchSaving(false);
+ }
+
+ async function runRawPreviewAudit() {
+ if (rawPreviewLoading) return;
+ setRawPreviewLoading(true);
+ setIsError(false);
+ setMessage('');
+ const res = await previewRawNormalizationAction({
+ fileFilter: rawPreviewFilter,
+ limit: rawPreviewLimit,
+ });
+ if (res.success) {
+ setRawPreviewItems((res.items as RawPreviewItem[]) ?? []);
+ } else {
+ setIsError(true);
+ setMessage(res.error || 'Не удалось просканировать raw HTML.');
+ }
+ setRawPreviewLoading(false);
  }
 
  async function applyBatchActivity() {
@@ -2238,8 +2288,56 @@ useEffect(() => {
               <div className="h-full w-full rounded-lg border border-stroke bg-surface animate-pulse" />
             )}
           </div>
+
+          <div className="rounded-lg border border-stroke bg-surface p-2">
+            <div className="mb-2 text-xs font-semibold text-foreground/80">Raw HTML Preview</div>
+            <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
+              <input
+                className={inputClass}
+                placeholder="Фильтр файла (напр. 56151015)"
+                value={rawPreviewFilter}
+                onChange={(e) => setRawPreviewFilter(e.target.value)}
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                max={20}
+                value={rawPreviewLimit}
+                onChange={(e) => setRawPreviewLimit(Math.max(1, Math.min(20, Number(e.target.value) || 3)))}
+              />
+            </div>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface disabled:opacity-60"
+              onClick={() => void runRawPreviewAudit()}
+              disabled={rawPreviewLoading}
+            >
+              {rawPreviewLoading ? 'Сканирование...' : 'Сканировать raw HTML'}
+            </button>
+            {rawPreviewItems.length > 0 ? (
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+                {rawPreviewItems.map((item) => (
+                  <div key={item.file} className="rounded-md border border-stroke bg-surface-strong p-2 text-xs">
+                    <div className="font-semibold text-foreground/80">{item.file}</div>
+                    <div className="mt-1 text-foreground/70">
+                      пробелы-перед-пунктуацией: {item.beforeIssues.spacesBeforePunct} → {item.afterIssues.spacesBeforePunct}
+                    </div>
+                    <div className="mt-1 grid gap-1">
+                      <div className="rounded border border-stroke bg-surface p-1 text-foreground/70">
+                        <span className="font-medium">До:</span> {item.beforeSnippet}
+                      </div>
+                      <div className="rounded border border-stroke bg-surface p-1 text-foreground/70">
+                        <span className="font-medium">После:</span> {item.afterSnippet}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
- <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
  {groupedItems.map(([type, typeItems]) => (
  <div key={type} className="space-y-2">
  <div className="sticky top-0 z-10 rounded-md border border-stroke bg-surface px-2 py-1 text-xs font-semibold text-foreground/80">
@@ -3031,6 +3129,15 @@ function parseIndexCsv(raw: string) {
  .split(',')
  .map((v) => Number(v.trim()))
  .filter((v) => Number.isInteger(v) && v > 0);
+}
+
+function normalizeSearchText(input: string) {
+ return String(input ?? '')
+ .toLowerCase()
+ .replace(/\u00ad/g, '')
+ .replace(/[*_`~[\]()<>{}|\\]/g, '')
+ .replace(/\s+/g, ' ')
+ .trim();
 }
 
 function parseEge21SentencesText(raw: string): Array<{ index: number; text: string }> {
