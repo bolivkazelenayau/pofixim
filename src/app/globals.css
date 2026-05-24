@@ -199,6 +199,14 @@ span[style*='text-decoration'] {
   --color-border-default: var(--stroke) !important;
 }
 
+/* Slightly increase readability in editable (left) markdown pane */
+.w-md-editor-text-input,
+.w-md-editor-text-pre,
+.w-md-editor-text-pre > code {
+  line-height: 1.58 !important;
+  letter-spacing: 0.012em !important;
+}
+
 ins.du {
   text-decoration-line: underline;
   text-decoration-style: double;
