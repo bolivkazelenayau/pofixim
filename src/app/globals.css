@@ -41,6 +41,13 @@ body {
   text-rendering: geometricPrecision;
 }
 
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -211,4 +218,19 @@ ins.du {
   text-decoration-line: underline;
   text-decoration-style: double;
   text-decoration-skip-ink: none;
+}
+
+@keyframes admin-md-skeleton-pulse {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+
+.admin-md-skeleton-bar,
+.admin-md-skeleton-panel {
+  animation: admin-md-skeleton-pulse 0.4s ease-in-out infinite;
+}
+
+.admin-md-skeleton-panel {
+  animation-delay: 0.08s;
 }

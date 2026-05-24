@@ -1,7 +1,7 @@
 'use server';
 
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { and, desc, eq, inArray, lt, ne, sql } from 'drizzle-orm';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { db } from '@/db';
 import { exerciseAttempts, exercises } from '@/db/schema';
 import { exerciseSchema } from '@/features/exercises/schemas';
@@ -620,6 +620,7 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
       })
       .returning({ id: exercises.id });
 
+    revalidateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true, id: inserted[0]?.id };
@@ -704,6 +705,7 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
       return { success: false, error: 'Exercise not found' };
     }
 
+    revalidateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
@@ -728,6 +730,7 @@ export async function deleteExerciseAction(id: number) {
       return { success: false, error: 'Exercise not found' };
     }
 
+    revalidateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
@@ -754,6 +757,7 @@ export async function batchUpdateExercisesMetaAction(input: {
     if (typeof input.isActive !== 'undefined') patch.isActive = input.isActive;
 
     await db.update(exercises).set(patch).where(inArray(exercises.id, ids));
+    revalidateTag('admin:list');
     revalidatePath('/admin');
     return { success: true, updated: ids.length };
   } catch (error) {
@@ -765,10 +769,15 @@ export async function batchUpdateExercisesMetaAction(input: {
 type ListExercisesParams = {
   limit?: number;
   offset?: number;
+  cursorId?: number;
+  cursorUpdatedAt?: string;
   query?: string;
   type?: string;
   qualityStatus?: string;
   examType?: string;
+  sortBy?: 'id' | 'updatedAt';
+  sortDir?: 'asc' | 'desc';
+  includeTotal?: boolean;
 };
 
 export async function getExerciseTypeOptionsAction() {
@@ -791,10 +800,15 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
   try {
     const normalizedLimit = Math.max(1, Math.min(params.limit ?? 100, 500));
     const normalizedOffset = Math.max(0, params.offset ?? 0);
+    const cursorId = Number(params.cursorId ?? NaN);
+    const cursorUpdatedAt = (params.cursorUpdatedAt ?? '').trim();
     const query = (params.query ?? '').trim();
     const type = (params.type ?? 'all').trim();
     const qualityStatus = (params.qualityStatus ?? 'all').trim();
     const examType = (params.examType ?? 'all').trim();
+    const sortBy = params.sortBy === 'updatedAt' ? 'updatedAt' : 'id';
+    const sortDir = params.sortDir === 'asc' ? 'asc' : 'desc';
+    const includeTotal = Boolean(params.includeTotal);
 
     const whereParts = [sql`${exercises.id} is not null`];
     if (type !== 'all') whereParts.push(eq(exercises.type, type as typeof exercises.type._.data));
@@ -818,14 +832,26 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
         )`,
       );
     }
+    if (sortBy === 'id' && Number.isInteger(cursorId) && cursorId > 0) {
+      if (sortDir === 'desc') whereParts.push(lt(exercises.id, cursorId));
+      else whereParts.push(sql`${exercises.id} > ${cursorId}`);
+    }
+    if (sortBy === 'updatedAt' && Number.isInteger(cursorId) && cursorId > 0 && cursorUpdatedAt) {
+      const cursorDate = new Date(cursorUpdatedAt);
+      if (!Number.isNaN(cursorDate.getTime())) {
+        if (sortDir === 'desc') {
+          whereParts.push(
+            sql`(${exercises.updatedAt} < ${cursorDate} or (${exercises.updatedAt} = ${cursorDate} and ${exercises.id} < ${cursorId}))`,
+          );
+        } else {
+          whereParts.push(
+            sql`(${exercises.updatedAt} > ${cursorDate} or (${exercises.updatedAt} = ${cursorDate} and ${exercises.id} > ${cursorId}))`,
+          );
+        }
+      }
+    }
 
     const whereExpr = and(...whereParts);
-
-    const totalRows = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(exercises)
-      .where(whereExpr);
-    const total = Number(totalRows[0]?.count ?? 0);
 
     const rows = await db
       .select({
@@ -840,11 +866,26 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       })
       .from(exercises)
       .where(whereExpr)
-      .orderBy(desc(exercises.updatedAt))
-      .limit(normalizedLimit)
-      .offset(normalizedOffset);
+      .orderBy(
+        sortBy === 'updatedAt'
+          ? (sortDir === 'desc' ? desc(exercises.updatedAt) : sql`${exercises.updatedAt} asc`)
+          : (sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`),
+        sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`,
+      )
+      .limit(normalizedLimit + 1)
+      .offset((Number.isInteger(cursorId) && cursorId > 0) ? 0 : normalizedOffset);
 
-    const items: ExerciseListItem[] = rows.map((row) => ({
+    const hasMore = rows.length > normalizedLimit;
+    const pageRows = hasMore ? rows.slice(0, normalizedLimit) : rows;
+    let total = normalizedOffset + pageRows.length + (hasMore ? 1 : 0);
+    if (includeTotal) {
+      const totalRows = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(exercises)
+        .where(whereExpr);
+      total = Number(totalRows[0]?.count ?? total);
+    }
+    const items: ExerciseListItem[] = pageRows.map((row) => ({
       id: row.id,
       type: row.type,
       skillTags: row.skillTags,
@@ -854,13 +895,16 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       updatedAt: row.updatedAt.toISOString(),
       isActive: row.isActive,
     }));
+    const last = pageRows[pageRows.length - 1];
 
     return {
       success: true,
       items,
       total,
-      hasMore: normalizedOffset + items.length < total,
+      hasMore,
       nextOffset: normalizedOffset + items.length,
+      nextCursorId: last ? last.id : null,
+      nextCursorUpdatedAt: last ? last.updatedAt.toISOString() : null,
     };
   } catch (error) {
     console.error('Failed to list exercises:', error);
@@ -871,6 +915,8 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       total: 0,
       hasMore: false,
       nextOffset: 0,
+      nextCursorId: null as number | null,
+      nextCursorUpdatedAt: null as string | null,
     };
   }
 }

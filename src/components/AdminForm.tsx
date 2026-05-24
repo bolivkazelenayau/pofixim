@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import { commands, type ICommand } from '@uiw/react-md-editor';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme-provider';
 import rehypeRaw from 'rehype-raw';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
@@ -13,8 +13,7 @@ import {
  createExerciseAction,
  deleteExerciseAction,
  getExerciseByIdAction,
- getExerciseTypeOptionsAction,
- listExercisesAction,
+  listExercisesAction,
  updateExerciseAction,
  type ExerciseEditorInput,
 } from '@/app/actions/admin';
@@ -30,9 +29,9 @@ import { EXERCISE_TYPES, type ExerciseCategory } from '@/features/exercises/type
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
  ssr: false,
  loading: () => (
- <div className="h-[205px] rounded-lg border border-stroke bg-surface-strong p-3 ">
- <div className="mb-3 h-8 w-full rounded-md bg-slate-100 " />
- <div className="h-[147px] w-full rounded-md bg-surface " />
+ <div className="admin-md-skeleton h-[205px] rounded-lg border border-stroke bg-surface-strong p-3">
+ <div className="admin-md-skeleton-bar mb-3 h-8 w-full rounded-md bg-slate-100 dark:bg-slate-800" />
+ <div className="admin-md-skeleton-panel h-[147px] w-full rounded-md bg-surface dark:bg-slate-800/70" />
  </div>
  ),
 });
@@ -813,7 +812,13 @@ export default function AdminForm({
  initialSelectedId = null,
  initialSelectedExercise = null,
 }: AdminFormProps) {
-  const { resolvedTheme, theme } = useTheme(); const [mounted, setMounted] = useState(false); useEffect(() => setMounted(true), []); const currentTheme = mounted ? (resolvedTheme || theme) : 'light';
+ const { resolvedTheme, theme } = useTheme();
+ const isClient = useSyncExternalStore(
+  () => () => {},
+  () => true,
+  () => false,
+ );
+ const currentTheme = isClient ? (resolvedTheme || theme || 'light') : 'light';
  const [form, setForm] = useState<Form>(() => {
  if (initialSelectedId && initialSelectedExercise) {
  return loadFormState(initialSelectedId, formFromExerciseItem(initialSelectedExercise));
@@ -821,13 +826,19 @@ export default function AdminForm({
  return EMPTY;
  });
  const isDraftLoaded = true;
- const [typeOptions, setTypeOptions] = useState<Form['type'][]>(
+ const [typeOptions] = useState<Form['type'][]>(
  Array.from(EXERCISE_TYPES) as Form['type'][],
  );
- const [items, setItems] = useState<ListItem[]>(initialItems);
- const [nextOffset, setNextOffset] = useState<number>(initialItems.length);
- const [hasMore, setHasMore] = useState<boolean>(initialItems.length >= 150);
- const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initialItems.length);
+const [items, setItems] = useState<ListItem[]>(initialItems);
+const [nextOffset, setNextOffset] = useState<number>(initialItems.length);
+const [hasMore, setHasMore] = useState<boolean>(initialItems.length >= 150);
+const [nextCursorId, setNextCursorId] = useState<number | null>(
+ initialItems.length > 0 ? initialItems[initialItems.length - 1].id : null,
+);
+const [nextCursorUpdatedAt, setNextCursorUpdatedAt] = useState<string | null>(
+ initialItems.length > 0 ? initialItems[initialItems.length - 1].updatedAt : null,
+);
+const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initialItems.length);
  const [loadingMore, setLoadingMore] = useState(false);
  const [selectedId, setSelectedId] = useState<number | null>(null);
  const [message, setMessage] = useState('');
@@ -867,10 +878,11 @@ export default function AdminForm({
  const lastPersistedSnapshotRef = useRef('');
  const switchingExerciseRef = useRef(false);
  const autosaveInFlightRef = useRef(false);
- const autosaveRetryTimerRef = useRef<number | null>(null);
- const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
- const initialTargetIdRef = useRef<number | null>(initialSelectedId);
- const sidebarRef = useRef<HTMLElement | null>(null);
+const autosaveRetryTimerRef = useRef<number | null>(null);
+const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
+const initialTargetIdRef = useRef<number | null>(initialSelectedId);
+const skipInitialListRefreshRef = useRef(initialItems.length > 0);
+const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
  const [activeMarks, setActiveMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
@@ -1073,7 +1085,7 @@ export default function AdminForm({
  if (!groups.has(key)) groups.set(key, []);
  groups.get(key)!.push(item);
  }
- return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+ return [...groups.entries()];
  }, [filteredItems]);
  const flatFilteredItems = filteredItems;
  const multiSelectedSet = useMemo(() => new Set(multiSelectedIds), [multiSelectedIds]);
@@ -1452,6 +1464,9 @@ export default function AdminForm({
  const res = await listExercisesAction({
  limit: 150,
  offset: 0,
+ sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
+ sortDir: listSortDir,
+ includeTotal: true,
  query: listQuery,
  type: listTypeFilter,
  qualityStatus: listStatusFilter,
@@ -1461,7 +1476,14 @@ export default function AdminForm({
  setItems(res.items as ListItem[]);
  setNextOffset(res.nextOffset ?? (res.items?.length ?? 0));
  setHasMore(Boolean(res.hasMore));
+ const cursorId = typeof res.nextCursorId === 'number' ? res.nextCursorId : null;
+ const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
+ setNextCursorId(cursorId);
+ setNextCursorUpdatedAt(cursorUpdatedAt);
  setTotalItems(Number(res.total ?? res.items.length));
+ } else {
+ setIsError(true);
+ setMessage(res.error || 'Ошибка загрузки списка заданий.');
  }
  }
 
@@ -1471,6 +1493,11 @@ export default function AdminForm({
  const res = await listExercisesAction({
  limit: 150,
  offset: nextOffset,
+ cursorId: nextCursorId,
+ cursorUpdatedAt: nextCursorUpdatedAt,
+ sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
+ sortDir: listSortDir,
+ includeTotal: false,
  query: listQuery,
  type: listTypeFilter,
  qualityStatus: listStatusFilter,
@@ -1488,18 +1515,28 @@ export default function AdminForm({
  });
  setNextOffset(res.nextOffset ?? (nextOffset + incoming.length));
  setHasMore(Boolean(res.hasMore));
- setTotalItems(Number(res.total ?? totalItems));
+ const cursorId = typeof res.nextCursorId === 'number' ? res.nextCursorId : null;
+ const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
+ setNextCursorId(cursorId);
+ setNextCursorUpdatedAt(cursorUpdatedAt);
+ } else {
+ setIsError(true);
+ setMessage(res.error || 'Ошибка подгрузки списка.');
  }
  setLoadingMore(false);
  }
 
- useEffect(() => {
+useEffect(() => {
+ if (skipInitialListRefreshRef.current) {
+ skipInitialListRefreshRef.current = false;
+ return;
+ }
  const timer = setTimeout(() => {
  void refreshList();
  }, 0);
  return () => clearTimeout(timer);
  // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [listQuery, listTypeFilter, listStatusFilter, listExamTypeFilter]);
+}, [listQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
 
  useEffect(() => {
  if (!isSeedRegenerateArmed) return;
@@ -1507,20 +1544,7 @@ export default function AdminForm({
  return () => clearTimeout(timer);
  }, [isSeedRegenerateArmed]);
 
- useEffect(() => {
- let cancelled = false;
- (async () => {
- const res = await getExerciseTypeOptionsAction();
- if (!cancelled && res.success && Array.isArray(res.items) && res.items.length > 0) {
- setTypeOptions(res.items as Form['type'][]);
- }
- })();
- return () => {
- cancelled = true;
- };
- }, []);
-
- useEffect(() => {
+useEffect(() => {
  if (selectedId) {
  localStorage.setItem('admin_last_selected_id', String(selectedId));
  return;
@@ -1535,7 +1559,11 @@ export default function AdminForm({
 
  async function loadExercise(id: number) {
  const res = await getExerciseByIdAction(id);
- if (!res.success || !res.item) return;
+ if (!res.success || !res.item) {
+ setIsError(true);
+ setMessage(res.error || 'Не удалось открыть задание.');
+ return;
+ }
  const item = res.item as Record<string, unknown>;
  const nextForm = formFromExerciseItem(item);
  const loaded = loadFormState(id, nextForm);

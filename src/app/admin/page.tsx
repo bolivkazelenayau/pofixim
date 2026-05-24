@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { count, desc } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import AdminForm from '@/components/AdminForm';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getExerciseByIdAction } from '@/app/actions/admin';
@@ -9,6 +10,58 @@ import { exercises } from '@/db/schema';
 type AdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const getAdminInitialListCached = unstable_cache(
+  async () =>
+    db
+      .select({
+        id: exercises.id,
+        type: exercises.type,
+        skillTags: exercises.skillTags,
+        seedKey: exercises.seedKey,
+        prompt: exercises.prompt,
+        qualityStatus: exercises.qualityStatus,
+        updatedAt: exercises.updatedAt,
+        isActive: exercises.isActive,
+      })
+      .from(exercises)
+      .orderBy(desc(exercises.id))
+      .limit(150),
+  ['admin-initial-list-v1'],
+  {
+    revalidate: 10,
+    tags: ['admin:list'],
+  },
+);
+
+const getAdminTotalCountCached = unstable_cache(
+  async () => {
+    const rows = await db.select({ count: sql<number>`count(*)` }).from(exercises);
+    return Number(rows[0]?.count ?? 0);
+  },
+  ['admin-total-count-v1'],
+  {
+    revalidate: 30,
+    tags: ['admin:list'],
+  },
+);
+
+async function fetchAdminInitialListDirect() {
+  return db
+    .select({
+      id: exercises.id,
+      type: exercises.type,
+      skillTags: exercises.skillTags,
+      seedKey: exercises.seedKey,
+      prompt: exercises.prompt,
+      qualityStatus: exercises.qualityStatus,
+      updatedAt: exercises.updatedAt,
+      isActive: exercises.isActive,
+    })
+    .from(exercises)
+    .orderBy(desc(exercises.id))
+    .limit(150);
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const resolved = searchParams ? await searchParams : {};
@@ -24,33 +77,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     seedKey: string | null;
     prompt: string;
     qualityStatus: string;
-    updatedAt: Date;
+    updatedAt: Date | string;
     isActive: boolean;
   }> = [];
   let totalItems = 0;
   let initialSelectedExercise: Record<string, unknown> | null = null;
 
   try {
-    rows = await db
-      .select({
-        id: exercises.id,
-        type: exercises.type,
-        skillTags: exercises.skillTags,
-        seedKey: exercises.seedKey,
-        prompt: exercises.prompt,
-        qualityStatus: exercises.qualityStatus,
-        updatedAt: exercises.updatedAt,
-        isActive: exercises.isActive,
-      })
-      .from(exercises)
-      .orderBy(desc(exercises.updatedAt))
-      .limit(150);
-    const totalCountRow = await db.select({ total: count() }).from(exercises).limit(1);
-    totalItems = Number(totalCountRow[0]?.total ?? rows.length);
+    const [rowsResult, totalCount, selectedResult] = await Promise.all([
+      getAdminInitialListCached(),
+      getAdminTotalCountCached(),
+      initialSelectedId ? getExerciseByIdAction(initialSelectedId) : Promise.resolve(null),
+    ]);
 
-    initialSelectedExercise = initialSelectedId
-      ? (await getExerciseByIdAction(initialSelectedId)).item ?? null
-      : null;
+    rows = rowsResult.length > 0 ? rowsResult : await fetchAdminInitialListDirect();
+    totalItems = totalCount > 0 ? totalCount : rows.length;
+    initialSelectedExercise = selectedResult?.item ?? null;
   } catch (error) {
     console.error('AdminPage data load failed:', error);
   }
@@ -62,7 +104,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     seedKey: row.seedKey,
     prompt: row.prompt,
     qualityStatus: row.qualityStatus,
-    updatedAt: row.updatedAt.toISOString(),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : new Date(row.updatedAt).toISOString(),
     isActive: row.isActive,
   }));
 

@@ -18,6 +18,18 @@ export const metadata: Metadata = {
   description: 'Подтяни орфографию, пунктуацию и грамматическое чутье',
 };
 
+const THEME_INIT_SCRIPT = `
+(() => {
+  try {
+    const saved = localStorage.getItem('theme');
+    const theme = saved === 'dark' ? 'dark' : 'light';
+    const root = document.documentElement;
+    if (theme === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
+  } catch {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,6 +41,9 @@ export default function RootLayout({
       className={`${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -35,28 +36,36 @@ export const questions = pgTable('questions', {
   explanation: text('explanation').notNull(), // Объяснение правила после ответа
 });
 
-export const exercises = pgTable('exercises', {
-  id: serial('id').primaryKey(),
-  seedKey: text('seed_key').unique(),
-  type: exerciseTypeEnum('type').notNull(),
-  category: categoryEnum('category').notNull(),
-  difficulty: integer('difficulty').notNull(),
-  skillTags: text('skill_tags').array().notNull(),
-  prompt: text('prompt').notNull(),
-  payload: jsonb('payload').notNull(),
-  answer: jsonb('answer').notNull(),
-  explanation: text('explanation').notNull(),
-  sourceAlignment: jsonb('source_alignment'),
-  typicalMistake: text('typical_mistake'),
-  mistakeModel: jsonb('mistake_model'),
-  algorithmSteps: jsonb('algorithm_steps'),
-  transferGroup: text('transfer_group'),
-  qualityStatus: text('quality_status').notNull().default('draft'),
-  visualHint: jsonb('visual_hint'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const exercises = pgTable(
+  'exercises',
+  {
+    id: serial('id').primaryKey(),
+    seedKey: text('seed_key').unique(),
+    type: exerciseTypeEnum('type').notNull(),
+    category: categoryEnum('category').notNull(),
+    difficulty: integer('difficulty').notNull(),
+    skillTags: text('skill_tags').array().notNull(),
+    prompt: text('prompt').notNull(),
+    payload: jsonb('payload').notNull(),
+    answer: jsonb('answer').notNull(),
+    explanation: text('explanation').notNull(),
+    sourceAlignment: jsonb('source_alignment'),
+    typicalMistake: text('typical_mistake'),
+    mistakeModel: jsonb('mistake_model'),
+    algorithmSteps: jsonb('algorithm_steps'),
+    transferGroup: text('transfer_group'),
+    qualityStatus: text('quality_status').notNull().default('draft'),
+    visualHint: jsonb('visual_hint'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('exercises_updated_at_idx').on(table.updatedAt),
+    index('exercises_type_idx').on(table.type),
+    index('exercises_quality_status_idx').on(table.qualityStatus),
+  ],
+);
 
 export const learningSessions = pgTable('learning_sessions', {
   id: text('id').primaryKey(),
