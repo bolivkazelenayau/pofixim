@@ -852,12 +852,13 @@ const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initia
  const [showFloatingSave, setShowFloatingSave] = useState(false);
  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
  const [initialSelectionPending, setInitialSelectionPending] = useState(Boolean(initialSelectedId && !initialSelectedExercise));
- const [listQuery, setListQuery] = useState('');
- const [listTypeFilter, setListTypeFilter] = useState<string>('all');
- const [listStatusFilter, setListStatusFilter] = useState<string>('all');
- const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
- const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>('id');
- const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>('asc');
+const [listQuery, setListQuery] = useState('');
+const [listTypeFilter, setListTypeFilter] = useState<string>('all');
+const [listStatusFilter, setListStatusFilter] = useState<string>('all');
+const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
+const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>('id');
+const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>('asc');
+const [sortPrefsReady, setSortPrefsReady] = useState(false);
  const [multiSelectedIds, setMultiSelectedIds] = useState<number[]>([]);
  const [lastMultiSelectedId, setLastMultiSelectedId] = useState<number | null>(null);
  const [selectionMode, setSelectionMode] = useState(false);
@@ -882,6 +883,7 @@ const autosaveRetryTimerRef = useRef<number | null>(null);
 const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
 const initialTargetIdRef = useRef<number | null>(initialSelectedId);
 const skipInitialListRefreshRef = useRef(initialItems.length > 0);
+const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -905,7 +907,33 @@ const sidebarRef = useRef<HTMLElement | null>(null);
  commands.checkedListCommand,
  ]), [activeMarks]);
 
- useEffect(() => {
+useEffect(() => {
+ const timer = window.setTimeout(() => {
+  try {
+   const savedSortBy = localStorage.getItem('admin_list_sort_by');
+   const savedSortDir = localStorage.getItem('admin_list_sort_dir');
+   if (savedSortBy === 'id' || savedSortBy === 'updatedAt' || savedSortBy === 'type' || savedSortBy === 'status') {
+    setListSortBy(savedSortBy);
+   }
+   if (savedSortDir === 'asc' || savedSortDir === 'desc') {
+    setListSortDir(savedSortDir);
+   }
+  } catch {}
+  sortPrefsReadyRef.current = true;
+  setSortPrefsReady(true);
+ }, 0);
+ return () => window.clearTimeout(timer);
+}, []);
+
+useEffect(() => {
+ if (!sortPrefsReadyRef.current) return;
+ try {
+ localStorage.setItem('admin_list_sort_by', listSortBy);
+ localStorage.setItem('admin_list_sort_dir', listSortDir);
+ } catch {}
+}, [listSortBy, listSortDir]);
+
+useEffect(() => {
  if (!initialSelectedId) {
  const params = new URLSearchParams(window.location.search);
  const rawId = params.get('id') ?? params.get('exerciseId');
@@ -2165,27 +2193,52 @@ useEffect(() => {
  ))}
  </select>
  </div>
- <div className="grid grid-cols-2 gap-2">
- <select
- className={inputClass}
- value={listSortBy}
- onChange={(e) => setListSortBy(e.target.value as typeof listSortBy)}
- >
- <option value="id">Сорт: номер</option>
- <option value="updatedAt">Сорт: дата изменения</option>
- <option value="type">Сорт: тип</option>
- <option value="status">Сорт: статус</option>
- </select>
- <select
- className={inputClass}
- value={listSortDir}
- onChange={(e) => setListSortDir(e.target.value as typeof listSortDir)}
- >
- <option value="asc">Порядок: ↑</option>
- <option value="desc">Порядок: ↓</option>
- </select>
- </div>
- </div>
+          <div className="grid grid-cols-2 gap-2">
+            {sortPrefsReady ? (
+              <>
+                <select
+                  className={inputClass}
+                  value={listSortBy}
+                  onChange={(e) => setListSortBy(e.target.value as typeof listSortBy)}
+                >
+                  <option value="id">Сорт: номер</option>
+                  <option value="updatedAt">Сорт: дата изменения</option>
+                  <option value="type">Сорт: тип</option>
+                  <option value="status">Сорт: статус</option>
+                </select>
+                <select
+                  className={inputClass}
+                  value={listSortDir}
+                  onChange={(e) => setListSortDir(e.target.value as typeof listSortDir)}
+                >
+                  <option value="asc">Порядок: ↑</option>
+                  <option value="desc">Порядок: ↓</option>
+                </select>
+              </>
+            ) : (
+              <>
+                <div className="h-10 rounded-lg border border-stroke bg-surface animate-pulse" />
+                <div className="h-10 rounded-lg border border-stroke bg-surface animate-pulse" />
+              </>
+            )}
+          </div>
+          <div className="h-10">
+            {sortPrefsReady ? (
+              <button
+                type="button"
+                className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface"
+                onClick={() => {
+                  setListSortBy('id');
+                  setListSortDir('asc');
+                }}
+              >
+                Сбросить сортировку
+              </button>
+            ) : (
+              <div className="h-full w-full rounded-lg border border-stroke bg-surface animate-pulse" />
+            )}
+          </div>
+        </div>
  <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
  {groupedItems.map(([type, typeItems]) => (
  <div key={type} className="space-y-2">
