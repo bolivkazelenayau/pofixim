@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db';
 import { exerciseAttempts, exercises } from '@/db/schema';
@@ -734,6 +734,31 @@ export async function deleteExerciseAction(id: number) {
   } catch (error) {
     console.error('Failed to delete exercise:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unexpected error' };
+  }
+}
+
+export async function batchUpdateExercisesMetaAction(input: {
+  ids: number[];
+  qualityStatus?: ExerciseEditorInput['qualityStatus'];
+  isActive?: boolean;
+}) {
+  try {
+    const ids = Array.from(new Set((input.ids ?? []).filter((id) => Number.isInteger(id) && id > 0)));
+    if (ids.length === 0) return { success: false, error: 'Нет id для обновления' };
+    if (typeof input.qualityStatus === 'undefined' && typeof input.isActive === 'undefined') {
+      return { success: false, error: 'Нет полей для обновления' };
+    }
+
+    const patch: { qualityStatus?: ExerciseEditorInput['qualityStatus']; isActive?: boolean } = {};
+    if (typeof input.qualityStatus !== 'undefined') patch.qualityStatus = input.qualityStatus;
+    if (typeof input.isActive !== 'undefined') patch.isActive = input.isActive;
+
+    await db.update(exercises).set(patch).where(inArray(exercises.id, ids));
+    revalidatePath('/admin');
+    return { success: true, updated: ids.length };
+  } catch (error) {
+    console.error('Failed to batch update exercises meta:', error);
+    return { success: false, error: 'Unexpected error' };
   }
 }
 

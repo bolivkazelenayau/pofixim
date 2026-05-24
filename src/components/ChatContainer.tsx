@@ -294,27 +294,27 @@ export default function ChatContainer() {
   ]);
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-white shadow-lg sm:h-[calc(100vh-2rem)]">
-      <div className="z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-[var(--stroke)] bg-white px-5">
+    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-lg sm:h-[calc(100vh-2rem)]">
+      <div className="z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3390EC] text-base font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-base font-bold text-white">
             П
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight tracking-tight text-slate-900">
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-foreground">
               Пофиксим
             </h1>
-            <p className="text-xs font-medium text-[#3390EC]">Тренируемся вместе</p>
+            <p className="text-xs font-medium text-primary">Тренируемся вместе</p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-700">Очки: {score}</div>
-          <div className="h-4 w-px bg-slate-300" />
+          <div className="text-sm font-semibold text-foreground/80">Очки: {score}</div>
+          <div className="h-4 w-px bg-[var(--stroke)]" />
           <div className="text-sm font-semibold text-orange-600">Серия: {streak}</div>
-          <div className="h-4 w-px bg-slate-300" />
+          <div className="h-4 w-px bg-[var(--stroke)]" />
           <button
             onClick={handleResetProgress}
-            className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
+            className="rounded-md px-2 py-1 text-xs font-medium text-foreground/70 transition hover:bg-[var(--stroke)] hover:text-foreground"
             title="Начать заново"
           >
             Сброс
@@ -355,13 +355,13 @@ export default function ChatContainer() {
               value={globalInputValue}
               onChange={(e) => setGlobalInputValue(e.target.value)}
               placeholder="Введите ваш ответ..."
-              className="h-11 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm text-slate-800 outline-none transition focus:border-[#3390EC] focus:ring-1 focus:ring-[#3390EC]"
+              className="h-11 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
               autoFocus
             />
             <button
               type="submit"
               disabled={!globalInputValue.trim()}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#3390EC] text-white transition hover:bg-[#2A7BCA] disabled:opacity-50"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:bg-primary-strong disabled:opacity-50"
               title="Отправить"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,7 +370,7 @@ export default function ChatContainer() {
             </button>
           </form>
         ) : (
-          <div className="flex h-11 w-full cursor-not-allowed items-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm font-medium text-slate-500">
+          <div className="flex h-11 w-full cursor-not-allowed items-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm font-medium text-foreground/50">
             Отвечайте в карточке задания выше.
           </div>
         )}

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --background: #E4EAEF;
@@ -10,9 +11,24 @@
   --primary-strong: #2A7BCA;
 }
 
+.dark {
+  --background: #000000;
+  --foreground: #ededed;
+  --surface: #0a0a0a;
+  --surface-strong: #141414;
+  --stroke: #262626;
+  --primary: #f59e0b;
+  --primary-strong: #d97706;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-stroke: var(--stroke);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-jetbrains-mono);
 }
@@ -43,6 +59,11 @@ body {
   background-clip: padding-box;
   background-color: rgba(61, 83, 128, 0.32);
 }
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.35);
+}
+
 u,
 span[style*='text-decoration'] {
   text-decoration-skip-ink: none;
@@ -54,7 +75,7 @@ span[style*='text-decoration'] {
   overflow-y: hidden;
 }
 
-.w-md-editor-toolbar > ul {
+.w-md-editor-toolbar>ul {
   display: flex !important;
   flex-wrap: nowrap !important;
   align-items: center;
@@ -71,6 +92,111 @@ span[style*='text-decoration'] {
 .w-md-editor-toolbar li button svg {
   width: 15px !important;
   height: 15px !important;
+}
+
+.dark .w-md-editor {
+  --color-canvas-default: var(--surface) !important;
+  --color-canvas-subtle: var(--surface-strong) !important;
+  --color-fg-default: var(--foreground) !important;
+  --color-fg-muted: color-mix(in srgb, var(--foreground) 70%, transparent) !important;
+  --color-border-default: var(--stroke) !important;
+  --color-border-muted: var(--stroke) !important;
+  --color-neutral-muted: var(--surface-strong) !important;
+  /* Override syntax highlighting tokens → orange in dark mode */
+  --color-prettylights-syntax-constant: #f59e0b !important;
+  --color-prettylights-syntax-markup-bold: #fb923c !important;
+  --color-prettylights-syntax-markup-italic: #fbbf24 !important;
+  --color-prettylights-syntax-comment: #737373 !important;
+  /* Toolbar hover/active → orange instead of blue */
+  --color-accent-fg: #f59e0b !important;
+  background-color: var(--surface) !important;
+  border-color: var(--stroke) !important;
+  color: var(--foreground) !important;
+}
+
+.dark .w-md-editor-toolbar {
+  background-color: var(--surface-strong) !important;
+  border-color: var(--stroke) !important;
+}
+
+.dark .w-md-editor-toolbar li button {
+  color: var(--foreground) !important;
+  opacity: 0.7;
+}
+
+.dark .w-md-editor-toolbar li button:hover {
+  background-color: var(--stroke) !important;
+  color: #f59e0b !important;
+  opacity: 1;
+}
+
+.dark .w-md-editor-toolbar button.wmde-markdown-active {
+  background-color: #262626 !important;
+  color: #ededed !important;
+  opacity: 1;
+}
+
+.dark .w-md-editor-content {
+  background-color: var(--surface) !important;
+}
+
+/* Textarea input must stay invisible (overlay renders the highlighted text) */
+.dark .w-md-editor-text-input {
+  caret-color: var(--foreground) !important;
+}
+
+/* Text selection in dark mode: light highlight instead of dark */
+.dark .w-md-editor-text-input::selection {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.dark .w-md-editor-text-input::-moz-selection {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Let syntax-highlighted overlay keep its token colors */
+.dark .w-md-editor-text-pre,
+.dark .w-md-editor-text-pre>code {
+  color: var(--foreground) !important;
+}
+
+/* Bold/italic markdown tokens → orange in dark mode */
+.dark .w-md-editor-text-pre .bold,
+.dark .w-md-editor-text-pre .token.bold {
+  color: #f59e0b !important;
+  -webkit-text-fill-color: #f59e0b !important;
+}
+
+.dark .w-md-editor-text-pre .italic,
+.dark .w-md-editor-text-pre .token.italic {
+  color: #fbbf24 !important;
+  -webkit-text-fill-color: #fbbf24 !important;
+}
+
+.dark .w-md-editor-text-pre .title,
+.dark .w-md-editor-text-pre .token.title {
+  color: #f59e0b !important;
+  -webkit-text-fill-color: #f59e0b !important;
+}
+
+/* Tracking (letter-spacing) for the editor */
+.w-md-editor-text-pre,
+.w-md-editor-text-pre>code,
+.w-md-editor-text-input {
+  letter-spacing: 0.015em !important;
+}
+
+.dark .w-md-editor-preview,
+.dark .wmde-markdown {
+  background-color: var(--surface) !important;
+  color: var(--foreground) !important;
+}
+
+.dark .wmde-markdown-var {
+  --color-canvas-default: var(--surface) !important;
+  --color-fg-default: var(--foreground) !important;
+  --color-canvas-subtle: var(--surface-strong) !important;
+  --color-border-default: var(--stroke) !important;
 }
 
 ins.du {

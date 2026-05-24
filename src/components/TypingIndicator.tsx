@@ -9,7 +9,7 @@ export default function TypingIndicator() {
         {[0, 1, 2].map((dot) => (
           <motion.div
             key={dot}
-            className="h-2 w-2 rounded-full bg-slate-400"
+            className="h-2 w-2 rounded-full bg-primary/70"
             animate={{ y: [0, -4, 0] }}
             transition={{
               duration: 0.6,

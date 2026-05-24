@@ -52,12 +52,12 @@ export default function PunctuationInsertCard({
   );
 
   return (
-    <div className="mt-2 mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
+    <div className="mt-2 mb-5 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-foreground/50">
         Выбери место для знака препинания
       </p>
 
-      <div className="flex flex-wrap items-center gap-y-1.5 text-[17px] font-semibold leading-7 text-slate-800">
+      <div className="flex flex-wrap items-center gap-y-1.5 text-[17px] font-semibold leading-7 text-foreground">
         {exercise.payload.tokens.map((token, idx) => {
           const hasMark = marks.some(
             (mark) =>
@@ -76,7 +76,7 @@ export default function PunctuationInsertCard({
                   className={`mx-1 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-sm font-black transition ${
                     hasMark
                       ? 'border-amber-400 bg-amber-100 text-amber-800 shadow-inner'
-                      : 'border-dashed border-slate-300 bg-slate-50 text-slate-300 hover:border-amber-300 hover:text-amber-500'
+                      : 'border-dashed border-stroke bg-surface text-foreground/50 hover:border-amber-300 hover:text-amber-500'
                   } disabled:opacity-60`}
                   aria-label={`Поставить знак после слова ${token}`}
                 >
@@ -105,7 +105,7 @@ export default function PunctuationInsertCard({
           });
           onSubmit({ type: 'punctuation_insert', marks: sortedMarks }, label);
         }}
-        className="mt-5 w-full rounded-xl bg-[#3390EC] px-5 py-3 font-bold text-white shadow-sm transition hover:bg-[#2A7BCA] disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить пунктуацию
       </motion.button>

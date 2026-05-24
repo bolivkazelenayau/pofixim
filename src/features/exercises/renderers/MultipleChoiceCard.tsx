@@ -28,7 +28,7 @@ export default function MultipleChoiceCard({
             )
           }
           disabled={disabled}
-          className="w-full text-left px-5 py-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:hover:bg-white text-slate-700 shadow-sm font-medium transition-all"
+          className="w-full text-left px-5 py-3.5 rounded-xl border border-stroke bg-surface-strong hover:bg-surface disabled:opacity-60 disabled:hover:bg-white text-foreground/80 shadow-sm font-medium transition-all"
         >
           {option}
         </motion.button>

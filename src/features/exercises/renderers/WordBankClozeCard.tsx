@@ -77,10 +77,10 @@ export default function WordBankClozeCard({
 
   return (
     <div
-      className="mb-5 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm"
       onClick={() => setActiveSlot(null)}
     >
-      <div className="text-[19px] leading-[2.35] text-slate-900 sm:text-[20px]">
+      <div className="text-[19px] leading-[2.35] text-foreground sm:text-[20px]">
         {parts.map((part, idx) => {
           if (part.kind === 'text') {
             return <span key={`t-${idx}`}>{part.value}</span>;
@@ -100,7 +100,7 @@ export default function WordBankClozeCard({
               className={`mx-1 inline-flex min-h-[28px] min-w-[78px] items-center justify-center rounded-lg border px-2 py-0.5 align-middle text-[14px] font-semibold transition ${
                 value
                   ? 'border-blue-300 bg-blue-50 text-blue-900'
-                  : 'border-slate-300 bg-slate-50 text-slate-500'
+                  : 'border-stroke bg-surface text-foreground/60'
               } ${isActive ? 'ring-2 ring-blue-200' : ''}`}
             >
               {value || '_____'}
@@ -120,7 +120,7 @@ export default function WordBankClozeCard({
                 event.stopPropagation();
                 placeWord(word);
               }}
-              className="rounded-full border border-cyan-400 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 transition hover:bg-cyan-50 disabled:opacity-50"
+              className="rounded-full border border-cyan-400 bg-white px-3 py-1.5 text-sm font-semibold text-foreground transition hover:bg-cyan-50 disabled:opacity-50"
             >
               {word}
             </button>
@@ -136,7 +136,7 @@ export default function WordBankClozeCard({
             event.stopPropagation();
             if (activeSlot !== null) clearSlot(activeSlot);
           }}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60"
+          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 disabled:opacity-60"
         >
           Очистить слот
         </button>
@@ -148,7 +148,7 @@ export default function WordBankClozeCard({
             setValues(Array(slotCount).fill(''));
             setActiveSlot(0);
           }}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60"
+          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 disabled:opacity-60"
         >
           Сбросить всё
         </button>
@@ -161,7 +161,7 @@ export default function WordBankClozeCard({
           event.stopPropagation();
           submit();
         }}
-        className="mt-4 w-full rounded-xl bg-slate-900 px-5 py-3 font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="mt-4 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить
       </motion.button>

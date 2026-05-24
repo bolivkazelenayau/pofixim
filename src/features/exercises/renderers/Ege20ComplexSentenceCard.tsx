@@ -63,12 +63,12 @@ export default function Ege20ComplexSentenceCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">
         ЕГЭ-20 · знаки в сложном предложении
       </p>
-      <p className="text-sm leading-6 text-slate-800">{exercise.payload.textWithSlots}</p>
-      <p className="mt-2 text-xs text-slate-500">Укажите номера мест, где нужна запятая.</p>
+      <p className="text-sm leading-6 text-foreground">{exercise.payload.textWithSlots}</p>
+      <p className="mt-2 text-xs text-foreground/60">Укажите номера мест, где нужна запятая.</p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {availableIndexes.map((index) => {
@@ -81,8 +81,8 @@ export default function Ege20ComplexSentenceCard({
               onClick={() => toggleIndex(index)}
               className={`rounded-lg border px-3 py-1 text-sm transition ${
                 active
-                  ? 'border-[#3390EC] bg-[#3390EC] text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#3390EC]'
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-stroke bg-surface text-foreground hover:border-primary'
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {index}

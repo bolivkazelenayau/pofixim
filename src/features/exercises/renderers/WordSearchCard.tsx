@@ -146,8 +146,8 @@ export default function WordSearchCard({
   };
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-2 touch-none select-none">
+    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+      <div className="mb-3 overflow-auto rounded-lg border border-stroke bg-surface p-2 touch-none select-none">
         <div className="grid w-max gap-1 touch-none select-none" style={{ gridTemplateColumns: `repeat(${cols}, minmax(32px, 1fr))` }}>
           {exercise.payload.grid.flatMap((row, r) =>
             row.map((cell, c) => {
@@ -179,7 +179,7 @@ export default function WordSearchCard({
                       ? 'border-blue-500 bg-blue-100 text-blue-900'
                       : inFound
                         ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                        : 'border-slate-300 bg-white text-slate-800'
+                        : 'border-stroke bg-surface-strong text-foreground'
                   }`}
                 >
                   {cell}
@@ -190,7 +190,7 @@ export default function WordSearchCard({
         </div>
       </div>
 
-      <div className="mb-3 text-sm font-semibold text-slate-700">Найдите и выделите слова в сетке:</div>
+      <div className="mb-3 text-sm font-semibold text-foreground/80">Найдите и выделите слова в сетке:</div>
       <div className="mb-4 flex flex-wrap gap-2">
         {[...expectedMap.values()].map((word) => {
           const active = foundSet.has(word);
@@ -200,7 +200,7 @@ export default function WordSearchCard({
               className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
                 active
                   ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                  : 'border-cyan-400 bg-white text-slate-800'
+                  : 'border-cyan-400 bg-white text-foreground'
               }`}
             >
               {word}
@@ -217,7 +217,7 @@ export default function WordSearchCard({
             setFoundWords([]);
             setFoundPaths([]);
           }}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-surface disabled:opacity-50"
         >
           Сбросить найденное
         </button>
@@ -227,7 +227,7 @@ export default function WordSearchCard({
         whileTap={!disabled && foundWords.length > 0 ? { scale: 0.98 } : {}}
         disabled={disabled || foundWords.length === 0}
         onClick={submit}
-        className="w-full rounded-xl bg-slate-900 px-5 py-3 font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить
       </motion.button>

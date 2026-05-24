@@ -54,11 +54,11 @@ export default function MessageBubble({ content, isBot, isQuestion }: MessageBub
 
   let bubbleClasses = '';
   if (isQuestion) {
-    bubbleClasses = 'bg-[#3390EC] text-white rounded-bl-none shadow-sm';
+    bubbleClasses = 'bg-primary text-white rounded-bl-none shadow-sm';
   } else if (isBot) {
-    bubbleClasses = 'bg-white text-black border border-[var(--stroke)] rounded-bl-none shadow-sm';
+    bubbleClasses = 'bg-[var(--surface-strong)] text-foreground border border-[var(--stroke)] rounded-bl-none shadow-sm';
   } else {
-    bubbleClasses = 'bg-[#EEFFDE] text-black border border-[#D5E5C3] rounded-br-none shadow-sm';
+    bubbleClasses = 'bg-[#EEFFDE] text-black border border-[#D5E5C3] dark:bg-emerald-950/40 dark:border-emerald-900/30 dark:text-emerald-50 rounded-br-none shadow-sm';
   }
 
   return (
@@ -74,14 +74,14 @@ export default function MessageBubble({ content, isBot, isQuestion }: MessageBub
         {sections ? (
           <div className="space-y-3">
             {sections.lead ? <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.lead)}</ReactMarkdown> : null}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-600/30 dark:bg-emerald-950/40 px-3 py-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
                 Правильный ответ
               </div>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.correctAnswer)}</ReactMarkdown>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 dark:border-[var(--stroke)] dark:bg-[var(--surface)] px-3 py-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-foreground/80">
                 Объяснение
               </div>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(escapeMarkdownParenListMarkers(sections.explanation))}</ReactMarkdown>

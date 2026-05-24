@@ -115,7 +115,7 @@ export default function ExerciseRenderer({
   return (
     <div>
       {content}
-      <p className="-mt-1 mb-2 text-[11px] text-slate-500">
+      <p className="-mt-1 mb-2 text-[11px] text-foreground/60">
         seed: <span className="font-mono select-all">{exercise.seedKey ?? `id:${exercise.id ?? 'n/a'}`}</span>
       </p>
     </div>

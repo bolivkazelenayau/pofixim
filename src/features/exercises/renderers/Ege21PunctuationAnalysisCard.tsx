@@ -66,11 +66,11 @@ export default function Ege21PunctuationAnalysisCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">
         ЕГЭ-21 · {PUNCTUATION_LABEL[exercise.payload.targetPunctuation]}
       </p>
-      <p className="text-sm leading-6 text-slate-800">{inlineText}</p>
+      <p className="text-sm leading-6 text-foreground">{inlineText}</p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {availableIndexes.map((index) => {
@@ -83,8 +83,8 @@ export default function Ege21PunctuationAnalysisCard({
               onClick={() => toggleIndex(index)}
               className={`rounded-lg border px-3 py-1 text-sm transition ${
                 active
-                  ? 'border-[#3390EC] bg-[#3390EC] text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#3390EC]'
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-stroke bg-surface text-foreground hover:border-primary'
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {index}
