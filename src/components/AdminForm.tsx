@@ -1733,7 +1733,7 @@ useEffect(() => {
  setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
  setIsError(false);
  clearMultiSelection();
- await refreshList();
+ await refreshList({ includeTotal: true, force: true });
  } else {
  setIsError(true);
  setMessage(res.error || 'Ошибка массового обновления.');
