@@ -53,6 +53,86 @@ function fillOptionPartFromExplanation(optionPart, explanationPart) {
   return optionPart.replace(optionWord, rebuilt);
 }
 
+function findMaskedWordMatches(value) {
+  const regex = /[А-ЯЁа-яёA-Za-z-]*(?:\.{2,}|…+|_+)[А-ЯЁа-яёA-Za-z-]*/gu;
+  const result = [];
+  let match;
+  while ((match = regex.exec(String(value ?? ''))) !== null) {
+    if (match.index == null) continue;
+    result.push({ value: match[0], start: match.index, end: match.index + match[0].length });
+  }
+  return result;
+}
+
+function getDonorWordsOutsideParentheses(value) {
+  const withoutParentheses = String(value ?? '').replace(/\([^)]*\)/g, ' ');
+  return withoutParentheses.match(/[А-ЯЁа-яёA-Za-z-]+/gu) ?? [];
+}
+
+function findBestUnusedDonorWordForMaskedWord(maskedWord, donorWords, usedDonorIndexes) {
+  const knownParts = String(maskedWord).split(/\.{2,}|…+|_+/u).filter(Boolean);
+  for (let i = 0; i < donorWords.length; i++) {
+    if (usedDonorIndexes.has(i)) continue;
+    const donorWord = donorWords[i];
+    const matches = knownParts.every((part) => donorWord.includes(part));
+    if (matches) {
+      usedDonorIndexes.add(i);
+      return donorWord;
+    }
+  }
+  return null;
+}
+
+function fillMaskedWordWithBold(maskedWord, donorWord) {
+  const gapRegex = /\.{2,}|…+|_+/u;
+  if (!gapRegex.test(maskedWord)) return maskedWord;
+  const parts = maskedWord.split(gapRegex);
+  let result = parts[0];
+  let cursor = parts[0].length;
+  if (!donorWord.startsWith(parts[0])) return donorWord;
+  for (let i = 1; i < parts.length; i++) {
+    const nextKnownPart = parts[i];
+    const nextIndex = nextKnownPart ? donorWord.indexOf(nextKnownPart, cursor) : donorWord.length;
+    if (nextIndex === -1) return donorWord;
+    const missingLetters = donorWord.slice(cursor, nextIndex);
+    if (missingLetters.length > 0) result += `**${missingLetters}**`;
+    result += nextKnownPart;
+    cursor = nextIndex + nextKnownPart.length;
+  }
+  return result;
+}
+
+function replaceMaskedWordsInText(optionText, donorWords) {
+  const optionClean = stripBoldMarkdown(optionText).trim();
+  const maskedMatches = findMaskedWordMatches(optionClean);
+  if (maskedMatches.length === 0) return optionClean;
+  if (donorWords.length === 0) return optionClean;
+
+  let result = optionClean;
+  let offset = 0;
+  const usedDonorIndexes = new Set();
+
+  maskedMatches.forEach((maskedMatch) => {
+    const donorWord = findBestUnusedDonorWordForMaskedWord(maskedMatch.value, donorWords, usedDonorIndexes);
+    if (!donorWord) return;
+    const filledWord = fillMaskedWordWithBold(maskedMatch.value, donorWord);
+    const start = maskedMatch.start + offset;
+    const end = maskedMatch.end + offset;
+    result = result.slice(0, start) + filledWord + result.slice(end);
+    offset += filledWord.length - maskedMatch.value.length;
+  });
+
+  return result;
+}
+
+function fillGapsInOptionRowWithBold(optionRow, explanationRow) {
+  const donorWords = getDonorWordsOutsideParentheses(explanationRow);
+  return replaceMaskedWordsInText(optionRow, donorWords)
+    .replace(/\s+([,;:])/g, '$1')
+    .replace(/,\s*/g, ', ')
+    .trim();
+}
+
 function mergeOptionWithExplanation(optionLine, explanationRowText) {
   const optionParts = optionLine.split(',').map((s) => s.trim()).filter(Boolean);
   const explanationParts = stripBoldMarkdown(explanationRowText).split(',').map((s) => s.trim()).filter(Boolean);
@@ -126,6 +206,72 @@ function buildCorrectAnswerLines(exercise) {
     'бессимптомный, испорченный, несдобровать',
     'пренеприятный, преступный (сговор), преуспеть (в учёбе)',
   ]);
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'проповед..вать, (на террасе) свеж..',
+      'проповедовать, (на террасе) свежо',
+    ),
+    'проповед**о**вать, (на террасе) свеж**о**',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      '(ветерок) ве..л, стоим..сть',
+      '(ветерок) веял, стоимость',
+    ),
+    '(ветерок) ве**я**л, стоим**о**сть',
+  );
+
+  assert.equal(fillMaskedWordWithBold('свеж..', 'свежо'), 'свеж**о**');
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'обур..вающий, торф..ное (болото)',
+      'обуревающий, торфяное (болото)',
+    ),
+    'обур**е**вающий, торф**я**ное (болото)',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'заботл..вый, луков..ца',
+      'заботливый, луковица',
+    ),
+    'заботл**и**вый, луков**и**ца',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      '(на террасе) свеж..',
+      '(на террасе) свежо',
+    ),
+    '(на террасе) свеж**о**',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'сращ..вать, трещ..нка',
+      'сращивать, трещинка',
+    ),
+    'сращ**и**вать, трещ**и**нка',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'собач..нка, морж..вый (клык)',
+      'собачонка, моржовый (клык)',
+    ),
+    'собач**о**нка, морж**о**вый (клык)',
+  );
+
+  assert.equal(
+    fillGapsInOptionRowWithBold(
+      'облиц..вать, сирен..ватый',
+      'облицовывать, сиреневатый',
+    ),
+    'облиц**овы**вать, сирен**е**ватый',
+  );
 
   console.log('PASS ege10 correct-answer display regression');
 })();

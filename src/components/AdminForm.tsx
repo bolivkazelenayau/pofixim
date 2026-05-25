@@ -235,7 +235,7 @@ function makeToggleCommand(
  executeMarkdownToggle({
  api,
  selectedText: state1.selectedText,
- selection: state.selection,
+ selection: range,
  prefix: style.prefix,
  suffix: style.suffix ?? style.prefix,
  });
@@ -243,7 +243,7 @@ function makeToggleCommand(
  executeHtmlToggle({
  api,
  selectedText: state1.selectedText,
- selection: state.selection,
+ selection: range,
  openTag: style.openTag,
  closeTag: style.closeTag,
  });
@@ -913,17 +913,17 @@ const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
- const [activeMarks, setActiveMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
+const [activeMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
  const lastAppliedRefreshKeyRef = useRef('');
  const inFlightRefreshKeyRef = useRef<string | null>(null);
  const refreshSeqRef = useRef(0);
 
- const markdownCommands = useMemo<ICommand[]>(() => ([
- makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, activeMarks.bold),
- makeToggleCommand('italic', 'italic', <span style={{ fontSize: 14, fontStyle: 'italic' }}>I</span>, 'Курсив', { kind: 'markdown', prefix: '*' }, activeMarks.italic),
- makeToggleCommand('strikethrough', 'strikethrough', <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый', { kind: 'markdown', prefix: '~~' }, activeMarks.strike),
- makeToggleCommand('underline', 'underline', <span style={{ fontSize: 14, textDecoration: 'underline' }}>U</span>, 'Подчёркнутый', { kind: 'html', openTag: '<u>', closeTag: '</u>' }, activeMarks.underline),
- makeToggleCommand('doubleUnderline', 'doubleUnderline', <span style={{ fontSize: 14, textDecoration: 'underline double' }}>U</span>, 'Двойное подчёркивание', { kind: 'html', openTag: '<ins class="du">', closeTag: '</ins>' }, activeMarks.doubleUnderline),
+const markdownCommands = useMemo<ICommand[]>(() => ([
+ makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, false),
+ makeToggleCommand('italic', 'italic', <span style={{ fontSize: 14, fontStyle: 'italic' }}>I</span>, 'Курсив', { kind: 'markdown', prefix: '*' }, false),
+ makeToggleCommand('strikethrough', 'strikethrough', <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый', { kind: 'markdown', prefix: '~~' }, false),
+ makeToggleCommand('underline', 'underline', <span style={{ fontSize: 14, textDecoration: 'underline' }}>U</span>, 'Подчёркнутый', { kind: 'html', openTag: '<u>', closeTag: '</u>' }, false),
+ makeToggleCommand('doubleUnderline', 'doubleUnderline', <span style={{ fontSize: 14, textDecoration: 'underline double' }}>U</span>, 'Двойное подчёркивание', { kind: 'html', openTag: '<ins class="du">', closeTag: '</ins>' }, false),
  commands.hr,
  commands.divider,
  commands.link,
@@ -934,7 +934,7 @@ const sidebarRef = useRef<HTMLElement | null>(null);
  commands.unorderedListCommand,
  commands.orderedListCommand,
  commands.checkedListCommand,
- ]), [activeMarks]);
+]), []);
 
 useEffect(() => {
  const timer = window.setTimeout(() => {
@@ -1067,26 +1067,7 @@ useEffect(() => {
  [],
  );
 
- function updateActiveMarksFromTarget(target: EventTarget | null) {
- if (!(target instanceof HTMLTextAreaElement)) return;
- const nextState: TextSelState = {
- text: target.value,
- selectedText: target.value.slice(target.selectionStart, target.selectionEnd),
- selection: { start: target.selectionStart, end: target.selectionEnd },
- };
- setActiveMarks(getActiveMarksFromState(nextState));
- }
-
- useEffect(() => {
- const onSelectionChange = () => {
- const active = document.activeElement;
- if (!(active instanceof HTMLTextAreaElement)) return;
- if (!active.className.includes('w-md-editor-text-input')) return;
- updateActiveMarksFromTarget(active);
- };
- document.addEventListener('selectionchange', onSelectionChange);
- return () => document.removeEventListener('selectionchange', onSelectionChange);
- }, []);
+function updateActiveMarksFromTarget(_target: EventTarget | null) {}
 
  useEffect(() => {
  const anchor = mainSaveAnchorRef.current;
@@ -2558,9 +2539,8 @@ useEffect(() => {
  <div className="mb-1 text-sm font-medium text-foreground/80">Формулировка</div>
  <MDEditor
  value={form.prompt}
- onChange={(val, event) => {
+ onChange={(val) => {
  setForm((f) => ({ ...f, prompt: val || '' }));
- updateActiveMarksFromTarget(event?.target ?? null);
  }}
  data-color-mode={currentTheme === 'dark' ? 'dark' : 'light'}
  className="w-full"
@@ -2573,9 +2553,8 @@ useEffect(() => {
  <div className="mb-1 text-sm font-medium text-foreground/80">Объяснение</div>
  <MDEditor
  value={form.explanation}
- onChange={(val, event) => {
+ onChange={(val) => {
  setForm((f) => ({ ...f, explanation: val || '' }));
- updateActiveMarksFromTarget(event?.target ?? null);
  }}
  data-color-mode={currentTheme === 'dark' ? 'dark' : 'light'}
  className="w-full"

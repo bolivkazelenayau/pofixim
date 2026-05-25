@@ -212,6 +212,20 @@ span[style*='text-decoration'] {
 .w-md-editor-text-pre > code {
   line-height: 1.58 !important;
   letter-spacing: 0.012em !important;
+  font-family: inherit !important;
+  font-variant-ligatures: none !important;
+}
+
+/* Keep edit-layer glyph metrics identical to hidden textarea.
+   Otherwise token styles (bold/italic) shift visual caret/selection. */
+.w-md-editor-text-pre .bold,
+.w-md-editor-text-pre .token.bold {
+  font-weight: 400 !important;
+}
+
+.w-md-editor-text-pre .italic,
+.w-md-editor-text-pre .token.italic {
+  font-style: normal !important;
 }
 
 ins.du {

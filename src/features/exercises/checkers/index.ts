@@ -473,10 +473,11 @@ function extractStructuredFeedback(
   if (exercise.type !== 'ege_multi_select') return null;
   const isEge10 = exercise.skillTags.includes('ege.10');
   const isEge9 = exercise.skillTags.includes('ege.9');
+  const isEge11 = exercise.skillTags.includes('ege.11');
   const feedback = exercise.payload.feedback;
   const hasStructuredRows = Object.keys(extractRowsFromExplanation(exercise.explanation)).length > 0;
 
-  if (isEge10 || isEge9 || hasStructuredRows) {
+  if (isEge10 || isEge9 || isEge11 || hasStructuredRows) {
     const correctAnswerLines = buildCorrectAnswerDisplayRows(exercise);
     if (correctAnswerLines.length > 0) {
       const detailedExplanation = feedback?.explanation
@@ -512,7 +513,7 @@ function buildCorrectAnswerDisplayRows(exercise: EgeMultiSelectExercise): string
     ? exercise.payload.options
     : [];
 
-  return [...new Set(exercise.answer.targetSet)]
+  const rows = [...new Set(exercise.answer.targetSet)]
     .sort((a, b) => a - b)
     .map((index) => {
       const fallback = optionSkeletons[index - 1];
@@ -521,22 +522,63 @@ function buildCorrectAnswerDisplayRows(exercise: EgeMultiSelectExercise): string
       if (!fromExplanation) return optionBase;
 
       const merged = fillGapsInOptionRowWithBold(optionBase, fromExplanation);
-      return merged || optionBase;
+      const displayRow = merged || optionBase;
+      if (/(?:\.\.|…|_)/u.test(displayRow)) {
+        console.warn('correctAnswerDisplay still has gaps', {
+          displayRow,
+          optionRow: optionBase,
+          explanationRow: fromExplanation,
+        });
+      }
+      return displayRow;
     })
     .filter(Boolean);
+
+  if (exercise.seedKey === 'ege11-bank-18210' || exercise.id === 18210) {
+    console.debug('correctAnswerDisplay debug ege11-bank-18210', {
+      exerciseId: exercise.id,
+      seedKey: exercise.seedKey,
+      targetSet: exercise.answer.targetSet,
+      optionSkeletons,
+      extractedRows: rowsByIndex,
+      displayRows: rows,
+    });
+  }
+
+  return rows;
 }
 
 function extractRowsFromExplanation(explanation: string): Record<number, string> {
   const result: Record<number, string> = {};
+  const normalizedExplanation = explanation.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
+  const rowStartRegex = /(?:^|\r?\n)\s*(?:\*\*)?Ряд\s*([1-5])(?:\*\*)?\s*:/giu;
+  const starts: Array<{ rowNumber: number; index: number; markerEnd: number }> = [];
+  let startMatch: RegExpExecArray | null;
+  while ((startMatch = rowStartRegex.exec(normalizedExplanation)) !== null) {
+    if (startMatch.index == null) continue;
+    starts.push({
+      rowNumber: Number(startMatch[1]),
+      index: startMatch.index,
+      markerEnd: rowStartRegex.lastIndex,
+    });
+  }
 
-  const rowRegex =
-    /(?:^|\n)\s*(?:\*\*)?Ряд\s*([1-5])(?:\*\*)?\s*:\s*([\s\S]*?)\s+[—-]\s*(?:\*\*)?(не\s+подходит|подходит)(?:\*\*)?\s*:/giu;
-
-  let match: RegExpExecArray | null;
-  while ((match = rowRegex.exec(explanation)) !== null) {
-    const rowNumber = Number(match[1]);
-    const rowHeader = stripMarkdown(match[2]);
-    result[rowNumber] = rowHeader.trim();
+  for (let i = 0; i < starts.length; i++) {
+    const current = starts[i];
+    const next = starts[i + 1];
+    const block = normalizedExplanation.slice(current.markerEnd, next ? next.index : normalizedExplanation.length);
+    let header = block;
+    const dashSeparatorIndex = block.search(/\s[—-]\s/u);
+    if (dashSeparatorIndex >= 0) {
+      const colonIndex = block.indexOf(':', dashSeparatorIndex);
+      if (colonIndex > dashSeparatorIndex && colonIndex - dashSeparatorIndex <= 80) {
+        header = block.slice(0, dashSeparatorIndex);
+      }
+    }
+    const rowHeader = stripMarkdown(header).trim();
+    if (rowHeader) {
+      result[current.rowNumber] = rowHeader;
+    }
   }
 
   return result;
@@ -551,18 +593,9 @@ function stripMarkdown(value: string): string {
 }
 
 function fillGapsInOptionRowWithBold(optionLine: string, explanationRowText: string) {
-  const optionItems = splitByTopLevelCommas(optionLine);
-  const explanationItems = splitByTopLevelCommas(explanationRowText);
+  const donorWords = getDonorWordsOutsideParentheses(explanationRowText);
 
-  if (optionItems.length !== explanationItems.length) {
-    return optionLine;
-  }
-
-  return optionItems
-    .map((optionItem, index) => {
-      return fillGapsInOptionItem(optionItem, explanationItems[index]);
-    })
-    .join(', ')
+  return replaceMaskedWordsInText(optionLine, donorWords)
     .replace(/\s+([,;:])/g, '$1')
     .replace(/,\s*/g, ', ')
     .trim();
@@ -591,26 +624,87 @@ function splitByTopLevelCommas(value: string): string[] {
   return result;
 }
 
-function fillGapsInOptionItem(optionItem: string, explanationItem: string): string {
-  const option = splitHeadAndTail(optionItem);
-  const donor = splitHeadAndTail(explanationItem);
+function replaceMaskedWordsInText(optionText: string, donorWords: string[]): string {
+  const optionClean = stripMarkdown(optionText).trim();
+  const maskedMatches = findMaskedWordMatches(optionClean);
 
-  const filledHead = fillMaskedWordWithBold(option.head, donor.head);
+  if (maskedMatches.length === 0) return optionClean;
+  if (donorWords.length === 0) {
+    console.warn('correctAnswerDisplay: no donor words', { optionText });
+    return optionClean;
+  }
 
-  return `${filledHead}${option.tail}`.trim();
+  let result = optionClean;
+  let offset = 0;
+  const usedDonorIndexes = new Set<number>();
+
+  for (const maskedMatch of maskedMatches) {
+    const donorWord = findBestUnusedDonorWordForMaskedWord(
+      maskedMatch.value,
+      donorWords,
+      usedDonorIndexes,
+    );
+
+    if (!donorWord) {
+      console.warn('No donor word for masked word', {
+        maskedWord: maskedMatch.value,
+        donorWords,
+        optionText,
+      });
+      continue;
+    }
+
+    const filledWord = fillMaskedWordWithBold(maskedMatch.value, donorWord);
+    const start = maskedMatch.start + offset;
+    const end = maskedMatch.end + offset;
+    result = result.slice(0, start) + filledWord + result.slice(end);
+    offset += filledWord.length - maskedMatch.value.length;
+  }
+
+  return result;
 }
 
-function splitHeadAndTail(item: string): { head: string; tail: string } {
-  const clean = stripMarkdown(item).trim();
+function findMaskedWordMatches(value: string): Array<{ value: string; start: number; end: number }> {
+  const regex = /[А-ЯЁа-яёA-Za-z-]*(?:\.{2,}|…+|_+)[А-ЯЁа-яёA-Za-z-]*/gu;
+  const result: Array<{ value: string; start: number; end: number }> = [];
 
-  const match = clean.match(/^([^\s(,;:]+)([\s\S]*)$/u);
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value)) !== null) {
+    if (match.index == null) continue;
+    result.push({
+      value: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
 
-  if (!match) return { head: clean, tail: '' };
+  return result;
+}
 
-  return {
-    head: match[1],
-    tail: match[2] ?? '',
-  };
+function getDonorWordsOutsideParentheses(value: string): string[] {
+  const withoutParentheses = value.replace(/\([^)]*\)/g, ' ');
+  return withoutParentheses.match(/[А-ЯЁа-яёA-Za-z-]+/gu) ?? [];
+}
+
+function findBestUnusedDonorWordForMaskedWord(
+  maskedWord: string,
+  donorWords: string[],
+  usedDonorIndexes: Set<number>,
+): string | null {
+  const knownParts = maskedWord
+    .split(/\.{2,}|…+|_+/u)
+    .filter(Boolean);
+
+  for (let i = 0; i < donorWords.length; i++) {
+    if (usedDonorIndexes.has(i)) continue;
+    const donorWord = donorWords[i];
+    const matches = knownParts.every((part) => donorWord.includes(part));
+    if (matches) {
+      usedDonorIndexes.add(i);
+      return donorWord;
+    }
+  }
+  return null;
 }
 
 function fillMaskedWordWithBold(maskedWord: string, donorWord: string): string {
