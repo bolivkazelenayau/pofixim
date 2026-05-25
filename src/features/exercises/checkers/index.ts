@@ -471,7 +471,25 @@ function extractStructuredFeedback(
   exercise: Exercise,
 ): { correctAnswer: string; detailedExplanation: string } | null {
   if (exercise.type !== 'ege_multi_select') return null;
+  const isEge10 = exercise.skillTags.includes('ege.10');
+  const isEge9 = exercise.skillTags.includes('ege.9');
   const feedback = exercise.payload.feedback;
+  const hasStructuredRows = Object.keys(extractRowsFromExplanation(exercise.explanation)).length > 0;
+
+  if (isEge10 || isEge9 || hasStructuredRows) {
+    const correctAnswerLines = buildCorrectAnswerDisplayRows(exercise);
+    if (correctAnswerLines.length > 0) {
+      const detailedExplanation = feedback?.explanation
+        ?.map((line) => String(line ?? '').trim())
+        .filter(Boolean)
+        .join('\n') || exercise.explanation;
+      return {
+        correctAnswer: correctAnswerLines.join('\n\n'),
+        detailedExplanation,
+      };
+    }
+  }
+
   if (!feedback) return null;
 
   const correctAnswer = feedback.correctAnswer
@@ -487,6 +505,157 @@ function extractStructuredFeedback(
   return { correctAnswer, detailedExplanation };
 }
 
+function buildCorrectAnswerDisplayRows(exercise: EgeMultiSelectExercise): string[] {
+  const rowsByIndex = extractRowsFromExplanation(exercise.explanation);
+
+  const optionSkeletons = Array.isArray(exercise.payload.options)
+    ? exercise.payload.options
+    : [];
+
+  return [...new Set(exercise.answer.targetSet)]
+    .sort((a, b) => a - b)
+    .map((index) => {
+      const fallback = optionSkeletons[index - 1];
+      const fromExplanation = rowsByIndex[index];
+      const optionBase = stripMarkdown(String(fallback ?? '').trim());
+      if (!fromExplanation) return optionBase;
+
+      const merged = fillGapsInOptionRowWithBold(optionBase, fromExplanation);
+      return merged || optionBase;
+    })
+    .filter(Boolean);
+}
+
+function extractRowsFromExplanation(explanation: string): Record<number, string> {
+  const result: Record<number, string> = {};
+
+  const rowRegex =
+    /(?:^|\n)\s*(?:\*\*)?Ряд\s*([1-5])(?:\*\*)?\s*:\s*([\s\S]*?)\s+[—-]\s*(?:\*\*)?(не\s+подходит|подходит)(?:\*\*)?\s*:/giu;
+
+  let match: RegExpExecArray | null;
+  while ((match = rowRegex.exec(explanation)) !== null) {
+    const rowNumber = Number(match[1]);
+    const rowHeader = stripMarkdown(match[2]);
+    result[rowNumber] = rowHeader.trim();
+  }
+
+  return result;
+}
+
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function fillGapsInOptionRowWithBold(optionLine: string, explanationRowText: string) {
+  const optionItems = splitByTopLevelCommas(optionLine);
+  const explanationItems = splitByTopLevelCommas(explanationRowText);
+
+  if (optionItems.length !== explanationItems.length) {
+    return optionLine;
+  }
+
+  return optionItems
+    .map((optionItem, index) => {
+      return fillGapsInOptionItem(optionItem, explanationItems[index]);
+    })
+    .join(', ')
+    .replace(/\s+([,;:])/g, '$1')
+    .replace(/,\s*/g, ', ')
+    .trim();
+}
+
+function splitByTopLevelCommas(value: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let depth = 0;
+
+  for (const char of value) {
+    if (char === '(') depth++;
+    if (char === ')') depth = Math.max(0, depth - 1);
+
+    if (char === ',' && depth === 0) {
+      result.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim()) result.push(current.trim());
+
+  return result;
+}
+
+function fillGapsInOptionItem(optionItem: string, explanationItem: string): string {
+  const option = splitHeadAndTail(optionItem);
+  const donor = splitHeadAndTail(explanationItem);
+
+  const filledHead = fillMaskedWordWithBold(option.head, donor.head);
+
+  return `${filledHead}${option.tail}`.trim();
+}
+
+function splitHeadAndTail(item: string): { head: string; tail: string } {
+  const clean = stripMarkdown(item).trim();
+
+  const match = clean.match(/^([^\s(,;:]+)([\s\S]*)$/u);
+
+  if (!match) return { head: clean, tail: '' };
+
+  return {
+    head: match[1],
+    tail: match[2] ?? '',
+  };
+}
+
+function fillMaskedWordWithBold(maskedWord: string, donorWord: string): string {
+  const trailingPunctuationMatch = maskedWord.match(/[.,;:!?]+$/u);
+  const trailingPunctuation = trailingPunctuationMatch ? trailingPunctuationMatch[0] : '';
+  const sourceWord = trailingPunctuation
+    ? maskedWord.slice(0, -trailingPunctuation.length)
+    : maskedWord;
+
+  const gapRegex = /(?:\.{2,}|…+|_+|(?<=\p{L})\.(?=\p{L}))/u;
+
+  if (!gapRegex.test(sourceWord)) {
+    return maskedWord;
+  }
+
+  const splitGapRegex = /(?:\.{2,}|…+|_+|(?<=\p{L})\.(?=\p{L}))/gu;
+  const parts = sourceWord.split(splitGapRegex);
+
+  let result = parts[0];
+  let cursor = parts[0].length;
+
+  if (!donorWord.startsWith(parts[0])) {
+    return donorWord;
+  }
+
+  for (let i = 1; i < parts.length; i++) {
+    const nextKnownPart = parts[i];
+    const nextIndex = nextKnownPart
+      ? donorWord.indexOf(nextKnownPart, cursor)
+      : donorWord.length;
+
+    if (nextIndex === -1) {
+      return donorWord;
+    }
+
+    const missingLetters = donorWord.slice(cursor, nextIndex);
+    if (missingLetters.length > 0) {
+      result += `**${missingLetters}**`;
+    }
+    result += nextKnownPart;
+    cursor = nextIndex + nextKnownPart.length;
+  }
+
+  return `${result}${trailingPunctuation}`;
+}
 function buildPedagogy(
   exercise: Exercise,
   isCorrect: boolean,

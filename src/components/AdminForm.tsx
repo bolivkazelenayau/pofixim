@@ -1419,24 +1419,6 @@ useEffect(() => {
  }, [form, parsedSkillTags, parsedSteps]);
  const previewFeedbackSections = useMemo(() => {
  if (!previewCheckResult) return null;
- if (form.type === 'ege_multi_select' && parsedSkillTags.includes('ege.10')) {
- const previewOptions = form.options.map((v) => v.trim()).filter(Boolean);
- const targetSet = parseIndexCsv(form.multiCorrectOptionIndexes).filter(
- (idx) => idx <= previewOptions.length,
- );
- const feedback = buildEgeMultiSelectFeedback(
- previewOptions,
- targetSet,
- form.explanation,
- );
- if (feedback) {
- return {
- lead: '',
- correctAnswer: feedback.correctAnswer.join('\n\n'),
- explanation: feedback.explanation.join('\n'),
- };
- }
- }
  if (previewCheckResult.correctAnswer && previewCheckResult.detailedExplanation) {
  return {
  lead: '',
@@ -1473,13 +1455,15 @@ useEffect(() => {
  return `\n\nРазбор по шагам:\n${lines.join('\n')}\n\nДальше: ${result.nextRecommendation.reason}`;
  }
 
- function handlePreviewSubmit(answer: SubmittedAnswer) {
+function handlePreviewSubmit(answer: SubmittedAnswer) {
  if (!preview.exercise) return;
  const result = checkExerciseAnswer(preview.exercise, answer, { streak: 0 });
  const previewFeedback =
  preview.exercise.type === 'ege_multi_select'
  ? preview.exercise.payload.feedback
  : undefined;
+ const computedCorrectAnswer = result.feedback.correctAnswer?.trim();
+ const fallbackCorrectAnswer = previewFeedback?.correctAnswer.join('\n\n');
  setPreviewCheckResult({
  isCorrect: result.isCorrect,
  text: `${answerFeedbackPrefix(result.isCorrect)}\n\n${result.feedback.explanation}${buildStepFeedbackText(
@@ -1487,11 +1471,11 @@ useEffect(() => {
  preview.exercise.type,
  )}`,
  correctAnswer:
- previewFeedback?.correctAnswer.join('\n\n') ?? result.feedback.correctAnswer,
+ computedCorrectAnswer || fallbackCorrectAnswer,
  detailedExplanation:
  previewFeedback?.explanation.join('\n') ?? result.feedback.detailedExplanation,
  });
- }
+}
 
  function generateSeedKey() {
  const prefix = seedPrefixForType(form.type);
