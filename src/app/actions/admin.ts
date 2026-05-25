@@ -806,7 +806,14 @@ function normalizeSearchQuery(input: string) {
   return input
     .toLowerCase()
     .replace(/\u00ad/g, '')
-    .replace(/[*_`~[\]()<>{}|\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeSearchBlobQuery(input: string) {
+  return input
+    .toLowerCase()
+    .replace(/\u00ad/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -841,6 +848,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
     const cursorUpdatedAt = (params.cursorUpdatedAt ?? '').trim();
     const query = (params.query ?? '').trim();
     const normalizedQuery = normalizeSearchQuery(query);
+    const blobQuery = normalizeSearchBlobQuery(query);
     const type = (params.type ?? 'all').trim();
     const qualityStatus = (params.qualityStatus ?? 'all').trim();
     const examType = (params.examType ?? 'all').trim();
@@ -863,29 +871,26 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
     if (query) {
       const pattern = `%${query.toLowerCase()}%`;
       const normalizedPattern = `%${normalizedQuery}%`;
+      const blobPattern = `%${blobQuery}%`;
       whereParts.push(
         sql`(
           cast(${exercises.id} as text) ilike ${pattern}
           or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
-          or lower(${exercises.prompt}) like ${pattern}
-          or lower(${exercises.explanation}) like ${pattern}
           or lower(
-            regexp_replace(
-              regexp_replace(
-                replace(${exercises.prompt}, chr(173), ''),
-                '[*_~\\[\\]()<>{}|\\\\]',
-                '',
-                'g'
-              ),
-              '\\s+',
-              ' ',
-              'g'
+            replace(
+              coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+              chr(173),
+              ''
             )
-          ) like ${normalizedPattern}
+          ) like ${blobPattern}
           or lower(
             regexp_replace(
               regexp_replace(
-                replace(${exercises.explanation}, chr(173), ''),
+                replace(
+                  coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                  chr(173),
+                  ''
+                ),
                 '[*_~\\[\\]()<>{}|\\\\]',
                 '',
                 'g'

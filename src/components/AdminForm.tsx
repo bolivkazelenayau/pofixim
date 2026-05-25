@@ -874,6 +874,7 @@ const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initia
  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
  const [initialSelectionPending, setInitialSelectionPending] = useState(Boolean(initialSelectedId && !initialSelectedExercise));
 const [listQuery, setListQuery] = useState('');
+const [serverListQuery, setServerListQuery] = useState('');
 const [listTypeFilter, setListTypeFilter] = useState<string>('all');
 const [listStatusFilter, setListStatusFilter] = useState<string>('all');
 const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
@@ -913,6 +914,9 @@ const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
  const [activeMarks, setActiveMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
+ const lastAppliedRefreshKeyRef = useRef('');
+ const inFlightRefreshKeyRef = useRef<string | null>(null);
+ const refreshSeqRef = useRef(0);
 
  const markdownCommands = useMemo<ICommand[]>(() => ([
  makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, activeMarks.bold),
@@ -1517,18 +1521,35 @@ useEffect(() => {
  setShowSeedRegenerateModal(true);
  }
 
- async function refreshList() {
+ async function refreshList(options?: { includeTotal?: boolean; force?: boolean }) {
+ const includeTotal = options?.includeTotal ?? false;
+ const requestKey = JSON.stringify({
+ query: serverListQuery,
+ type: listTypeFilter,
+ qualityStatus: listStatusFilter,
+ examType: listExamTypeFilter,
+ sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
+ sortDir: listSortDir,
+ includeTotal,
+ });
+ if (!options?.force) {
+ if (requestKey === lastAppliedRefreshKeyRef.current) return;
+ if (requestKey === inFlightRefreshKeyRef.current) return;
+ }
+ inFlightRefreshKeyRef.current = requestKey;
+ const requestSeq = ++refreshSeqRef.current;
  const res = await listExercisesAction({
  limit: 150,
  offset: 0,
  sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
  sortDir: listSortDir,
- includeTotal: true,
- query: listQuery,
+ includeTotal,
+ query: serverListQuery,
  type: listTypeFilter,
  qualityStatus: listStatusFilter,
  examType: listExamTypeFilter,
  });
+ if (requestSeq !== refreshSeqRef.current) return;
  if (res.success) {
  setItems(res.items as ListItem[]);
  setNextOffset(res.nextOffset ?? (res.items?.length ?? 0));
@@ -1537,10 +1558,16 @@ useEffect(() => {
  const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
  setNextCursorId(cursorId);
  setNextCursorUpdatedAt(cursorUpdatedAt);
+ if (includeTotal) {
  setTotalItems(Number(res.total ?? res.items.length));
+ }
+ lastAppliedRefreshKeyRef.current = requestKey;
  } else {
  setIsError(true);
  setMessage(res.error || 'Ошибка загрузки списка заданий.');
+ }
+ if (inFlightRefreshKeyRef.current === requestKey) {
+ inFlightRefreshKeyRef.current = null;
  }
  }
 
@@ -1556,7 +1583,7 @@ useEffect(() => {
  sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
  sortDir: listSortDir,
  includeTotal: false,
- query: listQuery,
+ query: serverListQuery,
  type: listTypeFilter,
  qualityStatus: listStatusFilter,
  examType: listExamTypeFilter,
@@ -1587,6 +1614,13 @@ useEffect(() => {
  }
 
 useEffect(() => {
+ const timer = setTimeout(() => {
+ setServerListQuery(listQuery);
+ }, 350);
+ return () => clearTimeout(timer);
+}, [listQuery]);
+
+useEffect(() => {
  if (skipInitialListRefreshRef.current) {
  skipInitialListRefreshRef.current = false;
  return;
@@ -1596,7 +1630,7 @@ useEffect(() => {
  }, 0);
  return () => clearTimeout(timer);
  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [listQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
+}, [serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
 
  useEffect(() => {
  if (!isSeedRegenerateArmed) return;
@@ -2083,7 +2117,7 @@ useEffect(() => {
  <div className="flex items-center gap-1">
  <button
  className="rounded-md px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke "
- onClick={() => void refreshList()}
+                  onClick={() => void refreshList({ includeTotal: true, force: true })}
  >
  Обновить
  </button>
