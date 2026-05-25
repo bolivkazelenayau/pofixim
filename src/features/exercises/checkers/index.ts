@@ -665,7 +665,7 @@ function replaceMaskedWordsInText(optionText: string, donorWords: string[]): str
 }
 
 function findMaskedWordMatches(value: string): Array<{ value: string; start: number; end: number }> {
-  const regex = /[А-ЯЁа-яёA-Za-z-]*(?:\.{2,}|…+|_+)[А-ЯЁа-яёA-Za-z-]*/gu;
+  const regex = /[\p{L}-]*(?:\.{2,}|\u2026+|_+|(?<=[\p{L}])\.(?=[\p{L}]))[\p{L}-]*/gu;
   const result: Array<{ value: string; start: number; end: number }> = [];
 
   let match: RegExpExecArray | null;
@@ -682,8 +682,8 @@ function findMaskedWordMatches(value: string): Array<{ value: string; start: num
 }
 
 function getDonorWordsOutsideParentheses(value: string): string[] {
-  const withoutParentheses = value.replace(/\([^)]*\)/g, ' ');
-  return withoutParentheses.match(/[А-ЯЁа-яёA-Za-z-]+/gu) ?? [];
+  const withoutParentheses = stripMarkdown(value).replace(/\([^)]*\)/g, ' ');
+  return withoutParentheses.match(/[\p{L}-]+/gu) ?? [];
 }
 
 function findBestUnusedDonorWordForMaskedWord(
@@ -692,13 +692,22 @@ function findBestUnusedDonorWordForMaskedWord(
   usedDonorIndexes: Set<number>,
 ): string | null {
   const knownParts = maskedWord
-    .split(/\.{2,}|…+|_+/u)
+    .split(/\.{2,}|\u2026+|_+/u)
     .filter(Boolean);
 
   for (let i = 0; i < donorWords.length; i++) {
     if (usedDonorIndexes.has(i)) continue;
     const donorWord = donorWords[i];
-    const matches = knownParts.every((part) => donorWord.includes(part));
+    let cursor = 0;
+    let matches = true;
+    for (const part of knownParts) {
+      const foundAt = donorWord.indexOf(part, cursor);
+      if (foundAt === -1) {
+        matches = false;
+        break;
+      }
+      cursor = foundAt + part.length;
+    }
     if (matches) {
       usedDonorIndexes.add(i);
       return donorWord;
@@ -708,20 +717,13 @@ function findBestUnusedDonorWordForMaskedWord(
 }
 
 function fillMaskedWordWithBold(maskedWord: string, donorWord: string): string {
-  const trailingPunctuationMatch = maskedWord.match(/[.,;:!?]+$/u);
-  const trailingPunctuation = trailingPunctuationMatch ? trailingPunctuationMatch[0] : '';
-  const sourceWord = trailingPunctuation
-    ? maskedWord.slice(0, -trailingPunctuation.length)
-    : maskedWord;
-
-  const gapRegex = /(?:\.{2,}|…+|_+|(?<=\p{L})\.(?=\p{L}))/u;
-
-  if (!gapRegex.test(sourceWord)) {
+  const gapRegex = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/u;
+  if (!gapRegex.test(maskedWord)) {
     return maskedWord;
   }
 
-  const splitGapRegex = /(?:\.{2,}|…+|_+|(?<=\p{L})\.(?=\p{L}))/gu;
-  const parts = sourceWord.split(splitGapRegex);
+  const splitGapRegex = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/gu;
+  const parts = maskedWord.split(splitGapRegex);
 
   let result = parts[0];
   let cursor = parts[0].length;
@@ -748,7 +750,7 @@ function fillMaskedWordWithBold(maskedWord: string, donorWord: string): string {
     cursor = nextIndex + nextKnownPart.length;
   }
 
-  return `${result}${trailingPunctuation}`;
+  return result;
 }
 function buildPedagogy(
   exercise: Exercise,
