@@ -12,8 +12,6 @@ import {
  batchUpdateExercisesMetaAction,
  createExerciseAction,
  deleteExerciseAction,
- getExerciseByIdAction,
-  listExercisesAction,
  previewRawNormalizationAction,
  updateExerciseAction,
  type ExerciseEditorInput,
@@ -281,6 +279,75 @@ type ListItem = {
   isActive: boolean;
 };
 
+type ExerciseListRequest = {
+  limit: number;
+  offset: number;
+  cursorId?: number | null;
+  cursorUpdatedAt?: string | null;
+  query: string;
+  type: string;
+  qualityStatus: string;
+  examType: string;
+  sortBy: 'id' | 'updatedAt';
+  sortDir: 'asc' | 'desc';
+  includeTotal: boolean;
+};
+
+type ExerciseListResponse = {
+  success: boolean;
+  error?: string;
+  items: ListItem[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+  nextCursorId: number | null;
+  nextCursorUpdatedAt: string | null;
+};
+
+type ExerciseDetailResponse = {
+  success: boolean;
+  error?: string;
+  item?: Record<string, unknown>;
+};
+
+async function fetchExerciseList(input: ExerciseListRequest): Promise<ExerciseListResponse> {
+  const params = new URLSearchParams({
+    limit: String(input.limit),
+    offset: String(input.offset),
+    query: input.query,
+    type: input.type,
+    qualityStatus: input.qualityStatus,
+    examType: input.examType,
+    sortBy: input.sortBy,
+    sortDir: input.sortDir,
+    includeTotal: String(input.includeTotal),
+  });
+  if (input.cursorId) params.set('cursorId', String(input.cursorId));
+  if (input.cursorUpdatedAt) params.set('cursorUpdatedAt', input.cursorUpdatedAt);
+
+  const response = await fetch(`/api/admin/exercises?${params.toString()}`, { cache: 'no-store' });
+  const result = await response.json() as ExerciseListResponse;
+  if (response.status === 401) {
+    return { ...result, error: 'Сессия администратора истекла. Обновите страницу и войдите снова.' };
+  }
+  return result;
+}
+
+async function fetchExerciseById(id: number): Promise<ExerciseDetailResponse> {
+  const response = await fetch(`/api/admin/exercises/${id}`, { cache: 'no-store' });
+  const result = await response.json() as ExerciseDetailResponse;
+  if (response.status === 401) {
+    return { ...result, error: 'Сессия администратора истекла. Обновите страницу и войдите снова.' };
+  }
+  return result;
+}
+
+function getExerciseIdFromHash(hash: string) {
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
+  const id = Number(params.get('exercise') ?? NaN);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 type RawPreviewItem = {
   file: string;
   beforeIssues: {
@@ -302,7 +369,7 @@ type RawPreviewItem = {
 
 type AdminFormProps = {
  initialItems: ListItem[];
- initialTotalItems?: number;
+ initialTotalItems?: number | null;
  initialSelectedId?: number | null;
  initialSelectedExercise?: Record<string, unknown> | null;
 };
@@ -731,8 +798,6 @@ function getDraftKey(id?: number | string | null) {
 }
 
 function loadFormState(targetId: number | null, baseForm: Form) {
- // For existing exercises, prefer fresh server data to avoid stale local drafts
- // masking updates made from another machine/user.
  if (targetId != null) {
  return normalizeFormForEditor(baseForm);
  }
@@ -749,6 +814,20 @@ function loadFormState(targetId: number | null, baseForm: Form) {
  }
  }
  return normalizeFormForEditor(baseForm);
+}
+
+function readStoredDraft(targetId: number | null) {
+ const raw = typeof window !== 'undefined' ? localStorage.getItem(getDraftKey(targetId)) : null;
+ if (!raw) return null;
+ try {
+ const parsed = JSON.parse(raw) as Form;
+ if (!parsed || typeof parsed !== 'object') return null;
+ if (targetId !== null && parsed.id !== targetId) return null;
+ return normalizeFormForEditor(parsed);
+ } catch (error) {
+ console.error(`Failed to parse ${getDraftKey(targetId)}`, error);
+ return null;
+ }
 }
 
 function formatUpdatedAt(value: string) {
@@ -859,12 +938,20 @@ const [nextCursorId, setNextCursorId] = useState<number | null>(
 const [nextCursorUpdatedAt, setNextCursorUpdatedAt] = useState<string | null>(
  initialItems.length > 0 ? initialItems[initialItems.length - 1].updatedAt : null,
 );
-const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initialItems.length);
+const [totalItems, setTotalItems] = useState<number | null>(initialTotalItems ?? null);
+ const [initialListPending, setInitialListPending] = useState(initialItems.length === 0);
+ const [matchingItems, setMatchingItems] = useState<number | null>(null);
  const [loadingMore, setLoadingMore] = useState(false);
- const [selectedId, setSelectedId] = useState<number | null>(null);
+ const [selectedId, setSelectedId] = useState<number | null>(
+  initialSelectedExercise ? initialSelectedId : null,
+ );
  const [message, setMessage] = useState('');
  const [isError, setIsError] = useState(false);
  const [saving, setSaving] = useState(false);
+ const [databaseSaveState, setDatabaseSaveState] = useState<'draft' | 'local' | 'saving' | 'saved'>(
+  initialSelectedExercise ? 'saved' : 'draft',
+ );
+ const [databaseSavedAt, setDatabaseSavedAt] = useState<Date | null>(null);
  const [deleting, setDeleting] = useState(false);
  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
  const [isSeedRegenerateArmed, setIsSeedRegenerateArmed] = useState(false);
@@ -872,6 +959,11 @@ const [totalItems, setTotalItems] = useState<number>(initialTotalItems ?? initia
  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
  const [showFloatingSave, setShowFloatingSave] = useState(false);
  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+ const [draftRecovery, setDraftRecovery] = useState<{
+  id: number;
+  serverForm: Form;
+  draftForm: Form;
+ } | null>(null);
  const [initialSelectionPending, setInitialSelectionPending] = useState(Boolean(initialSelectedId && !initialSelectedExercise));
 const [listQuery, setListQuery] = useState('');
 const [serverListQuery, setServerListQuery] = useState('');
@@ -903,12 +995,12 @@ const [previewCheckResult, setPreviewCheckResult] = useState<{
  const suppressHistoryRef = useRef(false);
  const lastSnapshotRef = useRef('');
  const lastPersistedSnapshotRef = useRef('');
+ const latestFormRef = useRef(form);
  const switchingExerciseRef = useRef(false);
  const autosaveInFlightRef = useRef(false);
 const autosaveRetryTimerRef = useRef<number | null>(null);
 const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
 const initialTargetIdRef = useRef<number | null>(initialSelectedId);
-const skipInitialListRefreshRef = useRef(false);
 const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
@@ -935,6 +1027,27 @@ const markdownCommands = useMemo<ICommand[]>(() => ([
  commands.orderedListCommand,
  commands.checkedListCommand,
 ]), []);
+
+ function clearPendingDraftMarker(id: number) {
+ const pendingValue = document.cookie
+ .split('; ')
+ .find((entry) => entry.startsWith('admin_pending_draft_id='))
+ ?.split('=')[1];
+ if (pendingValue === String(id)) {
+ document.cookie = 'admin_pending_draft_id=; Path=/admin; Max-Age=0; SameSite=Lax';
+ }
+ }
+
+ function offerExistingDraftRecovery(id: number, serverForm: Form) {
+ const localDraft = readStoredDraft(id);
+ if (!localDraft) return;
+ if (JSON.stringify(localDraft) === JSON.stringify(serverForm)) {
+ localStorage.removeItem(getDraftKey(id));
+ clearPendingDraftMarker(id);
+ return;
+ }
+ setDraftRecovery({ id, serverForm, draftForm: localDraft });
+ }
 
 useEffect(() => {
  const timer = window.setTimeout(() => {
@@ -963,20 +1076,43 @@ useEffect(() => {
 }, [listSortBy, listSortDir]);
 
 useEffect(() => {
+ const hashId = getExerciseIdFromHash(window.location.hash);
+ if (hashId && hashId !== initialSelectedId) {
+ initialTargetIdRef.current = hashId;
+ initializedFromUrlRef.current = true;
+ window.setTimeout(() => setInitialSelectionPending(true), 0);
+ return;
+ }
+
+ if (initialSelectedId && initialSelectedExercise) {
+ window.setTimeout(() => {
+  offerExistingDraftRecovery(
+   initialSelectedId,
+   loadFormState(initialSelectedId, formFromExerciseItem(initialSelectedExercise)),
+  );
+ }, 0);
+ return;
+ }
+
  if (!initialSelectedId) {
  const params = new URLSearchParams(window.location.search);
  const rawId = params.get('id') ?? params.get('exerciseId');
  const fallbackId = localStorage.getItem('admin_last_selected_id');
- const id = Number(rawId ?? fallbackId ?? NaN);
+ const id = Number(hashId ?? rawId ?? fallbackId ?? NaN);
  const hasTargetId = Number.isInteger(id) && id > 0;
  initialTargetIdRef.current = hasTargetId ? id : null;
  initializedFromUrlRef.current = hasTargetId;
+ if (hasTargetId) {
+ window.setTimeout(() => setInitialSelectionPending(true), 0);
+ }
  }
 
  if (!initializedFromUrlRef.current && !initialSelectedExercise) {
  setForm(loadFormState(null, EMPTY));
  setInitialSelectionPending(false);
  }
+ // This initialization reads local recovery once for the server-selected exercise.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [initialSelectedId, initialSelectedExercise]);
 
  useEffect(() => {
@@ -986,11 +1122,15 @@ useEffect(() => {
  }, [form, isDraftLoaded]);
 
  useEffect(() => {
+ latestFormRef.current = form;
  if (!isDraftLoaded) return;
- const timer = setTimeout(() => {
- localStorage.setItem(getDraftKey(form.id), JSON.stringify(form));
- }, 1000);
- return () => clearTimeout(timer);
+ const snapshot = JSON.stringify(form);
+ if (snapshot === lastPersistedSnapshotRef.current) return;
+ localStorage.setItem(getDraftKey(form.id), snapshot);
+ setDatabaseSaveState('local');
+ if (form.id) {
+ document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
+ }
  }, [form, isDraftLoaded]);
 
  useEffect(() => {
@@ -1016,19 +1156,73 @@ useEffect(() => {
  lastSnapshotRef.current = snapshot;
  }, [form, isDraftLoaded]);
 
- useEffect(() => {
+ function clearExerciseUrlSelection() {
  const url = new URL(window.location.href);
- if (form.id) {
- url.searchParams.set('id', String(form.id));
- url.searchParams.delete('slug');
+ const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+ hashParams.delete('exercise');
+ url.searchParams.delete('id');
  url.searchParams.delete('exerciseId');
+ url.hash = hashParams.toString();
+ window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
  }
+
+ function storeLocalDraft(source: Form) {
+ localStorage.setItem(getDraftKey(source.id), JSON.stringify(source));
+ if (source.id) {
+ document.cookie = `admin_pending_draft_id=${source.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
+ }
+ }
+
+ function markDatabaseSaveSucceeded(source: Form, snapshot: string) {
+  lastPersistedSnapshotRef.current = snapshot;
+  setDatabaseSavedAt(new Date());
+  if (JSON.stringify(latestFormRef.current) !== snapshot) {
+   storeLocalDraft(latestFormRef.current);
+   setDatabaseSaveState('local');
+   return;
+  }
+  localStorage.removeItem(getDraftKey(source.id));
+  if (source.id) clearPendingDraftMarker(source.id);
+  setDatabaseSaveState('saved');
+ }
+
+ function useRecoveredDraft() {
+ if (!draftRecovery) return;
+ lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
+ setForm(draftRecovery.draftForm);
+ setSelectedId(draftRecovery.id);
+ setDatabaseSaveState('local');
+ setDraftRecovery(null);
+ setIsError(false);
+ setMessage('Локальные изменения восстановлены. Автосохранение включено.');
+ }
+
+ function useDatabaseVersion() {
+ if (!draftRecovery) return;
+ localStorage.removeItem(getDraftKey(draftRecovery.id));
+ clearPendingDraftMarker(draftRecovery.id);
+ setForm(draftRecovery.serverForm);
+ lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
+ setSelectedId(draftRecovery.id);
+ setDatabaseSaveState('saved');
+ setDatabaseSavedAt(null);
+ setDraftRecovery(null);
+ setIsError(false);
+ setMessage('Используется актуальная версия из базы.');
+ }
+
+ useEffect(() => {
+ if (!form.id) return;
+ const url = new URL(window.location.href);
+ const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+ hashParams.set('exercise', String(form.id));
+ url.hash = hashParams.toString();
  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
  if (nextUrl !== currentUrl) {
  window.history.replaceState(window.history.state, '', nextUrl);
  }
- }, [form.id, form.prompt]);
+ }, [form.id]);
 
  useEffect(() => {
  const baseTitle = 'Админка ЕГЭ';
@@ -1486,8 +1680,14 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  setShowSeedRegenerateModal(true);
  }
 
+ const hasActiveListFilter =
+  serverListQuery.trim().length > 0 ||
+  listTypeFilter !== 'all' ||
+  listStatusFilter !== 'all' ||
+  listExamTypeFilter !== 'all';
+
  async function refreshList(options?: { includeTotal?: boolean; force?: boolean }) {
- const includeTotal = options?.includeTotal ?? false;
+ const includeTotal = options?.includeTotal ?? (hasActiveListFilter || initialListPending);
  const requestKey = JSON.stringify({
  query: serverListQuery,
  type: listTypeFilter,
@@ -1503,7 +1703,7 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  }
  inFlightRefreshKeyRef.current = requestKey;
  const requestSeq = ++refreshSeqRef.current;
- const res = await listExercisesAction({
+ const res = await fetchExerciseList({
  limit: 150,
  offset: 0,
  sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
@@ -1523,13 +1723,24 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
  setNextCursorId(cursorId);
  setNextCursorUpdatedAt(cursorUpdatedAt);
- if (includeTotal) {
- setTotalItems(Number(res.total ?? res.items.length));
+  if (includeTotal) {
+  const resultCount = Number(res.total ?? res.items.length);
+  if (hasActiveListFilter) {
+  setMatchingItems(resultCount);
+  } else {
+  setTotalItems(resultCount);
+  setMatchingItems(null);
+  }
+  } else if (!hasActiveListFilter) {
+  setMatchingItems(null);
  }
  lastAppliedRefreshKeyRef.current = requestKey;
  } else {
  setIsError(true);
  setMessage(res.error || 'Ошибка загрузки списка заданий.');
+ }
+ if (initialListPending) {
+ setInitialListPending(false);
  }
  if (inFlightRefreshKeyRef.current === requestKey) {
  inFlightRefreshKeyRef.current = null;
@@ -1540,7 +1751,7 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  if (!hasMore || loadingMore) return;
  setLoadingMore(true);
  try {
- const res = await listExercisesAction({
+ const res = await fetchExerciseList({
  limit: 150,
  offset: nextOffset,
  cursorId: nextCursorId,
@@ -1586,16 +1797,13 @@ useEffect(() => {
 }, [listQuery]);
 
 useEffect(() => {
- if (skipInitialListRefreshRef.current) {
- skipInitialListRefreshRef.current = false;
- return;
- }
+ if (!sortPrefsReady) return;
  const timer = setTimeout(() => {
  void refreshList();
  }, 0);
  return () => clearTimeout(timer);
  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
+}, [sortPrefsReady, serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
 
  useEffect(() => {
  if (!isSeedRegenerateArmed) return;
@@ -1606,9 +1814,11 @@ useEffect(() => {
 useEffect(() => {
  if (selectedId) {
  localStorage.setItem('admin_last_selected_id', String(selectedId));
+ document.cookie = `admin_selected_exercise_id=${selectedId}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
  return;
  }
  localStorage.removeItem('admin_last_selected_id');
+ document.cookie = 'admin_selected_exercise_id=; Path=/admin; Max-Age=0; SameSite=Lax';
  }, [selectedId]);
 
  useEffect(() => {
@@ -1617,7 +1827,7 @@ useEffect(() => {
  }, [form, isDraftLoaded]);
 
  async function loadExercise(id: number) {
- const res = await getExerciseByIdAction(id);
+ const res = await fetchExerciseById(id);
  if (!res.success || !res.item) {
  setIsError(true);
  setMessage(res.error || 'Не удалось открыть задание.');
@@ -1629,6 +1839,9 @@ useEffect(() => {
  setForm(loaded);
  lastPersistedSnapshotRef.current = JSON.stringify(loaded);
  setSelectedId(id);
+ setDatabaseSaveState('saved');
+ setDatabaseSavedAt(null);
+ offerExistingDraftRecovery(id, loaded);
  setMessage('');
  setIsSeedRegenerateArmed(false);
  setShowSeedRegenerateModal(false);
@@ -1687,6 +1900,13 @@ useEffect(() => {
  setShowMoreBatchActions(false);
  }
 
+ function selectAllShownItems() {
+  const visibleIds = flatFilteredItems.map((item) => item.id);
+  setMultiSelectedIds(visibleIds);
+  setLastMultiSelectedId(visibleIds[visibleIds.length - 1] ?? null);
+  setSelectionMode(true);
+ }
+
  async function applyBatchStatus() {
  if (multiSelectedIds.length === 0 || batchSaving) return;
  setBatchSaving(true);
@@ -1735,7 +1955,7 @@ useEffect(() => {
  setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
  setIsError(false);
  clearMultiSelection();
- await refreshList();
+ await refreshList({ force: true });
  } else {
  setIsError(true);
  setMessage(res.error || 'Ошибка массового обновления.');
@@ -1779,6 +1999,8 @@ useEffect(() => {
  setInitialSelectionPending(false);
  }
  })();
+ // Load only when a queued initial target changes; depending on loadExercise would refetch on renders.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [isDraftLoaded, initialSelectionPending]);
 
  function parsePunctuationMarks(raw: string) {
@@ -1947,29 +2169,46 @@ useEffect(() => {
  };
  }
 
+ function saveFailureMessage(error: string | undefined, switchCancelled = false) {
+ if (error === 'Unauthorized') {
+ return 'Сессия истекла. Изменения сохранены локально. Войдите снова, чтобы записать их в базу.';
+ }
+ const prefix = switchCancelled ? 'Переход отменён. ' : '';
+ return `${prefix}Изменения сохранены локально, но не записаны в базу: ${error || 'ошибка сохранения'}.`;
+ }
+
  async function autosaveCurrentToDbIfNeeded(nextId: number) {
- if (!isEdit || !form.id || form.id === nextId || saving || deleting) return;
+ if (!isEdit || !form.id || form.id === nextId || saving || deleting) return true;
  const snapshot = JSON.stringify(form);
- if (snapshot === lastPersistedSnapshotRef.current) return;
+ if (snapshot === lastPersistedSnapshotRef.current) return true;
+ storeLocalDraft(form);
+ setDatabaseSaveState('saving');
  const payload = buildPayloadFromForm(form);
  const res = await updateExerciseAction({ ...payload, id: form.id });
  if (res.success) {
- lastPersistedSnapshotRef.current = snapshot;
- await refreshList();
- } else if (autosaveRetryTimerRef.current == null) {
+ markDatabaseSaveSucceeded(form, snapshot);
+ await refreshList({ force: true });
+ return true;
+ }
+ setDatabaseSaveState('local');
+ setIsError(true);
+ setMessage(saveFailureMessage(res.error, true));
+ if (res.error !== 'Unauthorized' && autosaveRetryTimerRef.current == null) {
  autosaveRetryTimerRef.current = window.setTimeout(() => {
  autosaveRetryTimerRef.current = null;
  if (switchingExerciseRef.current || autosaveInFlightRef.current) return;
  void autosaveCurrentToDbIfNeeded(nextId);
  }, 3000);
  }
+ return false;
  }
 
  async function openExerciseWithAutosave(id: number) {
  if (switchingExerciseRef.current) return;
  switchingExerciseRef.current = true;
  try {
- await autosaveCurrentToDbIfNeeded(id);
+ const saved = await autosaveCurrentToDbIfNeeded(id);
+ if (!saved) return;
  await loadExercise(id);
  } finally {
  switchingExerciseRef.current = false;
@@ -1986,12 +2225,18 @@ useEffect(() => {
  if (autosaveInFlightRef.current) return;
  autosaveInFlightRef.current = true;
  try {
+ storeLocalDraft(form);
+ setDatabaseSaveState('saving');
  const payload = buildPayloadFromForm(form);
  const res = await updateExerciseAction({ ...payload, id: form.id! });
  if (res.success) {
- lastPersistedSnapshotRef.current = snapshot;
- await refreshList();
- } else if (autosaveRetryTimerRef.current == null) {
+ markDatabaseSaveSucceeded(form, snapshot);
+ await refreshList({ force: true });
+ } else {
+ setDatabaseSaveState('local');
+ setIsError(true);
+ setMessage(saveFailureMessage(res.error));
+ if (res.error !== 'Unauthorized' && autosaveRetryTimerRef.current == null) {
  autosaveRetryTimerRef.current = window.setTimeout(() => {
  autosaveRetryTimerRef.current = null;
  if (switchingExerciseRef.current || autosaveInFlightRef.current) return;
@@ -2001,17 +2246,24 @@ useEffect(() => {
  void (async () => {
  autosaveInFlightRef.current = true;
  try {
+ storeLocalDraft(form);
+ setDatabaseSaveState('saving');
  const retryPayload = buildPayloadFromForm(form);
  const retryRes = await updateExerciseAction({ ...retryPayload, id: form.id });
  if (retryRes.success) {
- lastPersistedSnapshotRef.current = retrySnapshot;
- await refreshList();
+ markDatabaseSaveSucceeded(form, retrySnapshot);
+ await refreshList({ force: true });
+ } else {
+ setDatabaseSaveState('local');
+ setIsError(true);
+ setMessage(saveFailureMessage(retryRes.error));
  }
  } finally {
  autosaveInFlightRef.current = false;
  }
  })();
  }, 3000);
+ }
  }
  } finally {
  autosaveInFlightRef.current = false;
@@ -2025,24 +2277,38 @@ useEffect(() => {
  async function onSubmit(event: React.FormEvent) {
  event.preventDefault();
  setSaving(true);
+ setDatabaseSaveState('saving');
  setMessage('');
  setIsError(false);
  const payload = buildPayloadFromForm(form);
 
- const res = isEdit
+ const wasEdit = isEdit;
+ const res = wasEdit
  ? await updateExerciseAction({ ...payload, id: form.id! })
  : await createExerciseAction(payload);
 
  if (res.success) {
- setMessage(isEdit ? 'Изменения сохранены.' : 'Задание создано.');
+ setMessage(wasEdit ? 'Изменения сохранены.' : 'Задание создано.');
  localStorage.removeItem(getDraftKey(form.id));
- const nextForm = isEdit ? form : loadFormState(null, EMPTY);
+ if (form.id) clearPendingDraftMarker(form.id);
+ const nextForm = wasEdit ? form : loadFormState(null, EMPTY);
  setForm(nextForm);
- lastPersistedSnapshotRef.current = JSON.stringify(nextForm);
- await refreshList();
+ if (wasEdit) {
+  markDatabaseSaveSucceeded(form, JSON.stringify(form));
  } else {
+  lastPersistedSnapshotRef.current = JSON.stringify(nextForm);
+  setDatabaseSaveState('draft');
+  setDatabaseSavedAt(null);
+ }
+ if (!wasEdit) {
+ setTotalItems((current) => (current === null ? current : current + 1));
+ }
+ await refreshList({ force: true });
+ } else {
+ storeLocalDraft(form);
+ setDatabaseSaveState('local');
  setIsError(true);
- setMessage(res.error || 'Ошибка сохранения.');
+ setMessage(saveFailureMessage(res.error));
  }
 
  setSaving(false);
@@ -2055,17 +2321,27 @@ useEffect(() => {
  setMessage('');
  setIsError(false);
 
- const res = await deleteExerciseAction(form.id!);
+ const deletedId = form.id!;
+ const res = await deleteExerciseAction(deletedId);
  if (res.success) {
  setMessage('Задание удалено.');
  localStorage.removeItem(getDraftKey(form.id));
+ clearPendingDraftMarker(deletedId);
  setForm(loadFormState(null, EMPTY));
  setSelectedId(null);
+ setDatabaseSaveState('draft');
+ setDatabaseSavedAt(null);
+ clearExerciseUrlSelection();
  setPreviewCheckResult(null);
  setIsSeedRegenerateArmed(false);
  setShowSeedRegenerateModal(false);
  setShowDeleteConfirmModal(false);
- await refreshList();
+ setItems((current) => current.filter((item) => item.id !== deletedId));
+ setTotalItems((current) => (current === null ? current : Math.max(0, current - 1)));
+ setMatchingItems((current) =>
+  hasActiveListFilter && current !== null ? Math.max(0, current - 1) : current,
+ );
+ await refreshList({ force: true });
  } else {
  setIsError(true);
  setMessage(res.error || 'Ошибка удаления.');
@@ -2074,11 +2350,49 @@ useEffect(() => {
  setDeleting(false);
  }
 
+ const databaseIndicator = databaseSaveState === 'saved'
+  ? {
+   label: 'В БД',
+   detail: databaseSavedAt
+    ? `сохранено ${databaseSavedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+    : 'актуальная версия',
+   box: 'border-emerald-200 bg-emerald-50/80 text-emerald-800',
+   dot: 'bg-emerald-500',
+  }
+  : databaseSaveState === 'saving'
+   ? {
+    label: 'Сохранение...',
+    detail: 'запись в БД',
+    box: 'border-sky-200 bg-sky-50/80 text-sky-800',
+    dot: 'animate-pulse bg-sky-500',
+   }
+   : databaseSaveState === 'local'
+    ? {
+     label: 'Только локально',
+     detail: 'ждёт записи в БД',
+     box: 'border-amber-200 bg-amber-50/80 text-amber-800',
+     dot: 'bg-amber-500',
+    }
+    : {
+     label: 'Новый черновик',
+     detail: 'ещё не в БД',
+     box: 'border-stroke bg-surface text-foreground/65',
+     dot: 'bg-foreground/25',
+    };
+
  return (
  <div className="mx-auto grid w-full max-w-[1400px] gap-5 items-start xl:grid-cols-[300px_minmax(0,1fr)]">
- <aside ref={sidebarRef} className="flex flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm max-h-[60vh] xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)]">
+ <aside ref={sidebarRef} className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
  <div className="mb-3 flex items-center justify-between">
- <h3 className="text-sm font-semibold">Задания · {totalItems}</h3>
+ <div>
+  <h3 className="text-sm font-semibold">
+   Задания · {totalItems ?? '...'}
+   {hasActiveListFilter && matchingItems !== null ? ` · найдено ${matchingItems}` : ''}
+  </h3>
+  <p className="text-[11px] text-foreground/60">
+   {initialListPending ? 'Загрузка списка...' : `Показано: ${flatFilteredItems.length}${hasMore ? ' · можно загрузить ещё' : ''}`}
+  </p>
+ </div>
  <div className="flex items-center gap-1">
  <button
  className="rounded-md px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke "
@@ -2103,6 +2417,24 @@ useEffect(() => {
  )}
  </div>
  </div>
+ <div
+  aria-live="polite"
+  className={`mb-3 flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[11px] ${databaseIndicator.box}`}
+ >
+  <span className={`h-2 w-2 shrink-0 rounded-full ${databaseIndicator.dot}`} />
+  <span className="font-semibold">{databaseIndicator.label}</span>
+  <span className="ml-auto opacity-75">{databaseIndicator.detail}</span>
+ </div>
+ {selectionMode && (
+ <button
+ type="button"
+ onClick={selectAllShownItems}
+ disabled={flatFilteredItems.length === 0}
+ className="mb-3 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-stroke disabled:cursor-not-allowed disabled:opacity-60"
+ >
+ Выбрать все показанные ({flatFilteredItems.length})
+ </button>
+ )}
  {selectionMode && multiSelectedIds.length > 0 && (
  <div className="mb-3 space-y-2 rounded-lg border border-stroke bg-surface p-2">
  <div className="flex items-center gap-1 text-xs font-semibold text-foreground/80">
@@ -2382,7 +2714,16 @@ useEffect(() => {
  ))}
  </div>
  ))}
- {groupedItems.length === 0 && (
+ {initialListPending ? (
+ <div className="space-y-2">
+ <div className="h-6 rounded-md border border-stroke bg-surface animate-pulse" />
+ <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
+ <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
+ <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
+ <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
+ <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
+ </div>
+ ) : groupedItems.length === 0 && (
  <div className="rounded-lg border border-dashed border-stroke px-3 py-4 text-sm text-foreground/60">
  Ничего не найдено по текущим фильтрам.
  </div>
@@ -2400,7 +2741,7 @@ useEffect(() => {
  </div>
  </aside>
 
- <div className={`rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm ${initialSelectionPending ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity`}>
+ <div className={`rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm ${initialSelectionPending && !initialSelectedExercise ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity`}>
  <div className="mb-4 flex items-center justify-between">
  <h2 className="text-xl font-semibold text-foreground ">
  {isEdit ? 'Редактирование задания' : 'Создание задания'}
@@ -2429,6 +2770,9 @@ useEffect(() => {
  onClick={() => {
  setForm(loadFormState(null, EMPTY));
  setSelectedId(null);
+ setDatabaseSaveState('draft');
+ setDatabaseSavedAt(null);
+ clearExerciseUrlSelection();
  setMessage('');
  setIsSeedRegenerateArmed(false);
  setShowSeedRegenerateModal(false);
@@ -3041,6 +3385,39 @@ useEffect(() => {
  : 'Создать задание'}
  </button>
  </div>
+
+ {draftRecovery && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+ <div className="w-full max-w-lg rounded-2xl border border-stroke bg-surface-strong p-5 shadow-xl">
+ <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/50">
+ Локальная страховочная копия
+ </p>
+ <h4 className="mt-2 text-base font-semibold text-foreground">
+ Найдены несохранённые изменения для задания #{draftRecovery.id}
+ </h4>
+ <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+ В браузере осталась версия, которая отличается от данных в базе. Можно восстановить её и продолжить редактирование
+ или отказаться от неё и открыть текущую версию из базы.
+ </p>
+ <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+ <button
+ type="button"
+ className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 hover:bg-surface"
+ onClick={useDatabaseVersion}
+ >
+ Использовать версию из БД
+ </button>
+ <button
+ type="button"
+ className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-strong"
+ onClick={useRecoveredDraft}
+ >
+ Восстановить локальные изменения
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
 
  {showSeedRegenerateModal && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">

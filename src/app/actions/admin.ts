@@ -3,11 +3,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { and, desc, eq, inArray, lt, ne, sql } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { db } from '@/db';
 import { exerciseAttempts, exercises } from '@/db/schema';
 import { exerciseSchema } from '@/features/exercises/schemas';
 import type { ExerciseCategory, ExerciseType } from '@/features/exercises/types';
+import { assertAdminAuthorized } from '@/lib/admin-auth';
 
 export type ExerciseEditorInput = {
   id?: number;
@@ -575,6 +576,8 @@ function buildExercisePayload(input: ExerciseEditorInput) {
 
 export async function createExerciseAction(input: ExerciseEditorInput) {
   try {
+    await assertAdminAuthorized();
+
     const normalizedSeedKey = input.seedKey?.trim() ?? '';
     if (!normalizedSeedKey) {
       return {
@@ -642,7 +645,7 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
       })
       .returning({ id: exercises.id });
 
-    revalidateTag('admin:list');
+    updateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true, id: inserted[0]?.id };
@@ -654,6 +657,8 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
 
 export async function updateExerciseAction(input: ExerciseEditorInput & { id: number }) {
   try {
+    await assertAdminAuthorized();
+
     const normalizedSeedKey = input.seedKey?.trim() ?? '';
     if (!normalizedSeedKey) {
       return {
@@ -727,7 +732,7 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
       return { success: false, error: 'Exercise not found' };
     }
 
-    revalidateTag('admin:list');
+    updateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
@@ -739,6 +744,8 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
 
 export async function deleteExerciseAction(id: number) {
   try {
+    await assertAdminAuthorized();
+
     if (!Number.isInteger(id) || id <= 0) {
       return { success: false, error: 'Invalid exercise id' };
     }
@@ -752,7 +759,7 @@ export async function deleteExerciseAction(id: number) {
       return { success: false, error: 'Exercise not found' };
     }
 
-    revalidateTag('admin:list');
+    updateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
@@ -768,6 +775,8 @@ export async function batchUpdateExercisesMetaAction(input: {
   isActive?: boolean;
 }) {
   try {
+    await assertAdminAuthorized();
+
     const ids = Array.from(new Set((input.ids ?? []).filter((id) => Number.isInteger(id) && id > 0)));
     if (ids.length === 0) return { success: false, error: 'Нет id для обновления' };
     if (typeof input.qualityStatus === 'undefined' && typeof input.isActive === 'undefined') {
@@ -779,7 +788,7 @@ export async function batchUpdateExercisesMetaAction(input: {
     if (typeof input.isActive !== 'undefined') patch.isActive = input.isActive;
 
     await db.update(exercises).set(patch).where(inArray(exercises.id, ids));
-    revalidateTag('admin:list');
+    updateTag('admin:list');
     revalidatePath('/admin');
     return { success: true, updated: ids.length };
   } catch (error) {
@@ -820,6 +829,8 @@ function normalizeSearchBlobQuery(input: string) {
 
 export async function getExerciseTypeOptionsAction() {
   try {
+    await assertAdminAuthorized();
+
     const rows = await db.execute(
       sql`select unnest(enum_range(NULL::exercise_type))::text as type`,
     );
@@ -836,6 +847,8 @@ export async function getExerciseTypeOptionsAction() {
 
 export async function listExercisesAction(params: ListExercisesParams = {}) {
   try {
+    await assertAdminAuthorized();
+
     const toIso = (value: unknown): string => {
       if (value instanceof Date) return value.toISOString();
       const parsed = new Date(String(value));
@@ -908,18 +921,15 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       else whereParts.push(sql`${exercises.id} > ${cursorId}`);
     }
     if (sortBy === 'updatedAt' && Number.isInteger(cursorId) && cursorId > 0 && cursorUpdatedAt) {
-      const cursorDate = new Date(cursorUpdatedAt);
-      if (!Number.isNaN(cursorDate.getTime())) {
-        const cursorIso = cursorDate.toISOString();
-        if (sortDir === 'desc') {
-          whereParts.push(
-            sql`(${exercises.updatedAt} < ${cursorIso}::timestamptz or (${exercises.updatedAt} = ${cursorIso}::timestamptz and ${exercises.id} < ${cursorId}))`,
-          );
-        } else {
-          whereParts.push(
-            sql`(${exercises.updatedAt} > ${cursorIso}::timestamptz or (${exercises.updatedAt} = ${cursorIso}::timestamptz and ${exercises.id} > ${cursorId}))`,
-          );
-        }
+      // Keep PostgreSQL's full timestamp precision; Date/ISO conversion truncates microseconds.
+      if (sortDir === 'desc') {
+        whereParts.push(
+          sql`(${exercises.updatedAt} < ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} < ${cursorId}))`,
+        );
+      } else {
+        whereParts.push(
+          sql`(${exercises.updatedAt} > ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} > ${cursorId}))`,
+        );
       }
     }
 
@@ -935,6 +945,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
         explanation: exercises.explanation,
         qualityStatus: exercises.qualityStatus,
         updatedAt: exercises.updatedAt,
+        updatedAtCursor: sql<string>`${exercises.updatedAt}::text`,
         isActive: exercises.isActive,
       })
       .from(exercises)
@@ -978,7 +989,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       hasMore,
       nextOffset: normalizedOffset + items.length,
       nextCursorId: last ? last.id : null,
-      nextCursorUpdatedAt: last ? toIso(last.updatedAt) : null,
+      nextCursorUpdatedAt: last ? last.updatedAtCursor : null,
     };
   } catch (error) {
     console.error('Failed to list exercises:', error);
@@ -997,6 +1008,8 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
 
 export async function getExerciseByIdAction(id: number) {
   try {
+    await assertAdminAuthorized();
+
     const rows = await db.select().from(exercises).where(eq(exercises.id, id)).limit(1);
     const row = rows[0];
     if (!row) return { success: false, error: 'Exercise not found' };
@@ -1258,6 +1271,8 @@ export async function previewRawNormalizationAction(input?: {
   limit?: number;
 }) {
   try {
+    await assertAdminAuthorized();
+
     const rootDir = path.resolve(process.cwd(), 'test_sources', 'raw_live');
     const filter = String(input?.fileFilter ?? '').trim().toLowerCase();
     const limit = Math.max(1, Math.min(Number(input?.limit ?? 3), 20));

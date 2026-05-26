@@ -59,3 +59,16 @@ PoFixim — это платформа для хранения, парсинга,
 Отладочные переменные:
 - `HARVEST_HEADLESS=false`
 - `HARVEST_DEBUG_FILL_ONLY=true`
+
+## Доступ к админке
+
+Маршрут `/admin` и административные операции требуют password-session. Для локального
+запуска задайте в `.env`:
+
+```env
+ADMIN_PASSWORD=replace-with-local-password
+ADMIN_SESSION_SECRET=replace-with-long-random-secret
+```
+
+`ADMIN_SESSION_SECRET` используется для подписи `httpOnly` cookie сессии. После его
+изменения перезапустите `next dev`, чтобы сервер прочитал новое значение.
