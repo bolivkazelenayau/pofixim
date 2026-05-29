@@ -9,6 +9,7 @@ import { exerciseAttempts, exercises } from '@/db/schema';
 import { exerciseSchema } from '@/features/exercises/schemas';
 import type { ExerciseCategory, ExerciseType } from '@/features/exercises/types';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
+import { logSlowServerAction } from '@/lib/slow-action-log';
 
 export type ExerciseEditorInput = {
   id?: number;
@@ -74,6 +75,7 @@ type ExerciseListItem = {
   explanation: string;
   qualityStatus: string;
   updatedAt: string;
+  updatedAtCursor: string;
   isActive: boolean;
 };
 
@@ -139,6 +141,32 @@ function validateTypeSkillConsistency(input: ExerciseEditorInput): string | null
 
   if (tags.has('ege.9') && looksLikeEgeMultiSelect && input.type !== 'ege_multi_select') {
     return 'Для формулировки ЕГЭ-9 с выбором номеров тип должен быть ege_multi_select, а не fill_blank.';
+  }
+
+  return null;
+}
+
+function validateAnswerCompleteness(input: ExerciseEditorInput): string | null {
+  if (input.type === 'ege_multi_select') {
+    const options = (input.options ?? []).map((value) => value.trim()).filter(Boolean);
+    const targetSet = (input.multiCorrectOptionIndexes ?? [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0);
+
+    if (options.length < 2) {
+      return 'Для ege_multi_select нужно заполнить как минимум два варианта ответа.';
+    }
+
+    if (targetSet.length === 0) {
+      return 'Для ege_multi_select нужно указать правильные номера ответа.';
+    }
+  }
+
+  if (input.type === 'fill_blank') {
+    const accepted = (input.fillAccepted ?? []).map((value) => value.trim()).filter(Boolean);
+    if (accepted.length === 0) {
+      return 'Для fill_blank нужно указать допустимые ответы.';
+    }
   }
 
   return null;
@@ -595,6 +623,10 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
     if (typeSkillError) {
       return { success: false, error: typeSkillError };
     }
+    const answerCompletenessError = validateAnswerCompleteness(input);
+    if (answerCompletenessError) {
+      return { success: false, error: answerCompletenessError };
+    }
 
     const parsed = exerciseSchema.safeParse(
       buildExercisePayload({
@@ -676,6 +708,10 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
     if (typeSkillError) {
       return { success: false, error: typeSkillError };
     }
+    const answerCompletenessError = validateAnswerCompleteness(input);
+    if (answerCompletenessError) {
+      return { success: false, error: answerCompletenessError };
+    }
 
     const parsed = exerciseSchema.safeParse(
       buildExercisePayload({
@@ -743,6 +779,7 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
 }
 
 export async function deleteExerciseAction(id: number) {
+  const startedAt = Date.now();
   try {
     await assertAdminAuthorized();
 
@@ -759,6 +796,17 @@ export async function deleteExerciseAction(id: number) {
       return { success: false, error: 'Exercise not found' };
     }
 
+    const existing = await db
+      .select({ id: exercises.id })
+      .from(exercises)
+      .where(eq(exercises.id, id))
+      .limit(1);
+
+    if (existing.length > 0) {
+      console.error('Delete verification failed: exercise still exists after delete', { id });
+      return { success: false, error: 'Delete verification failed' };
+    }
+
     updateTag('admin:list');
     revalidatePath('/admin');
     revalidatePath('/');
@@ -766,6 +814,8 @@ export async function deleteExerciseAction(id: number) {
   } catch (error) {
     console.error('Failed to delete exercise:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unexpected error' };
+  } finally {
+    logSlowServerAction('deleteExerciseAction', startedAt, { id });
   }
 }
 
@@ -827,6 +877,20 @@ function normalizeSearchBlobQuery(input: string) {
     .trim();
 }
 
+function buildUpdatedAtCursorCondition(input: {
+  cursorId: number;
+  cursorUpdatedAt: string;
+  sortDir: 'asc' | 'desc';
+}) {
+  const { cursorId, cursorUpdatedAt, sortDir } = input;
+
+  if (sortDir === 'desc') {
+    return sql`(${exercises.updatedAt} < ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} < ${cursorId}))`;
+  }
+
+  return sql`(${exercises.updatedAt} > ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} > ${cursorId}))`;
+}
+
 export async function getExerciseTypeOptionsAction() {
   try {
     await assertAdminAuthorized();
@@ -846,15 +910,9 @@ export async function getExerciseTypeOptionsAction() {
 }
 
 export async function listExercisesAction(params: ListExercisesParams = {}) {
+  const startedAt = Date.now();
   try {
     await assertAdminAuthorized();
-
-    const toIso = (value: unknown): string => {
-      if (value instanceof Date) return value.toISOString();
-      const parsed = new Date(String(value));
-      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-      return new Date(0).toISOString();
-    };
     const normalizedLimit = Math.max(1, Math.min(params.limit ?? 100, 500));
     const normalizedOffset = Math.max(0, params.offset ?? 0);
     const cursorId = Number(params.cursorId ?? NaN);
@@ -922,15 +980,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
     }
     if (sortBy === 'updatedAt' && Number.isInteger(cursorId) && cursorId > 0 && cursorUpdatedAt) {
       // Keep PostgreSQL's full timestamp precision; Date/ISO conversion truncates microseconds.
-      if (sortDir === 'desc') {
-        whereParts.push(
-          sql`(${exercises.updatedAt} < ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} < ${cursorId}))`,
-        );
-      } else {
-        whereParts.push(
-          sql`(${exercises.updatedAt} > ${cursorUpdatedAt}::text::timestamp or (${exercises.updatedAt} = ${cursorUpdatedAt}::text::timestamp and ${exercises.id} > ${cursorId}))`,
-        );
-      }
+      whereParts.push(buildUpdatedAtCursorCondition({ cursorId, cursorUpdatedAt, sortDir }));
     }
 
     const whereExpr = and(...whereParts);
@@ -944,7 +994,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
         prompt: exercises.prompt,
         explanation: exercises.explanation,
         qualityStatus: exercises.qualityStatus,
-        updatedAt: exercises.updatedAt,
+        updatedAt: sql<string>`${exercises.updatedAt}::text`,
         updatedAtCursor: sql<string>`${exercises.updatedAt}::text`,
         isActive: exercises.isActive,
       })
@@ -977,7 +1027,8 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       prompt: row.prompt,
       explanation: row.explanation,
       qualityStatus: row.qualityStatus,
-      updatedAt: toIso(row.updatedAt),
+      updatedAt: row.updatedAt,
+      updatedAtCursor: row.updatedAtCursor,
       isActive: row.isActive,
     }));
     const last = pageRows[pageRows.length - 1];
@@ -1003,6 +1054,17 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       nextCursorId: null as number | null,
       nextCursorUpdatedAt: null as string | null,
     };
+  } finally {
+    logSlowServerAction('listExercisesAction', startedAt, {
+      sortBy: params.sortBy === 'updatedAt' ? 'updatedAt' : 'id',
+      sortDir: params.sortDir === 'asc' ? 'asc' : 'desc',
+      hasQuery: Boolean((params.query ?? '').trim()),
+      type: (params.type ?? 'all').trim(),
+      qualityStatus: (params.qualityStatus ?? 'all').trim(),
+      examType: (params.examType ?? 'all').trim(),
+      limit: Math.max(1, Math.min(params.limit ?? 100, 500)),
+      includeTotal: Boolean(params.includeTotal),
+    });
   }
 }
 

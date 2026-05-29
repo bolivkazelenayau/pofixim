@@ -18,6 +18,16 @@ import {
 } from '@/app/actions/admin';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import { checkExerciseAnswer } from '@/features/exercises/checkers';
+import { formatAdminDateTime, formatAdminTime } from '@/lib/date-time';
+import {
+ buildFillBlankQuestionText,
+ describeAnswerTransfer,
+ extractOptionsFromQuestionText,
+ extractPromptFromQuestionText,
+ parseFillAcceptedSignature,
+ parseIndexCsv,
+ serializeMultiAnswerForFillBlank,
+} from '@/lib/exercise-type-conversion';
 import {
  exerciseSchema,
  type Exercise,
@@ -276,7 +286,8 @@ type ListItem = {
  explanation: string;
  qualityStatus: string;
  updatedAt: string;
-  isActive: boolean;
+ updatedAtCursor: string;
+ isActive: boolean;
 };
 
 type ExerciseListRequest = {
@@ -476,6 +487,67 @@ function seedPrefixForType(type: Form['type']) {
  default:
  return 'mc';
  }
+}
+
+function convertFormForTypeChange(form: Form, nextType: Form['type']): Form {
+ if (form.type === nextType) return form;
+
+ if (form.type === 'ege_multi_select' && nextType === 'fill_blank') {
+ const signature = serializeMultiAnswerForFillBlank(form.multiCorrectOptionIndexes);
+ const fillBefore =
+ form.fillBefore.trim() || buildFillBlankQuestionText(form.prompt, form.options);
+ return {
+ ...form,
+ type: nextType,
+ fillBefore,
+ fillAfter: form.fillAfter,
+ fillAccepted: form.fillAccepted.trim() || signature,
+ };
+ }
+
+ if (form.type === 'fill_blank' && nextType === 'ege_multi_select') {
+ const sourceText = form.fillBefore.trim() || form.prompt.trim();
+ const parsedPrompt = extractPromptFromQuestionText(sourceText);
+ const parsedOptions = extractOptionsFromQuestionText(sourceText);
+ const multiCorrectOptionIndexes =
+ form.multiCorrectOptionIndexes.trim() || parseFillAcceptedSignature(form.fillAccepted);
+ return {
+ ...form,
+ type: nextType,
+ prompt: parsedPrompt || form.prompt,
+ options: parsedOptions.length >= 2 ? parsedOptions : form.options,
+ multiCorrectOptionIndexes,
+ };
+ }
+
+ return {
+ ...form,
+ type: nextType,
+ };
+}
+
+function buildTypeChangeMessage(previousForm: Form, nextForm: Form) {
+ if (previousForm.type === nextForm.type) return '';
+
+ if (previousForm.type === 'ege_multi_select' && nextForm.type === 'fill_blank') {
+ return describeAnswerTransfer(
+ previousForm.type,
+ nextForm.type,
+ previousForm.multiCorrectOptionIndexes,
+ nextForm.fillAccepted,
+ );
+ }
+
+ if (previousForm.type === 'fill_blank' && nextForm.type === 'ege_multi_select') {
+ return describeAnswerTransfer(
+ previousForm.type,
+ nextForm.type,
+ previousForm.fillAccepted,
+ nextForm.multiCorrectOptionIndexes,
+ );
+ }
+
+ return '';
 }
 
 function slugFromPrompt(prompt: string) {
@@ -831,15 +903,7 @@ function readStoredDraft(targetId: number | null) {
 }
 
 function formatUpdatedAt(value: string) {
- const date = new Date(value);
- if (Number.isNaN(date.getTime())) return 'дата неизвестна';
- return new Intl.DateTimeFormat('ru-RU', {
- day: '2-digit',
- month: '2-digit',
- year: 'numeric',
- hour: '2-digit',
- minute: '2-digit',
- }).format(date);
+ return formatAdminDateTime(value);
 }
 
 function formFromExerciseItem(item: Record<string, unknown>): Form {
@@ -936,7 +1000,7 @@ const [nextCursorId, setNextCursorId] = useState<number | null>(
  initialItems.length > 0 ? initialItems[initialItems.length - 1].id : null,
 );
 const [nextCursorUpdatedAt, setNextCursorUpdatedAt] = useState<string | null>(
- initialItems.length > 0 ? initialItems[initialItems.length - 1].updatedAt : null,
+ initialItems.length > 0 ? initialItems[initialItems.length - 1].updatedAtCursor : null,
 );
 const [totalItems, setTotalItems] = useState<number | null>(initialTotalItems ?? null);
  const [initialListPending, setInitialListPending] = useState(initialItems.length === 0);
@@ -998,7 +1062,9 @@ const [previewCheckResult, setPreviewCheckResult] = useState<{
  const latestFormRef = useRef(form);
  const switchingExerciseRef = useRef(false);
  const autosaveInFlightRef = useRef(false);
+ const autosaveTimerRef = useRef<number | null>(null);
 const autosaveRetryTimerRef = useRef<number | null>(null);
+ const deletedExerciseIdsRef = useRef<Set<number>>(new Set());
 const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
 const initialTargetIdRef = useRef<number | null>(initialSelectedId);
 const sortPrefsReadyRef = useRef(false);
@@ -1308,7 +1374,7 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  return [...filtered].sort((a, b) => {
  let cmp = 0;
  if (listSortBy === 'id') cmp = a.id - b.id;
- else if (listSortBy === 'updatedAt') cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+ else if (listSortBy === 'updatedAt') cmp = new Date(a.updatedAtCursor).getTime() - new Date(b.updatedAtCursor).getTime();
  else if (listSortBy === 'type') cmp = a.type.localeCompare(b.type);
  else cmp = a.qualityStatus.localeCompare(b.qualityStatus);
  return listSortDir === 'asc' ? cmp : -cmp;
@@ -1736,6 +1802,7 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  }
  lastAppliedRefreshKeyRef.current = requestKey;
  } else {
+ deletedExerciseIdsRef.current.delete(deletedId);
  setIsError(true);
  setMessage(res.error || 'Ошибка загрузки списка заданий.');
  }
@@ -1781,6 +1848,7 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  setNextCursorId(cursorId);
  setNextCursorUpdatedAt(cursorUpdatedAt);
  } else {
+ deletedExerciseIdsRef.current.delete(deletedId);
  setIsError(true);
  setMessage(res.error || 'Ошибка подгрузки списка.');
  }
@@ -2177,8 +2245,20 @@ useEffect(() => {
  return `${prefix}Изменения сохранены локально, но не записаны в базу: ${error || 'ошибка сохранения'}.`;
  }
 
+ function cancelPendingAutosaves() {
+ if (autosaveTimerRef.current != null) {
+ window.clearTimeout(autosaveTimerRef.current);
+ autosaveTimerRef.current = null;
+ }
+ if (autosaveRetryTimerRef.current != null) {
+ window.clearTimeout(autosaveRetryTimerRef.current);
+ autosaveRetryTimerRef.current = null;
+ }
+ }
+
  async function autosaveCurrentToDbIfNeeded(nextId: number) {
  if (!isEdit || !form.id || form.id === nextId || saving || deleting) return true;
+ if (deletedExerciseIdsRef.current.has(form.id)) return true;
  const snapshot = JSON.stringify(form);
  if (snapshot === lastPersistedSnapshotRef.current) return true;
  storeLocalDraft(form);
@@ -2218,19 +2298,24 @@ useEffect(() => {
  useEffect(() => {
  if (!isDraftLoaded || !isEdit || !form.id) return;
  if (saving || deleting || switchingExerciseRef.current) return;
+ if (deletedExerciseIdsRef.current.has(form.id)) return;
  const snapshot = JSON.stringify(form);
  if (snapshot === lastPersistedSnapshotRef.current) return;
+ const autosaveForm = form;
+ const autosaveId = form.id;
 
- const timer = window.setTimeout(async () => {
+ autosaveTimerRef.current = window.setTimeout(async () => {
+ if (deletedExerciseIdsRef.current.has(autosaveId)) return;
  if (autosaveInFlightRef.current) return;
  autosaveInFlightRef.current = true;
  try {
- storeLocalDraft(form);
+ storeLocalDraft(autosaveForm);
  setDatabaseSaveState('saving');
- const payload = buildPayloadFromForm(form);
- const res = await updateExerciseAction({ ...payload, id: form.id! });
+ const payload = buildPayloadFromForm(autosaveForm);
+ const res = await updateExerciseAction({ ...payload, id: autosaveId });
+ if (deletedExerciseIdsRef.current.has(autosaveId)) return;
  if (res.success) {
- markDatabaseSaveSucceeded(form, snapshot);
+ markDatabaseSaveSucceeded(autosaveForm, snapshot);
  await refreshList({ force: true });
  } else {
  setDatabaseSaveState('local');
@@ -2240,18 +2325,19 @@ useEffect(() => {
  autosaveRetryTimerRef.current = window.setTimeout(() => {
  autosaveRetryTimerRef.current = null;
  if (switchingExerciseRef.current || autosaveInFlightRef.current) return;
- if (!form.id) return;
- const retrySnapshot = JSON.stringify(form);
+ if (deletedExerciseIdsRef.current.has(autosaveId)) return;
+ const retrySnapshot = JSON.stringify(autosaveForm);
  if (retrySnapshot === lastPersistedSnapshotRef.current) return;
  void (async () => {
  autosaveInFlightRef.current = true;
  try {
- storeLocalDraft(form);
+ storeLocalDraft(autosaveForm);
  setDatabaseSaveState('saving');
- const retryPayload = buildPayloadFromForm(form);
- const retryRes = await updateExerciseAction({ ...retryPayload, id: form.id });
+ const retryPayload = buildPayloadFromForm(autosaveForm);
+ const retryRes = await updateExerciseAction({ ...retryPayload, id: autosaveId });
+ if (deletedExerciseIdsRef.current.has(autosaveId)) return;
  if (retryRes.success) {
- markDatabaseSaveSucceeded(form, retrySnapshot);
+ markDatabaseSaveSucceeded(autosaveForm, retrySnapshot);
  await refreshList({ force: true });
  } else {
  setDatabaseSaveState('local');
@@ -2270,7 +2356,12 @@ useEffect(() => {
  }
  }, 2000);
 
- return () => window.clearTimeout(timer);
+ return () => {
+ if (autosaveTimerRef.current != null) {
+ window.clearTimeout(autosaveTimerRef.current);
+ autosaveTimerRef.current = null;
+ }
+ };
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [form, isDraftLoaded, isEdit, saving, deleting]);
 
@@ -2317,11 +2408,13 @@ useEffect(() => {
  async function handleDeleteExercise() {
  if (!isEdit || deleting) return;
  setShowDeleteConfirmModal(false);
+ cancelPendingAutosaves();
  setDeleting(true);
  setMessage('');
  setIsError(false);
 
  const deletedId = form.id!;
+ deletedExerciseIdsRef.current.add(deletedId);
  const res = await deleteExerciseAction(deletedId);
  if (res.success) {
  setMessage('Задание удалено.');
@@ -2354,7 +2447,7 @@ useEffect(() => {
   ? {
    label: 'В БД',
    detail: databaseSavedAt
-    ? `сохранено ${databaseSavedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+    ? `сохранено ${formatAdminTime(databaseSavedAt)}`
     : 'актуальная версия',
    box: 'border-emerald-200 bg-emerald-50/80 text-emerald-800',
    dot: 'bg-emerald-500',
@@ -2807,7 +2900,18 @@ useEffect(() => {
  <select
  className={inputClass}
  value={form.type}
- onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as Form['type'] }))}
+ onChange={(e) => {
+                        const nextType = e.target.value as Form['type'];
+                        setForm((f) => {
+                          const nextForm = convertFormForTypeChange(f, nextType);
+                          const transferMessage = buildTypeChangeMessage(f, nextForm);
+                          if (transferMessage) {
+                            setIsError(false);
+                            setMessage(transferMessage);
+                          }
+                          return nextForm;
+                        });
+                      }}
  >
  {typeOptions.map((type) => (
  <option key={type} value={type}>
@@ -3498,12 +3602,7 @@ function Input({
  );
 }
 
-function parseIndexCsv(raw: string) {
- return raw
- .split(',')
- .map((v) => Number(v.trim()))
- .filter((v) => Number.isInteger(v) && v > 0);
-}
+
 
 function normalizeSearchText(input: string) {
  return String(input ?? '')
@@ -3547,5 +3646,3 @@ function parseEge21SentencesText(raw: string): Array<{ index: number; text: stri
 
  return out.sort((a, b) => a.index - b.index);
 }
-
-

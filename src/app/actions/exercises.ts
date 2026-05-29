@@ -19,6 +19,7 @@ import {
 } from '@/features/exercises/schemas';
 import { ratingDeltaForAttempt } from '@/features/exercises/scoring';
 import type { ExerciseCategory } from '@/features/exercises/types';
+import { logSlowServerAction } from '@/lib/slow-action-log';
 import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
 
 type GetNextExerciseInput = {
@@ -35,6 +36,7 @@ type SubmitExerciseAnswerInput = {
 };
 
 export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
+  const startedAt = Date.now();
   try {
     const session = await getOrCreateLearningSession(input.sessionId);
     const recentAttempts = await getRecentAttempts(session.id);
@@ -80,16 +82,37 @@ export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
   } catch (error) {
     console.error('Failed to fetch next exercise:', error);
     return { success: false, error: 'Exercise matchmaking failed' };
+  } finally {
+    logSlowServerAction('getNextExerciseAction', startedAt, {
+      hasSessionId: Boolean(input.sessionId),
+      seenExerciseIds: input.seenExerciseIds?.length ?? 0,
+      category: input.category ?? 'all',
+    });
   }
 }
 
 export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInput) {
+  const startedAt = Date.now();
   try {
     const submittedAnswer = submittedAnswerSchema.parse(input.submittedAnswer);
     const session = await getOrCreateLearningSession(input.sessionId);
     const exercise = await getExerciseById(input.exerciseId);
 
     if (!exercise) {
+      const dbRows = await db
+        .select({
+          id: exercises.id,
+          seedKey: exercises.seedKey,
+          type: exercises.type,
+          isActive: exercises.isActive,
+        })
+        .from(exercises)
+        .where(eq(exercises.id, input.exerciseId))
+        .limit(1);
+      console.error('submitExerciseAnswerAction: exercise lookup failed', {
+        requestedExerciseId: input.exerciseId,
+        dbRow: dbRows[0] ?? null,
+      });
       return { success: false, error: 'Exercise not found' };
     }
 
@@ -150,6 +173,16 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
   } catch (error) {
     console.error('Failed to submit exercise answer:', error);
     return { success: false, error: 'Exercise answer submission failed' };
+  } finally {
+    logSlowServerAction('submitExerciseAnswerAction', startedAt, {
+      sessionId: input.sessionId,
+      exerciseId: input.exerciseId,
+      hasTimeSpentMs: typeof input.timeSpentMs === 'number',
+      submittedAnswerType:
+        input.submittedAnswer && typeof input.submittedAnswer === 'object'
+          ? String((input.submittedAnswer as { type?: unknown }).type ?? 'unknown')
+          : typeof input.submittedAnswer,
+    });
   }
 }
 

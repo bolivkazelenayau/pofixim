@@ -64,46 +64,67 @@ export const exercises = pgTable(
     index('exercises_updated_at_idx').on(table.updatedAt),
     index('exercises_type_idx').on(table.type),
     index('exercises_quality_status_idx').on(table.qualityStatus),
+    index('exercises_type_quality_updated_id_idx').on(
+      table.type,
+      table.qualityStatus,
+      table.updatedAt,
+      table.id,
+    ),
   ],
 );
 
-export const learningSessions = pgTable('learning_sessions', {
-  id: text('id').primaryKey(),
-  userId: text('user_id'),
-  currentRating: integer('current_rating').notNull().default(900),
-  currentStreak: integer('current_streak').notNull().default(0),
-  bestStreak: integer('best_streak').notNull().default(0),
-  totalScore: integer('total_score').notNull().default(0),
-  completedCount: integer('completed_count').notNull().default(0),
-  correctCount: integer('correct_count').notNull().default(0),
-  lastCategory: categoryEnum('last_category'),
-  lastExerciseType: exerciseTypeEnum('last_exercise_type'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const learningSessions = pgTable(
+  'learning_sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id'),
+    currentRating: integer('current_rating').notNull().default(900),
+    currentStreak: integer('current_streak').notNull().default(0),
+    bestStreak: integer('best_streak').notNull().default(0),
+    totalScore: integer('total_score').notNull().default(0),
+    completedCount: integer('completed_count').notNull().default(0),
+    correctCount: integer('correct_count').notNull().default(0),
+    lastCategory: categoryEnum('last_category'),
+    lastExerciseType: exerciseTypeEnum('last_exercise_type'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('learning_sessions_updated_at_idx').on(table.updatedAt),
+  ],
+);
 
-export const exerciseAttempts = pgTable('exercise_attempts', {
-  id: serial('id').primaryKey(),
-  sessionId: text('session_id')
-    .notNull()
-    .references(() => learningSessions.id),
-  userId: text('user_id'),
-  exerciseId: integer('exercise_id')
-    .notNull()
-    .references(() => exercises.id),
-  exerciseType: exerciseTypeEnum('exercise_type').notNull(),
-  category: categoryEnum('category').notNull(),
-  difficulty: integer('difficulty').notNull(),
-  skillTags: text('skill_tags').array().notNull(),
-  submittedAnswer: jsonb('submitted_answer').notNull(),
-  isCorrect: boolean('is_correct').notNull(),
-  scoreDelta: integer('score_delta').notNull(),
-  ratingDelta: integer('rating_delta').notNull(),
-  mistakeCode: text('mistake_code'),
-  failedStepIds: text('failed_step_ids').array(),
-  timeSpentMs: integer('time_spent_ms'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const exerciseAttempts = pgTable(
+  'exercise_attempts',
+  {
+    id: serial('id').primaryKey(),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => learningSessions.id),
+    userId: text('user_id'),
+    exerciseId: integer('exercise_id')
+      .notNull()
+      .references(() => exercises.id),
+    exerciseType: exerciseTypeEnum('exercise_type').notNull(),
+    category: categoryEnum('category').notNull(),
+    difficulty: integer('difficulty').notNull(),
+    skillTags: text('skill_tags').array().notNull(),
+    submittedAnswer: jsonb('submitted_answer').notNull(),
+    isCorrect: boolean('is_correct').notNull(),
+    scoreDelta: integer('score_delta').notNull(),
+    ratingDelta: integer('rating_delta').notNull(),
+    mistakeCode: text('mistake_code'),
+    failedStepIds: text('failed_step_ids').array(),
+    timeSpentMs: integer('time_spent_ms'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('exercise_attempts_session_created_at_idx').on(
+      table.sessionId,
+      table.createdAt,
+    ),
+  ],
+);
 
 export const skillProgress = pgTable('skill_progress', {
   id: serial('id').primaryKey(),
