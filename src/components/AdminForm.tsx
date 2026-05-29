@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import { commands, type ICommand } from '@uiw/react-md-editor';
 import { useTheme } from '@/components/theme-provider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import rehypeRaw from 'rehype-raw';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
@@ -2601,23 +2602,31 @@ useEffect(() => {
  </div>
  {showMoreBatchActions ? (
  <div className="grid grid-cols-1 gap-2">
- <select
- className={inputClass}
- value={batchStatus}
- onChange={(e) => setBatchStatus(e.target.value as typeof batchStatus)}
- >
- {qualityStatuses.map((status) => (
- <option key={status} value={status}>{status}</option>
- ))}
- </select>
- <select
- className={inputClass}
- value={batchIsActive}
- onChange={(e) => setBatchIsActive(e.target.value as typeof batchIsActive)}
- >
- <option value="active">Активно</option>
- <option value="inactive">Неактивно</option>
- </select>
+ <Select
+              value={batchStatus}
+              onValueChange={(value) => setBatchStatus(value as typeof batchStatus)}
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {qualityStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+ <Select
+              value={batchIsActive}
+              onValueChange={(value) => setBatchIsActive(value as typeof batchIsActive)}
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Активно</SelectItem>
+                <SelectItem value="inactive">Неактивно</SelectItem>
+              </SelectContent>
+            </Select>
  </div>
  ) : null}
  </div>
@@ -2630,64 +2639,84 @@ useEffect(() => {
  onChange={(e) => setListQuery(e.target.value)}
  />
  <div className="grid grid-cols-2 gap-2">
- <select
- className={inputClass}
- value={listTypeFilter}
- onChange={(e) => setListTypeFilter(e.target.value)}
- >
- {listTypes.map((type) => (
- <option key={type} value={type}>
- {type === 'all' ? 'Все типы' : type}
- </option>
- ))}
- </select>
- <select
- className={inputClass}
- value={listExamTypeFilter}
- onChange={(e) => setListExamTypeFilter(e.target.value)}
- >
- {listExamTypes.map((n) => (
- <option key={n} value={n}>
- {n === 'all' ? 'ЕГЭ: все' : `ЕГЭ: ${n}`}
- </option>
- ))}
- </select>
+ <Select
+            value={listTypeFilter}
+            onValueChange={(value) => setListTypeFilter(value)}
+          >
+            <SelectTrigger className={inputClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {listTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type === 'all' ? 'Все типы' : type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+ <Select
+            value={listExamTypeFilter}
+            onValueChange={(value) => setListExamTypeFilter(value)}
+          >
+            <SelectTrigger className={inputClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {listExamTypes.map((n) => (
+                <SelectItem key={n} value={n}>
+                  {n === 'all' ? 'ЕГЭ: все' : `ЕГЭ: ${n}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
  </div>
  <div className="grid grid-cols-1 gap-2">
- <select
- className={inputClass}
- value={listStatusFilter}
- onChange={(e) => setListStatusFilter(e.target.value)}
- >
- <option value="all">Все статусы</option>
- {qualityStatuses.map((status) => (
- <option key={status} value={status}>
- {status}
- </option>
- ))}
- </select>
+ <Select
+            value={listStatusFilter}
+            onValueChange={(value) => setListStatusFilter(value)}
+          >
+            <SelectTrigger className={inputClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все статусы</SelectItem>
+              {qualityStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
  </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {sortPrefsReady ? (
               <>
-                <select
-                  className={inputClass}
+                <Select
                   value={listSortBy}
-                  onChange={(e) => setListSortBy(e.target.value as typeof listSortBy)}
+                  onValueChange={(value) => setListSortBy(value as typeof listSortBy)}
                 >
-                  <option value="id">Сорт: номер</option>
-                  <option value="updatedAt">Сорт: дата изменения</option>
-                  <option value="type">Сорт: тип</option>
-                  <option value="status">Сорт: статус</option>
-                </select>
-                <select
-                  className={inputClass}
+                  <SelectTrigger className={inputClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="id">Сорт: номер</SelectItem>
+                    <SelectItem value="updatedAt">Сорт: дата изменения</SelectItem>
+                    <SelectItem value="type">Сорт: тип</SelectItem>
+                    <SelectItem value="status">Сорт: статус</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
                   value={listSortDir}
-                  onChange={(e) => setListSortDir(e.target.value as typeof listSortDir)}
+                  onValueChange={(value) => setListSortDir(value as typeof listSortDir)}
                 >
-                  <option value="asc">Порядок: ↑</option>
-                  <option value="desc">Порядок: ↓</option>
-                </select>
+                  <SelectTrigger className={inputClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">Порядок: ↑</SelectItem>
+                    <SelectItem value="desc">Порядок: ↓</SelectItem>
+                  </SelectContent>
+                </Select>
               </>
             ) : (
               <>
@@ -2897,11 +2926,10 @@ useEffect(() => {
  >
  <div className="grid gap-3 sm:grid-cols-3">
  <Input label="Тип">
- <select
- className={inputClass}
- value={form.type}
- onChange={(e) => {
-                        const nextType = e.target.value as Form['type'];
+ <Select
+                      value={form.type}
+                      onValueChange={(value) => {
+                        const nextType = value as Form['type'];
                         setForm((f) => {
                           const nextForm = convertFormForTypeChange(f, nextType);
                           const transferMessage = buildTypeChangeMessage(f, nextForm);
@@ -2912,43 +2940,56 @@ useEffect(() => {
                           return nextForm;
                         });
                       }}
- >
- {typeOptions.map((type) => (
- <option key={type} value={type}>
- {type}
- </option>
- ))}
- </select>
+                    >
+                      <SelectTrigger className={inputClass}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {typeOptions.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
  </Input>
  <Input label="Категория">
- <select
- className={inputClass}
- value={form.category}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- category: e.target.value as ExerciseCategory,
- }))
- }
- >
- {categories.map((category) => (
- <option key={category} value={category}>
- {category}
- </option>
- ))}
- </select>
+ <Select
+              value={form.category}
+              onValueChange={(value) =>
+                setForm((f) => ({
+                  ...f,
+                  category: value as ExerciseCategory,
+                }))
+              }
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
  </Input>
  <Input label="Сложность">
- <select
- className={inputClass}
- value={String(form.difficulty)}
- onChange={(e) =>
- setForm((f) => ({ ...f, difficulty: Number(e.target.value) as 1 | 2 }))
- }
- >
- <option value="1">1</option>
- <option value="2">2</option>
- </select>
+ <Select
+              value={String(form.difficulty)}
+              onValueChange={(value) =>
+                setForm((f) => ({ ...f, difficulty: Number(value) as 1 | 2 }))
+              }
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1</SelectItem>
+                <SelectItem value="2">2</SelectItem>
+              </SelectContent>
+            </Select>
  </Input>
  </div>
 
@@ -3269,21 +3310,25 @@ useEffect(() => {
  {form.type === 'ege21_punctuation_analysis' && (
  <div className="mt-3 space-y-3">
  <Input label="Целевой знак">
- <select
- className={inputClass}
- value={form.ege21TargetPunctuation}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- ege21TargetPunctuation: e.target.value as Form['ege21TargetPunctuation'],
- }))
- }
- >
- <option value="comma">comma</option>
- <option value="dash">dash</option>
- <option value="colon">colon</option>
- <option value="semicolon">semicolon</option>
- </select>
+ <Select
+              value={form.ege21TargetPunctuation}
+              onValueChange={(value) =>
+                setForm((f) => ({
+                  ...f,
+                  ege21TargetPunctuation: value as Form['ege21TargetPunctuation'],
+                }))
+              }
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="comma">comma</SelectItem>
+                <SelectItem value="dash">dash</SelectItem>
+                <SelectItem value="colon">colon</SelectItem>
+                <SelectItem value="semicolon">semicolon</SelectItem>
+              </SelectContent>
+            </Select>
  </Input>
  <Input label="Предложения (каждая строка: index. text)">
  <textarea
@@ -3337,34 +3382,42 @@ useEffect(() => {
 
  <div className="mt-3 grid gap-3 sm:grid-cols-2">
  <Input label="Статус качества">
- <select
- className={inputClass}
- value={form.qualityStatus}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- qualityStatus: e.target.value as Form['qualityStatus'],
- }))
- }
- >
- {qualityStatuses.map((status) => (
- <option key={status} value={status}>
- {status}
- </option>
- ))}
- </select>
+ <Select
+              value={form.qualityStatus}
+              onValueChange={(value) =>
+                setForm((f) => ({
+                  ...f,
+                  qualityStatus: value as Form['qualityStatus'],
+                }))
+              }
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {qualityStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
  </Input>
  <Input label="Активность">
- <select
- className={inputClass}
- value={form.isActive ? 'active' : 'inactive'}
- onChange={(e) =>
- setForm((f) => ({ ...f, isActive: e.target.value === 'active' }))
- }
- >
- <option value="active">Активно</option>
- <option value="inactive">Неактивно</option>
- </select>
+ <Select
+              value={form.isActive ? 'active' : 'inactive'}
+              onValueChange={(value) =>
+                setForm((f) => ({ ...f, isActive: value === 'active' }))
+              }
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Активно</SelectItem>
+                <SelectItem value="inactive">Неактивно</SelectItem>
+              </SelectContent>
+            </Select>
  </Input>
  </div>
 

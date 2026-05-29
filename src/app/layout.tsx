@@ -1,8 +1,11 @@
-﻿import type { Metadata } from 'next';
-import { Manrope, JetBrains_Mono } from 'next/font/google';
+import type { Metadata } from 'next';
+import { Manrope, JetBrains_Mono, Geist } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const manrope = Manrope({
   variable: '--font-manrope',
@@ -39,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={cn("h-full", "antialiased", manrope.variable, jetbrainsMono.variable, "font-sans", geist.variable)}
       suppressHydrationWarning
     >
       <head>
