@@ -20,7 +20,7 @@ import {
 import { ratingDeltaForAttempt } from '@/features/exercises/scoring';
 import type { ExerciseCategory } from '@/features/exercises/types';
 import { logSlowServerAction } from '@/lib/slow-action-log';
-import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 type GetNextExerciseInput = {
   sessionId?: string;
@@ -155,7 +155,7 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
         correctCount: session.correctCount + (result.isCorrect ? 1 : 0),
         lastCategory: exercise.category,
         lastExerciseType: exercise.type,
-        updatedAt: new Date(),
+        updatedAt: sql`now()::timestamp`,
       })
       .where(eq(learningSessions.id, session.id));
 

@@ -1,5 +1,8 @@
 @import "tailwindcss";
+@plugin "../../node_modules/tailwindcss-animate";
 @custom-variant dark (&:is(.dark *));
+@custom-variant data-open (&[data-state=open]);
+@custom-variant data-closed (&[data-state=closed]);
 
 :root {
   --background: #E4EAEF;
@@ -31,6 +34,13 @@
   --color-primary-strong: var(--primary-strong);
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-jetbrains-mono);
+}
+
+/* Prevent layout shift when Radix UI Select opens (react-remove-scroll-bar) */
+html body[data-scroll-locked] {
+  overflow-y: scroll !important;
+  margin-right: 0px !important;
+  padding-right: 0px !important;
 }
 
 body {

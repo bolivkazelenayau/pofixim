@@ -111,6 +111,14 @@ function isLetterChar(value: string) {
   return /^\p{L}$/u.test(value);
 }
 
+function normalizeValidationText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function validateFillBlankBoundaries(input: ExerciseEditorInput): string | null {
   if (input.type !== 'fill_blank') {
     return null;
@@ -118,10 +126,28 @@ function validateFillBlankBoundaries(input: ExerciseEditorInput): string | null 
 
   const before = (input.fillBefore ?? '').trimEnd();
   const after = (input.fillAfter ?? '').trimStart();
+  const prompt = normalizeValidationText(input.prompt ?? '');
   const lastBefore = before.slice(-1);
   const firstAfter = after.slice(0, 1);
+  const accepted = (input.fillAccepted ?? []).map((value) => value.trim()).filter(Boolean);
+  const hasLetterAcceptedAnswer = accepted.some((value) => /\p{L}/u.test(value));
+  const looksLikeNumberSignature = accepted.length > 0 && accepted.every((value) => /^\d[\d,\s.]*$/u.test(value));
+  const looksLikeMultiSelectPrompt =
+    prompt.includes('укажите варианты ответов') &&
+    prompt.includes('запишите номера ответов');
 
   if (!lastBefore || !firstAfter) {
+    if (!after && looksLikeMultiSelectPrompt && looksLikeNumberSignature) {
+      return 'Этот fill_blank выглядит как задание с выбором номеров: текст после пропуска пустой, а допустимый ответ похож на "124". Для такого задания используйте ege_multi_select.';
+    }
+    return null;
+  }
+
+  // Legitimate fill_blank tasks often place the blank inside a word
+  // (e.g. "вид" + "__" + "мый"). We only block word-internal splits when
+  // the accepted answers do not look like letter fragments, which is a
+  // strong signal of a broken cross-type conversion.
+  if (hasLetterAcceptedAnswer) {
     return null;
   }
 
@@ -678,7 +704,6 @@ export async function createExerciseAction(input: ExerciseEditorInput) {
       .returning({ id: exercises.id });
 
     updateTag('admin:list');
-    revalidatePath('/admin');
     revalidatePath('/');
     return { success: true, id: inserted[0]?.id };
   } catch (error) {
@@ -759,7 +784,7 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
         algorithmSteps: exercise.algorithmSteps ?? null,
         qualityStatus: exercise.qualityStatus,
         isActive: exercise.isActive,
-        updatedAt: new Date(),
+        updatedAt: sql`now()::timestamp`,
       })
       .where(eq(exercises.id, input.id))
       .returning({ id: exercises.id });
@@ -769,7 +794,6 @@ export async function updateExerciseAction(input: ExerciseEditorInput & { id: nu
     }
 
     updateTag('admin:list');
-    revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
   } catch (error) {
@@ -808,7 +832,6 @@ export async function deleteExerciseAction(id: number) {
     }
 
     updateTag('admin:list');
-    revalidatePath('/admin');
     revalidatePath('/');
     return { success: true };
   } catch (error) {
@@ -839,7 +862,6 @@ export async function batchUpdateExercisesMetaAction(input: {
 
     await db.update(exercises).set(patch).where(inArray(exercises.id, ids));
     updateTag('admin:list');
-    revalidatePath('/admin');
     return { success: true, updated: ids.length };
   } catch (error) {
     console.error('Failed to batch update exercises meta:', error);
@@ -875,6 +897,89 @@ function normalizeSearchBlobQuery(input: string) {
     .replace(/\u00ad/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isDigitsOnlySearchQuery(input: string) {
+  return /^\d+$/u.test(input);
+}
+
+function isSeedKeyLikeSearchQuery(input: string) {
+  return /^[a-z0-9:_-]+$/iu.test(input) && /[a-z:_-]/iu.test(input);
+}
+
+function shouldUseNormalizedBlobSearch(input: string) {
+  return /[*_~[\]()<>{}|\\]/u.test(input) || /\s{2,}/u.test(input);
+}
+
+async function fetchExerciseListRows(input: {
+  whereExpr: ReturnType<typeof and>;
+  sortBy: 'id' | 'updatedAt';
+  sortDir: 'asc' | 'desc';
+  normalizedLimit: number;
+  normalizedOffset: number;
+  useOffset: boolean;
+}) {
+  const { whereExpr, sortBy, sortDir, normalizedLimit, normalizedOffset, useOffset } = input;
+
+  return db
+    .select({
+      id: exercises.id,
+      type: exercises.type,
+      skillTags: exercises.skillTags,
+      seedKey: exercises.seedKey,
+      prompt: exercises.prompt,
+      explanation: exercises.explanation,
+      qualityStatus: exercises.qualityStatus,
+      updatedAt: sql<string>`${exercises.updatedAt}::text`,
+      updatedAtCursor: sql<string>`${exercises.updatedAt}::text`,
+      isActive: exercises.isActive,
+    })
+    .from(exercises)
+    .where(whereExpr)
+    .orderBy(
+      sortBy === 'updatedAt'
+        ? (sortDir === 'desc' ? desc(exercises.updatedAt) : sql`${exercises.updatedAt} asc`)
+        : (sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`),
+      sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`,
+    )
+    .limit(normalizedLimit + 1)
+    .offset(useOffset ? normalizedOffset : 0);
+}
+
+type ExerciseListRow = Awaited<ReturnType<typeof fetchExerciseListRows>>[number];
+
+function compareExerciseListRows(
+  left: ExerciseListRow,
+  right: ExerciseListRow,
+  sortBy: 'id' | 'updatedAt',
+  sortDir: 'asc' | 'desc',
+) {
+  if (sortBy === 'updatedAt') {
+    if (left.updatedAtCursor !== right.updatedAtCursor) {
+      return sortDir === 'desc'
+        ? right.updatedAtCursor.localeCompare(left.updatedAtCursor)
+        : left.updatedAtCursor.localeCompare(right.updatedAtCursor);
+    }
+  }
+
+  return sortDir === 'desc' ? right.id - left.id : left.id - right.id;
+}
+
+function mergeExerciseListRows(
+  rows: ExerciseListRow[],
+  sortBy: 'id' | 'updatedAt',
+  sortDir: 'asc' | 'desc',
+) {
+  const deduped = new Map<number, ExerciseListRow>();
+  for (const row of rows) {
+    if (!deduped.has(row.id)) {
+      deduped.set(row.id, row);
+    }
+  }
+
+  return Array.from(deduped.values()).sort((left, right) =>
+    compareExerciseListRows(left, right, sortBy, sortDir),
+  );
 }
 
 function buildUpdatedAtCursorCondition(input: {
@@ -926,12 +1031,13 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
     const sortBy = params.sortBy === 'updatedAt' ? 'updatedAt' : 'id';
     const sortDir = params.sortDir === 'asc' ? 'asc' : 'desc';
     const includeTotal = Boolean(params.includeTotal);
+    const hasCursor = Number.isInteger(cursorId) && cursorId > 0;
 
-    const whereParts = [sql`${exercises.id} is not null`];
-    if (type !== 'all') whereParts.push(eq(exercises.type, type as typeof exercises.type._.data));
-    if (qualityStatus !== 'all') whereParts.push(eq(exercises.qualityStatus, qualityStatus));
+    const baseWhereParts = [sql`${exercises.id} is not null`];
+    if (type !== 'all') baseWhereParts.push(eq(exercises.type, type as typeof exercises.type._.data));
+    if (qualityStatus !== 'all') baseWhereParts.push(eq(exercises.qualityStatus, qualityStatus));
     if (examType !== 'all') {
-      whereParts.push(
+      baseWhereParts.push(
         sql`exists (
           select 1
           from unnest(${exercises.skillTags}) as tag
@@ -939,75 +1045,190 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
         )`,
       );
     }
-    if (query) {
+
+    const buildListResult = (rows: Awaited<ReturnType<typeof fetchExerciseListRows>>) => {
+      const hasMore = rows.length > normalizedLimit;
+      const pageRows = hasMore ? rows.slice(0, normalizedLimit) : rows;
+      const items: ExerciseListItem[] = pageRows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        skillTags: row.skillTags,
+        seedKey: row.seedKey,
+        prompt: row.prompt,
+        explanation: row.explanation,
+        qualityStatus: row.qualityStatus,
+        updatedAt: row.updatedAt,
+        updatedAtCursor: row.updatedAtCursor,
+        isActive: row.isActive,
+      }));
+      const last = pageRows[pageRows.length - 1];
+      const estimatedTotal = normalizedOffset + pageRows.length + (hasMore ? 1 : 0);
+
+      return {
+        success: true,
+        items,
+        total: estimatedTotal,
+        hasMore,
+        nextOffset: normalizedOffset + items.length,
+        nextCursorId: last ? last.id : null,
+        nextCursorUpdatedAt: last ? last.updatedAtCursor : null,
+      };
+    };
+
+    if (query && !includeTotal && !hasCursor) {
       const pattern = `%${query.toLowerCase()}%`;
-      const normalizedPattern = `%${normalizedQuery}%`;
-      const blobPattern = `%${blobQuery}%`;
-      whereParts.push(
-        sql`(
-          cast(${exercises.id} as text) ilike ${pattern}
-          or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
-          or lower(
-            replace(
-              coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
-              chr(173),
-              ''
-            )
-          ) like ${blobPattern}
-          or lower(
-            regexp_replace(
-              regexp_replace(
+      const fastQueryIsEligible =
+        isDigitsOnlySearchQuery(query) || isSeedKeyLikeSearchQuery(query);
+      const useNormalizedBlobSearch = shouldUseNormalizedBlobSearch(query);
+
+      const fastRows = fastQueryIsEligible
+        ? await fetchExerciseListRows({
+            whereExpr: and(
+              ...baseWhereParts,
+              sql`(
+                cast(${exercises.id} as text) ilike ${pattern}
+                or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
+              )`,
+            ),
+            sortBy,
+            sortDir,
+            normalizedLimit,
+            normalizedOffset,
+            useOffset: true,
+          })
+        : [];
+
+      if (fastRows.length > normalizedLimit) {
+        return buildListResult(fastRows);
+      }
+
+      const blobRows = await fetchExerciseListRows({
+        whereExpr: and(
+          ...baseWhereParts,
+          sql`lower(
                 replace(
                   coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
                   chr(173),
                   ''
-                ),
-                '[*_~\\[\\]()<>{}|\\\\]',
-                '',
-                'g'
-              ),
-              '\\s+',
-              ' ',
-              'g'
-            )
-          ) like ${normalizedPattern}
-        )`,
+                )
+              ) like ${`%${blobQuery}%`}`,
+        ),
+        sortBy,
+        sortDir,
+        normalizedLimit,
+        normalizedOffset,
+        useOffset: true,
+      });
+
+      const normalizedRows = useNormalizedBlobSearch
+        ? await fetchExerciseListRows({
+            whereExpr: and(
+              ...baseWhereParts,
+              sql`lower(
+                    regexp_replace(
+                      regexp_replace(
+                        replace(
+                          coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                          chr(173),
+                          ''
+                        ),
+                        '[*_~\\[\\]()<>{}|\\\\]',
+                        '',
+                        'g'
+                      ),
+                      '\\s+',
+                      ' ',
+                      'g'
+                    )
+                  ) like ${`%${normalizedQuery}%`}`,
+            ),
+            sortBy,
+            sortDir,
+            normalizedLimit,
+            normalizedOffset,
+            useOffset: true,
+          })
+        : [];
+
+      const mergedRows = mergeExerciseListRows(
+        [...fastRows, ...blobRows, ...normalizedRows],
+        sortBy,
+        sortDir,
       );
+      return buildListResult(mergedRows);
     }
-    if (sortBy === 'id' && Number.isInteger(cursorId) && cursorId > 0) {
+
+    const whereParts = [...baseWhereParts];
+    if (query) {
+      const pattern = `%${query.toLowerCase()}%`;
+      const normalizedPattern = `%${normalizedQuery}%`;
+      const blobPattern = `%${blobQuery}%`;
+      if (shouldUseNormalizedBlobSearch(query)) {
+        whereParts.push(
+          sql`(
+            cast(${exercises.id} as text) ilike ${pattern}
+            or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
+            or lower(
+              replace(
+                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                chr(173),
+                ''
+              )
+            ) like ${blobPattern}
+            or lower(
+              regexp_replace(
+                regexp_replace(
+                  replace(
+                    coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                    chr(173),
+                    ''
+                  ),
+                  '[*_~\\[\\]()<>{}|\\\\]',
+                  '',
+                  'g'
+                ),
+                '\\s+',
+                ' ',
+                'g'
+              )
+            ) like ${normalizedPattern}
+          )`,
+        );
+      } else {
+        whereParts.push(
+          sql`(
+            cast(${exercises.id} as text) ilike ${pattern}
+            or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
+            or lower(
+              replace(
+                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                chr(173),
+                ''
+              )
+            ) like ${blobPattern}
+          )`,
+        );
+      }
+    }
+    if (sortBy === 'id' && hasCursor) {
       if (sortDir === 'desc') whereParts.push(lt(exercises.id, cursorId));
       else whereParts.push(sql`${exercises.id} > ${cursorId}`);
     }
-    if (sortBy === 'updatedAt' && Number.isInteger(cursorId) && cursorId > 0 && cursorUpdatedAt) {
+    if (sortBy === 'updatedAt' && hasCursor && cursorUpdatedAt) {
       // Keep PostgreSQL's full timestamp precision; Date/ISO conversion truncates microseconds.
       whereParts.push(buildUpdatedAtCursorCondition({ cursorId, cursorUpdatedAt, sortDir }));
     }
 
     const whereExpr = and(...whereParts);
 
-    const rows = await db
-      .select({
-        id: exercises.id,
-        type: exercises.type,
-        skillTags: exercises.skillTags,
-        seedKey: exercises.seedKey,
-        prompt: exercises.prompt,
-        explanation: exercises.explanation,
-        qualityStatus: exercises.qualityStatus,
-        updatedAt: sql<string>`${exercises.updatedAt}::text`,
-        updatedAtCursor: sql<string>`${exercises.updatedAt}::text`,
-        isActive: exercises.isActive,
-      })
-      .from(exercises)
-      .where(whereExpr)
-      .orderBy(
-        sortBy === 'updatedAt'
-          ? (sortDir === 'desc' ? desc(exercises.updatedAt) : sql`${exercises.updatedAt} asc`)
-          : (sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`),
-        sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`,
-      )
-      .limit(normalizedLimit + 1)
-      .offset((Number.isInteger(cursorId) && cursorId > 0) ? 0 : normalizedOffset);
+    const rows = await fetchExerciseListRows({
+      whereExpr,
+      sortBy,
+      sortDir,
+      normalizedLimit,
+      normalizedOffset,
+      useOffset: !hasCursor,
+    });
 
     const hasMore = rows.length > normalizedLimit;
     const pageRows = hasMore ? rows.slice(0, normalizedLimit) : rows;

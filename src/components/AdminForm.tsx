@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { commands, type ICommand } from '@uiw/react-md-editor';
 import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw, CheckSquare, Search, ArrowUp, ArrowDown, X, XSquare, History } from "lucide-react";
 import rehypeRaw from 'rehype-raw';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
@@ -303,6 +305,7 @@ type ExerciseListRequest = {
   sortBy: 'id' | 'updatedAt';
   sortDir: 'asc' | 'desc';
   includeTotal: boolean;
+  signal?: AbortSignal;
 };
 
 type ExerciseListResponse = {
@@ -337,7 +340,10 @@ async function fetchExerciseList(input: ExerciseListRequest): Promise<ExerciseLi
   if (input.cursorId) params.set('cursorId', String(input.cursorId));
   if (input.cursorUpdatedAt) params.set('cursorUpdatedAt', input.cursorUpdatedAt);
 
-  const response = await fetch(`/api/admin/exercises?${params.toString()}`, { cache: 'no-store' });
+  const response = await fetch(`/api/admin/exercises?${params.toString()}`, {
+    cache: 'no-store',
+    signal: input.signal,
+  });
   const result = await response.json() as ExerciseListResponse;
   if (response.status === 401) {
     return { ...result, error: 'Сессия администратора истекла. Обновите страницу и войдите снова.' };
@@ -357,6 +363,12 @@ async function fetchExerciseById(id: number): Promise<ExerciseDetailResponse> {
 function getExerciseIdFromHash(hash: string) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const id = Number(params.get('exercise') ?? NaN);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function getExerciseIdFromSearch(search: string) {
+  const params = new URLSearchParams(search);
+  const id = Number(params.get('exercise') ?? params.get('id') ?? params.get('exerciseId') ?? NaN);
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
@@ -870,6 +882,76 @@ function getDraftKey(id?: number | string | null) {
  return id ? `admin_form_draft_${id}` : 'admin_form_draft_new';
 }
 
+type StoredDraftEnvelope = {
+ sessionId: string | null;
+ savedAt: string;
+ form: Form;
+};
+
+function randomDraftSessionId() {
+ if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+ return crypto.randomUUID();
+ }
+ return `draft_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getDraftSessionId() {
+  if (typeof window === 'undefined') return null;
+  const key = 'admin_draft_session_id';
+  const existing = window.sessionStorage.getItem(key);
+ if (existing) return existing;
+ const nextValue = randomDraftSessionId();
+  window.sessionStorage.setItem(key, nextValue);
+  return nextValue;
+}
+
+function logDraftRecoveryDebug(event: string, details?: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+  console.info(`[admin-draft] ${event}`, details ?? {});
+}
+
+function parseStoredDraft(raw: string, targetId: number | null) {
+ try {
+ const parsed = JSON.parse(raw) as Form | StoredDraftEnvelope;
+ if (!parsed || typeof parsed !== 'object') return null;
+
+ if ('form' in parsed) {
+ const form = parsed.form;
+ if (!form || typeof form !== 'object') return null;
+ if (targetId !== null && form.id !== targetId) return null;
+ return {
+ form: normalizeFormForEditor(form),
+ sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
+ };
+ }
+
+ if (targetId !== null && parsed.id !== targetId) return null;
+ return {
+ form: normalizeFormForEditor(parsed as Form),
+ sessionId: null,
+ };
+ } catch {
+ return null;
+ }
+}
+
+function writeStoredDraft(targetId: number | null, form: Form) {
+  if (typeof window === 'undefined') return;
+  const sessionId = getDraftSessionId();
+  const envelope: StoredDraftEnvelope = {
+    sessionId,
+    savedAt: new Date().toISOString(),
+    form,
+  };
+  window.localStorage.setItem(getDraftKey(targetId), JSON.stringify(envelope));
+  logDraftRecoveryDebug('writeStoredDraft', {
+    targetId,
+    formId: form.id ?? null,
+    sessionId,
+    type: form.type,
+  });
+}
+
 function loadFormState(targetId: number | null, baseForm: Form) {
  if (targetId != null) {
  return normalizeFormForEditor(baseForm);
@@ -877,10 +959,10 @@ function loadFormState(targetId: number | null, baseForm: Form) {
  const key = getDraftKey(targetId);
  const draft = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
  if (draft) {
- try {
- const parsed = JSON.parse(draft);
- if (parsed && typeof parsed === 'object') {
- return normalizeFormForEditor(parsed as Form);
+  try {
+ const parsed = parseStoredDraft(draft, targetId);
+ if (parsed) {
+ return parsed.form;
  }
  } catch (e) {
  console.error(`Failed to parse ${key}`, e);
@@ -893,10 +975,8 @@ function readStoredDraft(targetId: number | null) {
  const raw = typeof window !== 'undefined' ? localStorage.getItem(getDraftKey(targetId)) : null;
  if (!raw) return null;
  try {
- const parsed = JSON.parse(raw) as Form;
- if (!parsed || typeof parsed !== 'object') return null;
- if (targetId !== null && parsed.id !== targetId) return null;
- return normalizeFormForEditor(parsed);
+ const parsed = parseStoredDraft(raw, targetId);
+ return parsed;
  } catch (error) {
  console.error(`Failed to parse ${getDraftKey(targetId)}`, error);
  return null;
@@ -977,6 +1057,7 @@ export default function AdminForm({
  initialSelectedId = null,
  initialSelectedExercise = null,
 }: AdminFormProps) {
+ const router = useRouter();
  const { resolvedTheme, theme } = useTheme();
  const isClient = useSyncExternalStore(
   () => () => {},
@@ -1068,14 +1149,18 @@ const autosaveRetryTimerRef = useRef<number | null>(null);
  const deletedExerciseIdsRef = useRef<Set<number>>(new Set());
 const initializedFromUrlRef = useRef(Boolean(initialSelectedId));
 const initialTargetIdRef = useRef<number | null>(initialSelectedId);
+const initialSelectionResolvedRef = useRef(false);
 const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
 const [activeMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
- const lastAppliedRefreshKeyRef = useRef('');
- const inFlightRefreshKeyRef = useRef<string | null>(null);
- const refreshSeqRef = useRef(0);
+const lastAppliedRefreshKeyRef = useRef('');
+const inFlightRefreshKeyRef = useRef<string | null>(null);
+const refreshSeqRef = useRef(0);
+const refreshAbortControllerRef = useRef<AbortController | null>(null);
+const sessionDraftIdsRef = useRef<Set<number>>(new Set());
+const loadExerciseSeqRef = useRef(0);
 
 const markdownCommands = useMemo<ICommand[]>(() => ([
  makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, false),
@@ -1106,13 +1191,56 @@ const markdownCommands = useMemo<ICommand[]>(() => ([
  }
 
  function offerExistingDraftRecovery(id: number, serverForm: Form) {
- const localDraft = readStoredDraft(id);
- if (!localDraft) return;
+ const storedDraft = readStoredDraft(id);
+ if (!storedDraft) {
+ logDraftRecoveryDebug('offerExistingDraftRecovery:noDraft', { id, serverType: serverForm.type });
+ return;
+ }
+ const { form: localDraft, sessionId } = storedDraft;
  if (JSON.stringify(localDraft) === JSON.stringify(serverForm)) {
  localStorage.removeItem(getDraftKey(id));
  clearPendingDraftMarker(id);
+ sessionDraftIdsRef.current.delete(id);
+ logDraftRecoveryDebug('offerExistingDraftRecovery:draftMatchesServer', { id, sessionId });
  return;
  }
+ const currentSessionId = getDraftSessionId();
+ if (sessionId && sessionId === currentSessionId) {
+ sessionDraftIdsRef.current.add(id);
+ setForm(localDraft);
+ setSelectedId(id);
+ setDatabaseSaveState('local');
+ setDraftRecovery(null);
+ logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSameSession', {
+ id,
+ draftSessionId: sessionId,
+ currentSessionId,
+ serverType: serverForm.type,
+ draftType: localDraft.type,
+ });
+ return;
+ }
+ if (sessionDraftIdsRef.current.has(id)) {
+ setForm(localDraft);
+ setSelectedId(id);
+ setDatabaseSaveState('local');
+ setDraftRecovery(null);
+ logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSessionRef', {
+ id,
+ draftSessionId: sessionId,
+ currentSessionId,
+ serverType: serverForm.type,
+ draftType: localDraft.type,
+ });
+ return;
+ }
+ logDraftRecoveryDebug('offerExistingDraftRecovery:showModal', {
+ id,
+ draftSessionId: sessionId,
+ currentSessionId,
+ serverType: serverForm.type,
+ draftType: localDraft.type,
+ });
  setDraftRecovery({ id, serverForm, draftForm: localDraft });
  }
 
@@ -1142,42 +1270,38 @@ useEffect(() => {
  } catch {}
 }, [listSortBy, listSortDir]);
 
-useEffect(() => {
- const hashId = getExerciseIdFromHash(window.location.hash);
- if (hashId && hashId !== initialSelectedId) {
- initialTargetIdRef.current = hashId;
- initializedFromUrlRef.current = true;
- window.setTimeout(() => setInitialSelectionPending(true), 0);
- return;
- }
+ useEffect(() => {
+  if (initialSelectionResolvedRef.current) return;
+  const searchId = getExerciseIdFromSearch(window.location.search);
+  const hashId = getExerciseIdFromHash(window.location.hash);
 
- if (initialSelectedId && initialSelectedExercise) {
- window.setTimeout(() => {
-  offerExistingDraftRecovery(
-   initialSelectedId,
+  if (initialSelectedId && initialSelectedExercise) {
+  initialSelectionResolvedRef.current = true;
+  window.setTimeout(() => {
+   offerExistingDraftRecovery(
+    initialSelectedId,
    loadFormState(initialSelectedId, formFromExerciseItem(initialSelectedExercise)),
   );
  }, 0);
  return;
  }
 
- if (!initialSelectedId) {
- const params = new URLSearchParams(window.location.search);
- const rawId = params.get('id') ?? params.get('exerciseId');
- const fallbackId = localStorage.getItem('admin_last_selected_id');
- const id = Number(hashId ?? rawId ?? fallbackId ?? NaN);
- const hasTargetId = Number.isInteger(id) && id > 0;
- initialTargetIdRef.current = hasTargetId ? id : null;
- initializedFromUrlRef.current = hasTargetId;
- if (hasTargetId) {
- window.setTimeout(() => setInitialSelectionPending(true), 0);
- }
- }
+  if (!initialSelectedId) {
+  const id = searchId ?? hashId;
+  const hasTargetId = id !== null;
+  initialTargetIdRef.current = hasTargetId ? id : null;
+  initializedFromUrlRef.current = hasTargetId;
+  if (hasTargetId) {
+  initialSelectionResolvedRef.current = true;
+  window.setTimeout(() => setInitialSelectionPending(true), 0);
+  }
+  }
 
- if (!initializedFromUrlRef.current && !initialSelectedExercise) {
- setForm(loadFormState(null, EMPTY));
- setInitialSelectionPending(false);
- }
+  if (!initializedFromUrlRef.current && !initialSelectedExercise) {
+  initialSelectionResolvedRef.current = true;
+  setForm(loadFormState(null, EMPTY));
+  setInitialSelectionPending(false);
+  }
  // This initialization reads local recovery once for the server-selected exercise.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [initialSelectedId, initialSelectedExercise]);
@@ -1193,7 +1317,10 @@ useEffect(() => {
  if (!isDraftLoaded) return;
  const snapshot = JSON.stringify(form);
  if (snapshot === lastPersistedSnapshotRef.current) return;
- localStorage.setItem(getDraftKey(form.id), snapshot);
+ writeStoredDraft(form.id, form);
+ if (form.id) {
+ sessionDraftIdsRef.current.add(form.id);
+ }
  setDatabaseSaveState('local');
  if (form.id) {
  document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
@@ -1227,15 +1354,17 @@ useEffect(() => {
  const url = new URL(window.location.href);
  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
  hashParams.delete('exercise');
+ url.searchParams.delete('exercise');
  url.searchParams.delete('id');
  url.searchParams.delete('exerciseId');
  url.hash = hashParams.toString();
- window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+ router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
  }
 
  function storeLocalDraft(source: Form) {
- localStorage.setItem(getDraftKey(source.id), JSON.stringify(source));
+ writeStoredDraft(source.id, source);
  if (source.id) {
+ sessionDraftIdsRef.current.add(source.id);
  document.cookie = `admin_pending_draft_id=${source.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
  }
  }
@@ -1249,12 +1378,20 @@ useEffect(() => {
    return;
   }
   localStorage.removeItem(getDraftKey(source.id));
-  if (source.id) clearPendingDraftMarker(source.id);
+  if (source.id) {
+  clearPendingDraftMarker(source.id);
+  sessionDraftIdsRef.current.delete(source.id);
+  }
   setDatabaseSaveState('saved');
  }
 
  function useRecoveredDraft() {
  if (!draftRecovery) return;
+ logDraftRecoveryDebug('useRecoveredDraft', {
+ id: draftRecovery.id,
+ draftType: draftRecovery.draftForm.type,
+ serverType: draftRecovery.serverForm.type,
+ });
  lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
  setForm(draftRecovery.draftForm);
  setSelectedId(draftRecovery.id);
@@ -1266,8 +1403,14 @@ useEffect(() => {
 
  function useDatabaseVersion() {
  if (!draftRecovery) return;
+ logDraftRecoveryDebug('useDatabaseVersion', {
+ id: draftRecovery.id,
+ draftType: draftRecovery.draftForm.type,
+ serverType: draftRecovery.serverForm.type,
+ });
  localStorage.removeItem(getDraftKey(draftRecovery.id));
  clearPendingDraftMarker(draftRecovery.id);
+ sessionDraftIdsRef.current.delete(draftRecovery.id);
  setForm(draftRecovery.serverForm);
  lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
  setSelectedId(draftRecovery.id);
@@ -1281,15 +1424,18 @@ useEffect(() => {
  useEffect(() => {
  if (!form.id) return;
  const url = new URL(window.location.href);
+  url.searchParams.set('exercise', String(form.id));
+  url.searchParams.delete('id');
+  url.searchParams.delete('exerciseId');
  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
- hashParams.set('exercise', String(form.id));
+ hashParams.delete('exercise');
  url.hash = hashParams.toString();
  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
  if (nextUrl !== currentUrl) {
- window.history.replaceState(window.history.state, '', nextUrl);
+ router.replace(nextUrl, { scroll: false });
  }
- }, [form.id]);
+ }, [form.id, router]);
 
  useEffect(() => {
  const baseTitle = 'Админка ЕГЭ';
@@ -1754,7 +1900,8 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
   listExamTypeFilter !== 'all';
 
  async function refreshList(options?: { includeTotal?: boolean; force?: boolean }) {
- const includeTotal = options?.includeTotal ?? (hasActiveListFilter || initialListPending);
+ const hasSearchQuery = serverListQuery.trim().length > 0;
+ const includeTotal = options?.includeTotal ?? ((hasActiveListFilter && !hasSearchQuery) || initialListPending);
  const requestKey = JSON.stringify({
  query: serverListQuery,
  type: listTypeFilter,
@@ -1768,9 +1915,14 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  if (requestKey === lastAppliedRefreshKeyRef.current) return;
  if (requestKey === inFlightRefreshKeyRef.current) return;
  }
+ refreshAbortControllerRef.current?.abort();
+ const abortController = new AbortController();
+ refreshAbortControllerRef.current = abortController;
  inFlightRefreshKeyRef.current = requestKey;
  const requestSeq = ++refreshSeqRef.current;
- const res = await fetchExerciseList({
+ let res: ExerciseListResponse;
+ try {
+ res = await fetchExerciseList({
  limit: 150,
  offset: 0,
  sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
@@ -1780,7 +1932,17 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  type: listTypeFilter,
  qualityStatus: listStatusFilter,
  examType: listExamTypeFilter,
+ signal: abortController.signal,
  });
+ } catch (error) {
+ if (error instanceof DOMException && error.name === 'AbortError') {
+ if (inFlightRefreshKeyRef.current === requestKey) {
+ inFlightRefreshKeyRef.current = null;
+ }
+ return;
+ }
+ throw error;
+ }
  if (requestSeq !== refreshSeqRef.current) return;
  if (res.success) {
  setItems(res.items as ListItem[]);
@@ -1798,7 +1960,7 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
   setTotalItems(resultCount);
   setMatchingItems(null);
   }
-  } else if (!hasActiveListFilter) {
+  } else {
   setMatchingItems(null);
  }
  lastAppliedRefreshKeyRef.current = requestKey;
@@ -1812,6 +1974,9 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  }
  if (inFlightRefreshKeyRef.current === requestKey) {
  inFlightRefreshKeyRef.current = null;
+ }
+ if (refreshAbortControllerRef.current === abortController) {
+ refreshAbortControllerRef.current = null;
  }
  }
 
@@ -1861,9 +2026,13 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
 useEffect(() => {
  const timer = setTimeout(() => {
  setServerListQuery(listQuery);
- }, 350);
+ }, 500);
  return () => clearTimeout(timer);
 }, [listQuery]);
+
+useEffect(() => () => {
+ refreshAbortControllerRef.current?.abort();
+}, []);
 
 useEffect(() => {
  if (!sortPrefsReady) return;
@@ -1895,9 +2064,25 @@ useEffect(() => {
  setHasUnsavedChanges(JSON.stringify(form) !== lastPersistedSnapshotRef.current);
  }, [form, isDraftLoaded]);
 
- async function loadExercise(id: number) {
+async function loadExercise(id: number) {
+ const requestSeq = ++loadExerciseSeqRef.current;
+ logDraftRecoveryDebug('loadExercise:start', {
+ id,
+ requestSeq,
+ currentSelectedId: selectedId,
+ currentFormId: form.id ?? null,
+ currentFormType: form.type,
+ });
  const res = await fetchExerciseById(id);
+ if (requestSeq !== loadExerciseSeqRef.current) {
+  logDraftRecoveryDebug('loadExercise:staleResultIgnored', { id, requestSeq });
+  return;
+ }
  if (!res.success || !res.item) {
+ logDraftRecoveryDebug('loadExercise:error', {
+ id,
+ error: res.error || 'Не удалось открыть задание.',
+ });
  setIsError(true);
  setMessage(res.error || 'Не удалось открыть задание.');
  return;
@@ -1910,6 +2095,11 @@ useEffect(() => {
  setSelectedId(id);
  setDatabaseSaveState('saved');
  setDatabaseSavedAt(null);
+ logDraftRecoveryDebug('loadExercise:loaded', {
+ id,
+ requestSeq,
+ loadedType: loaded.type,
+ });
  offerExistingDraftRecovery(id, loaded);
  setMessage('');
  setIsSeedRegenerateArmed(false);
@@ -2284,17 +2474,36 @@ useEffect(() => {
  return false;
  }
 
- async function openExerciseWithAutosave(id: number) {
+async function openExerciseWithAutosave(id: number) {
  if (switchingExerciseRef.current) return;
+ logDraftRecoveryDebug('openExerciseWithAutosave:start', {
+ nextId: id,
+ currentSelectedId: selectedId,
+ currentFormId: form.id ?? null,
+ currentFormType: form.type,
+ });
  switchingExerciseRef.current = true;
  try {
  const saved = await autosaveCurrentToDbIfNeeded(id);
+ logDraftRecoveryDebug('openExerciseWithAutosave:autosaveResult', {
+ nextId: id,
+ saved,
+ currentSelectedId: selectedId,
+ currentFormId: form.id ?? null,
+ currentFormType: form.type,
+ });
  if (!saved) return;
  await loadExercise(id);
  } finally {
+ logDraftRecoveryDebug('openExerciseWithAutosave:done', {
+ nextId: id,
+ finalSelectedId: selectedId,
+ finalFormId: latestFormRef.current.id ?? null,
+ finalFormType: latestFormRef.current.type,
+ });
  switchingExerciseRef.current = false;
  }
- }
+}
 
  useEffect(() => {
  if (!isDraftLoaded || !isEdit || !form.id) return;
@@ -2477,47 +2686,61 @@ useEffect(() => {
  return (
  <div className="mx-auto grid w-full max-w-[1400px] gap-5 items-start xl:grid-cols-[300px_minmax(0,1fr)]">
  <aside ref={sidebarRef} className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
- <div className="mb-3 flex items-center justify-between">
+ <div className="mb-4 flex items-center justify-between">
  <div>
-  <h3 className="text-sm font-semibold">
-   Задания · {totalItems ?? '...'}
-   {hasActiveListFilter && matchingItems !== null ? ` · найдено ${matchingItems}` : ''}
-  </h3>
-  <p className="text-[11px] text-foreground/60">
-   {initialListPending ? 'Загрузка списка...' : `Показано: ${flatFilteredItems.length}${hasMore ? ' · можно загрузить ещё' : ''}`}
+  <div className="flex items-center gap-2">
+   <h3 className="text-xl font-bold tracking-tight">Задания</h3>
+   <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-semibold text-primary">
+    {hasActiveListFilter && matchingItems !== null ? `${matchingItems} / ` : ''}
+    {totalItems ?? '...'}
+   </span>
+  </div>
+  <p className="mt-0.5 text-[11px] font-medium text-foreground/50">
+   {initialListPending ? 'Загрузка списка...' : `Показано: ${flatFilteredItems.length}`}
   </p>
  </div>
- <div className="flex items-center gap-1">
+ <div className="flex items-center gap-1.5">
  <button
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke "
+ className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
                   onClick={() => void refreshList({ includeTotal: true, force: true })}
  >
- Обновить
+ <RefreshCw className="h-4 w-4" />
+ <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+ Обновить список
+ </span>
  </button>
  {!selectionMode ? (
  <button
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke "
+ className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
  onClick={() => setSelectionMode(true)}
  >
- Выбрать
+ <CheckSquare className="h-4 w-4" />
+ <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+ Выбрать задания
+ </span>
  </button>
  ) : (
  <button
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke "
+ className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
  onClick={clearMultiSelection}
  >
- Отмена
+ <XSquare className="h-4 w-4" />
+ <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+ Отмена выбора
+ </span>
  </button>
  )}
  </div>
  </div>
  <div
   aria-live="polite"
-  className={`mb-3 flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[11px] ${databaseIndicator.box}`}
+  className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide ${databaseIndicator.box.replace('border-stroke', 'border-transparent').replace('bg-surface', 'bg-surface-strong')}`}
  >
-  <span className={`h-2 w-2 shrink-0 rounded-full ${databaseIndicator.dot}`} />
-  <span className="font-semibold">{databaseIndicator.label}</span>
-  <span className="ml-auto opacity-75">{databaseIndicator.detail}</span>
+  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${databaseIndicator.dot}`} />
+  <span>{databaseIndicator.label}</span>
+  {databaseIndicator.detail && (
+    <span className="opacity-70">· {databaseIndicator.detail}</span>
+  )}
  </div>
  {selectionMode && (
  <button
@@ -2631,13 +2854,16 @@ useEffect(() => {
  ) : null}
  </div>
  )}
- <div className="mb-3 space-y-2">
+ <div className="mb-4 space-y-3">
+ <div className="relative">
+ <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
  <input
- className={inputClass}
+ className={`${inputClass} pl-9`}
  placeholder="Поиск: id / seed_key / текст"
  value={listQuery}
  onChange={(e) => setListQuery(e.target.value)}
  />
+ </div>
  <div className="grid grid-cols-2 gap-2">
  <Select
             value={listTypeFilter}
@@ -2688,71 +2914,74 @@ useEffect(() => {
             </SelectContent>
           </Select>
  </div>
-          <div className="grid grid-cols-1 gap-2">
-            {sortPrefsReady ? (
-              <>
-                <Select
-                  value={listSortBy}
-                  onValueChange={(value) => setListSortBy(value as typeof listSortBy)}
+          <div>
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-foreground/50">
+              <span className="uppercase tracking-wider">Сортировка</span>
+              {sortPrefsReady && (listSortBy !== 'id' || listSortDir !== 'asc') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setListSortBy('id');
+                    setListSortDir('asc');
+                  }}
+                  className="group relative flex items-center gap-1 hover:text-foreground"
                 >
-                  <SelectTrigger className={inputClass}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="id">Сорт: номер</SelectItem>
-                    <SelectItem value="updatedAt">Сорт: дата изменения</SelectItem>
-                    <SelectItem value="type">Сорт: тип</SelectItem>
-                    <SelectItem value="status">Сорт: статус</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={listSortDir}
-                  onValueChange={(value) => setListSortDir(value as typeof listSortDir)}
-                >
-                  <SelectTrigger className={inputClass}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="asc">Порядок: ↑</SelectItem>
-                    <SelectItem value="desc">Порядок: ↓</SelectItem>
-                  </SelectContent>
-                </Select>
-              </>
-            ) : (
-              <>
-                <div className="h-10 rounded-lg border border-stroke bg-surface animate-pulse" />
-                <div className="h-10 rounded-lg border border-stroke bg-surface animate-pulse" />
-              </>
-            )}
-          </div>
-          <div className="h-10">
-            {sortPrefsReady ? (
-              <button
-                type="button"
-                className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface"
-                onClick={() => {
-                  setListSortBy('id');
-                  setListSortDir('asc');
-                }}
-              >
-                Сбросить сортировку
-              </button>
-            ) : (
-              <div className="h-full w-full rounded-lg border border-stroke bg-surface animate-pulse" />
-            )}
+                  <X className="h-3 w-3" />
+                  Сбросить
+                  <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+                    Сбросить сортировку
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              {sortPrefsReady ? (
+                <>
+                  <Select
+                    value={listSortBy}
+                    onValueChange={(value) => setListSortBy(value as typeof listSortBy)}
+                  >
+                    <SelectTrigger className={inputClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="id">По номеру</SelectItem>
+                      <SelectItem value="updatedAt">По дате изменения</SelectItem>
+                      <SelectItem value="type">По типу</SelectItem>
+                      <SelectItem value="status">По статусу</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button
+                    type="button"
+                    onClick={() => setListSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                    className="group relative flex w-10 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition hover:bg-stroke hover:text-foreground"
+                  >
+                    {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                    <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+                      {listSortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="h-10 w-full rounded-lg border border-stroke bg-surface animate-pulse" />
+                  <div className="h-10 w-10 rounded-lg border border-stroke bg-surface animate-pulse" />
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="rounded-lg border border-stroke bg-surface p-2">
-            <div className="mb-2 text-xs font-semibold text-foreground/80">Raw HTML Preview</div>
+          <div className="mt-4 rounded-xl border border-dashed border-stroke/70 bg-surface/30 p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground/50">Raw HTML Preview</div>
             <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
               <input
-                className={inputClass}
-                placeholder="Фильтр файла (напр. 56151015)"
+                className={`${inputClass} bg-surface-strong`}
+                placeholder="Файл (напр. 56151015)"
                 value={rawPreviewFilter}
                 onChange={(e) => setRawPreviewFilter(e.target.value)}
               />
               <input
-                className={inputClass}
+                className={`${inputClass} bg-surface-strong`}
                 type="number"
                 min={1}
                 max={20}
@@ -2762,7 +2991,7 @@ useEffect(() => {
             </div>
             <button
               type="button"
-              className="mt-2 w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-foreground/5 px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => void runRawPreviewAudit()}
               disabled={rawPreviewLoading}
             >
@@ -2851,6 +3080,10 @@ useEffect(() => {
  </div>
  )}
  {hasMore && (
+ <div className="mt-2 text-center">
+ <div className="mb-2 text-[11px] font-medium text-foreground/50">
+  Можно загрузить ещё
+ </div>
  <button
  type="button"
  onClick={() => void loadMore()}
@@ -2859,6 +3092,7 @@ useEffect(() => {
  >
  {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
  </button>
+ </div>
  )}
  </div>
  </aside>
@@ -2907,7 +3141,7 @@ useEffect(() => {
 
  {message && (
  <div
- className={`fixed bottom-6 right-6 z-50 mb-4 rounded-xl border px-6 py-4 text-sm font-medium shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-5 ${
+ className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-5 ${
  isError
  ? 'border-red-200 bg-red-50 text-red-700'
  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -3544,33 +3778,44 @@ useEffect(() => {
  </div>
 
  {draftRecovery && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
- <div className="w-full max-w-lg rounded-2xl border border-stroke bg-surface-strong p-5 shadow-xl">
- <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/50">
+ <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
+ <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-stroke/50 bg-surface-strong shadow-2xl">
+ <div className="border-b border-stroke/50 bg-surface/30 p-6">
+ <div className="flex items-center gap-4">
+ <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 shadow-sm">
+ <History className="h-6 w-6" />
+ </div>
+ <div>
+ <p className="text-[11px] font-bold uppercase tracking-wider text-amber-500">
  Локальная страховочная копия
  </p>
- <h4 className="mt-2 text-base font-semibold text-foreground">
- Найдены несохранённые изменения для задания #{draftRecovery.id}
+ <h4 className="mt-1 text-lg font-bold tracking-tight text-foreground">
+ Восстановление задания #{draftRecovery.id}
  </h4>
- <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+ </div>
+ </div>
+ </div>
+ <div className="p-6">
+ <p className="text-sm leading-relaxed text-foreground/75">
  В браузере осталась версия, которая отличается от данных в базе. Можно восстановить её и продолжить редактирование
  или отказаться от неё и открыть текущую версию из базы.
  </p>
- <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+ <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
  <button
  type="button"
- className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 hover:bg-surface"
+ className="rounded-xl border border-stroke/60 bg-surface px-4 py-3 text-sm font-semibold text-foreground/70 transition-all hover:bg-stroke/40 hover:text-foreground"
  onClick={useDatabaseVersion}
  >
  Использовать версию из БД
  </button>
  <button
  type="button"
- className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-strong"
+ className="rounded-xl bg-gradient-to-r from-primary to-primary-strong px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 active:translate-y-0"
  onClick={useRecoveredDraft}
  >
- Восстановить локальные изменения
+ Восстановить изменения
  </button>
+ </div>
  </div>
  </div>
  </div>

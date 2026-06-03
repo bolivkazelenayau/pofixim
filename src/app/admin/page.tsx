@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import AdminForm from '@/components/AdminForm';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getExerciseByIdAction } from '@/app/actions/admin';
@@ -14,11 +13,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   await requireAdminPageSession();
 
   const resolved = searchParams ? await searchParams : {};
-  const cookieStore = await cookies();
-  const rawId = (Array.isArray(resolved.id) ? resolved.id[0] : resolved.id)
-    ?? (Array.isArray(resolved.exerciseId) ? resolved.exerciseId[0] : resolved.exerciseId)
-    ?? cookieStore.get('admin_pending_draft_id')?.value
-    ?? cookieStore.get('admin_selected_exercise_id')?.value;
+  const rawId = (Array.isArray(resolved.exercise) ? resolved.exercise[0] : resolved.exercise)
+    ?? (Array.isArray(resolved.id) ? resolved.id[0] : resolved.id)
+    ?? (Array.isArray(resolved.exerciseId) ? resolved.exerciseId[0] : resolved.exerciseId);
   const selectedId = Number(rawId ?? NaN);
   const initialSelectedId = Number.isInteger(selectedId) && selectedId > 0 ? selectedId : null;
 

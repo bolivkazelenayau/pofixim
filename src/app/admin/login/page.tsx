@@ -1,5 +1,6 @@
 import ThemeToggle from '@/components/ThemeToggle';
 import { loginAdminAction } from './actions';
+import { Database, LockKeyhole } from 'lucide-react';
 
 type AdminLoginPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -11,53 +12,61 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
-      <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-      <div className="absolute -right-24 bottom-10 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-      <div className="absolute right-5 top-5">
+      {/* Decorative blurred background blobs */}
+      <div className="absolute -left-[10%] top-[10%] h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px] dark:bg-primary/15" />
+      <div className="absolute -right-[10%] bottom-[10%] h-[500px] w-[500px] rounded-full bg-purple-500/20 blur-[120px] dark:bg-purple-600/15" />
+      
+      <div className="absolute right-5 top-5 z-50">
         <ThemeToggle />
       </div>
 
-      <section className="relative w-full max-w-md overflow-hidden rounded-3xl border border-stroke bg-surface-strong p-7 shadow-xl">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary font-mono text-sm font-semibold text-white">
-            DB
+      <section className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-stroke/60 bg-surface-strong/80 p-8 shadow-2xl backdrop-blur-xl dark:border-stroke/30 dark:bg-surface-strong/60">
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-strong text-white shadow-lg shadow-primary/30">
+            <Database className="h-6 w-6" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground/50">restricted access</p>
-            <h1 className="text-xl font-semibold text-foreground">Панель администратора</h1>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+              Secure Gateway
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Панель управления</h1>
           </div>
         </div>
 
-        <p className="mb-6 text-sm leading-relaxed text-foreground/65">
+        <p className="mb-8 text-sm leading-relaxed text-foreground/70">
           Войдите, чтобы управлять заданиями, искать по базе и запускать служебные операции.
         </p>
 
-        <form action={loginAdminAction} className="space-y-4">
+        <form action={loginAdminAction} className="space-y-5">
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-foreground/55">
-              Пароль
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground/60">
+              Мастер-пароль
             </span>
-            <input
-              autoComplete="current-password"
-              autoFocus
-              name="password"
-              required
-              type="password"
-              className="w-full rounded-xl border border-stroke bg-surface px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="relative group">
+              <LockKeyhole className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40 transition-colors group-focus-within:text-primary" />
+              <input
+                autoComplete="current-password"
+                autoFocus
+                name="password"
+                required
+                type="password"
+                placeholder="••••••••••••"
+                className="w-full rounded-xl border border-stroke/80 bg-surface/50 py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-foreground/30 outline-none transition-all hover:bg-surface focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10 dark:focus:ring-primary/20"
+              />
+            </div>
           </label>
 
           {error === '1' ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300">
-              Неверный пароль. Попробуйте ещё раз.
-            </p>
+            <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-red-200/50 bg-red-50/50 px-4 py-3 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
+              <span className="font-semibold">Ошибка доступа.</span> Неверный пароль.
+            </div>
           ) : null}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="w-full rounded-xl bg-gradient-to-r from-primary to-primary-strong px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 active:translate-y-0"
           >
-            Войти в админку
+            Войти в систему
           </button>
         </form>
       </section>

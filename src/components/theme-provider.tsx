@@ -12,6 +12,11 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
+const FALLBACK_THEME_CONTEXT: ThemeContextValue = {
+  theme: 'light',
+  resolvedTheme: 'light',
+  setTheme: () => {},
+};
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return;
@@ -82,7 +87,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = React.useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
+    return FALLBACK_THEME_CONTEXT;
   }
   return context;
 }
