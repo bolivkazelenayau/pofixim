@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import FormattedFeedbackExplanation from './FormattedFeedbackExplanation';
 
 type MessageBubbleProps = {
   content: string;
@@ -33,10 +34,6 @@ function splitFeedbackSections(content: string): FeedbackSections | null {
   }
 
   return null;
-}
-
-function escapeMarkdownParenListMarkers(value: string) {
-  return value.replace(/(^|\n)(\s*)(\d+)\)/gu, '$1$2$3\\)');
 }
 
 function renderEditorMarkdown(value: string) {
@@ -84,7 +81,7 @@ export default function MessageBubble({ content, isBot, isQuestion }: MessageBub
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-foreground/80">
                 Объяснение
               </div>
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(escapeMarkdownParenListMarkers(sections.explanation))}</ReactMarkdown>
+              <FormattedFeedbackExplanation text={sections.explanation} />
             </div>
           </div>
         ) : (

@@ -1,22 +1,30 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const postgres = require('postgres');
 require('dotenv').config();
+
+function getOptions(payload) {
+  const arr = Array.isArray(payload?.options) ? payload.options : [];
+  return arr.slice(0, 5).map((x) => String(x));
+}
 
 function extractAnswers(answer) {
   const out = [];
   if (!answer || typeof answer !== 'object') return out;
 
   if (Array.isArray(answer.targetSet)) {
-    for (const v of answer.targetSet) out.push(String(v));
+    for (const value of answer.targetSet) out.push(String(value));
   }
 
   const unpack = (arr) => {
-    for (const v of arr) {
-      const s = String(v);
-      const digits = s.replace(/\D/g, '');
-      if (digits) for (const ch of digits) out.push(ch);
-      else out.push(s);
+    for (const value of arr) {
+      const str = String(value);
+      const digits = str.replace(/\D/g, '');
+      if (digits) {
+        for (const ch of digits) out.push(ch);
+      } else {
+        out.push(str);
+      }
     }
   };
 
@@ -24,12 +32,7 @@ function extractAnswers(answer) {
   if (Array.isArray(answer.accepted)) unpack(answer.accepted);
 
   const seen = new Set();
-  return out.filter((x) => (seen.has(x) ? false : (seen.add(x), true)));
-}
-
-function getOptions(payload) {
-  const arr = Array.isArray(payload?.options) ? payload.options : [];
-  return arr.slice(0, 5).map((x) => String(x));
+  return out.filter((item) => (seen.has(item) ? false : (seen.add(item), true)));
 }
 
 (async () => {
@@ -45,23 +48,23 @@ function getOptions(payload) {
         explanation
       from exercises
       where type = 'ege_multi_select'
-        and (seed_key like 'ege12-%' or exists (select 1 from unnest(skill_tags) t where t='ege.12'))
+        and (seed_key like 'ege13-%' or exists (select 1 from unnest(skill_tags) t where t='ege.13'))
       order by ref_num asc nulls last, id asc
     `;
 
     const out = [];
-    out.push('# ЕГЭ 12: номер, варианты, правильные ответы и explanation');
+    out.push('# ЕГЭ 13: номер, ID, варианты, правильные ответы и explanation');
     out.push('');
 
     let count = 0;
-    for (const r of rows) {
-      const heading = r.ref_num ? String(r.ref_num) : `${r.seed_key ?? `id-${r.id}`}`;
-      const answers = extractAnswers(r.answer);
-      const options = getOptions(r.payload);
+    for (const row of rows) {
+      const heading = row.ref_num ? String(row.ref_num) : `${row.seed_key ?? `id-${row.id}`}`;
+      const options = getOptions(row.payload);
+      const answers = extractAnswers(row.answer);
 
       out.push(`## ${heading}`);
       out.push('');
-      out.push(`- ID в базе: ${r.id}`);
+      out.push(`- ID в базе: ${row.id}`);
       out.push('');
       out.push('Варианты ответов:');
       out.push(`1) ${options[0] ?? '—'}`);
@@ -72,9 +75,11 @@ function getOptions(payload) {
       out.push('');
       out.push(`- Правильные ответы: ${answers.length ? answers.join(', ') : '—'}`);
       out.push('');
-      out.push(String(r.explanation ?? ''));
+      out.push('### Explanation');
       out.push('');
-      count++;
+      out.push(String(row.explanation ?? ''));
+      out.push('');
+      count += 1;
     }
 
     out.push('---');
@@ -83,10 +88,13 @@ function getOptions(payload) {
 
     const dir = path.join(process.cwd(), 'exports');
     fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, 'ege12_all_number_options_answers_explanation.md');
+    const file = path.join(dir, 'ege13_multiselect_number_id_options_answers_explanation.md');
     fs.writeFileSync(file, `\uFEFF${out.join('\n')}`, 'utf8');
     console.log(file);
   } finally {
     await sql.end();
   }
-})();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -71,7 +71,8 @@ function extractAnswers(answer) {
       const ans = extractAnswers(r.answer);
       out.push(`## ${heading}`);
       out.push('');
-      out.push(`Правильные ответы: ${ans.length ? ans.join(', ') : '—'}`);
+      out.push(`- ID в базе: ${r.id}`);
+      out.push(`- Правильные ответы: ${ans.length ? ans.join(', ') : '—'}`);
       out.push('');
       out.push(String(r.explanation ?? ''));
       out.push('');
@@ -85,7 +86,7 @@ function extractAnswers(answer) {
     const dir = path.join(process.cwd(), 'exports');
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, 'ege12_all_number_answers_explanation.md');
-    fs.writeFileSync(file, out.join('\n'), 'utf8');
+    fs.writeFileSync(file, `\uFEFF${out.join('\n')}`, 'utf8');
     console.log(file);
   } finally {
     await sql.end();

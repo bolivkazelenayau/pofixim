@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { commands, type ICommand } from '@uiw/react-md-editor';
+import FormattedFeedbackExplanation from '@/components/FormattedFeedbackExplanation';
 import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, CheckSquare, Search, ArrowUp, ArrowDown, X, XSquare, History } from "lucide-react";
@@ -27,9 +28,11 @@ import {
  describeAnswerTransfer,
  extractOptionsFromQuestionText,
  extractPromptFromQuestionText,
+ normalizeNumberAnswerSignature,
  parseFillAcceptedSignature,
  parseIndexCsv,
  serializeMultiAnswerForFillBlank,
+ stripEge18PromptFromFillBefore,
 } from '@/lib/exercise-type-conversion';
 import {
  exerciseSchema,
@@ -860,22 +863,35 @@ function shouldNormalizeEge10Form(form: Pick<Form, 'type' | 'skillTags'>) {
  );
 }
 
-function normalizeFormForEditor(form: Form): Form {
- if (!shouldNormalizeEge10Form(form)) return form;
- const explanationRows = extractNumberedExplanationRows(form.explanation).map(
- normalizeMorphemeMarkdownSpacing,
+function shouldStripEge18FillBeforePrompt(form: Pick<Form, 'type' | 'skillTags'>) {
+ return (
+ form.type === 'fill_blank' &&
+ form.skillTags
+ .split(',')
+ .map((tag) => tag.trim())
+ .includes('ege.18')
  );
- const rows = splitEge10FeedbackRows(explanationRows, form.options.length);
- return {
- ...form,
- explanation: rows.explanationRows.length
- ? rows.explanationRows.join('\n')
- : normalizeMorphemeMarkdownSpacing(form.explanation),
- };
 }
 
-function escapeMarkdownParenListMarkers(value: string) {
- return value.replace(/(^|\n)(\s*)(\d+)\)/gu, '$1$2$3\\)');
+function normalizeFormForEditor(form: Form): Form {
+ const nextForm = shouldStripEge18FillBeforePrompt(form)
+ ? {
+ ...form,
+ fillBefore: stripEge18PromptFromFillBefore(form.fillBefore, form.prompt),
+ }
+ : form;
+
+ if (!shouldNormalizeEge10Form(nextForm)) return nextForm;
+ const explanationRows = extractNumberedExplanationRows(nextForm.explanation).map(
+ normalizeMorphemeMarkdownSpacing,
+ );
+ const rows = splitEge10FeedbackRows(explanationRows, nextForm.options.length);
+ return {
+ ...nextForm,
+ explanation: rows.explanationRows.length
+ ? rows.explanationRows.join('\n')
+ : normalizeMorphemeMarkdownSpacing(nextForm.explanation),
+ };
 }
 
 function getDraftKey(id?: number | string | null) {
@@ -1464,6 +1480,12 @@ useEffect(() => {
  () => form.skillTags.split(',').map((v) => v.trim()).filter(Boolean),
  [form.skillTags],
  );
+ const isEge18FillBlank =
+ form.type === 'fill_blank' && parsedSkillTags.includes('ege.18');
+ const ege18AcceptedSignature = useMemo(
+ () => normalizeNumberAnswerSignature(form.fillAccepted),
+ [form.fillAccepted],
+ );
  const parsedSteps = useMemo(
  () => form.algorithmSteps.split('\n').map((v) => v.trim()).filter(Boolean),
  [form.algorithmSteps],
@@ -1611,7 +1633,9 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  },
  };
  } else if (form.type === 'fill_blank') {
- const accepted = form.fillAccepted
+ const accepted = isEge18FillBlank
+ ? [ege18AcceptedSignature].filter(Boolean)
+ : form.fillAccepted
  .split(',')
  .map((v) => v.trim())
  .filter(Boolean);
@@ -1619,7 +1643,10 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  candidate = {
  ...base,
  payload: {
- before: form.fillBefore || 'Текст до пропуска',
+ before:
+ isEge18FillBlank
+ ? stripEge18PromptFromFillBefore(form.fillBefore, form.prompt) || 'Текст до пропуска'
+ : form.fillBefore || 'Текст до пропуска',
  after: form.fillAfter || 'текст после пропуска',
  },
  answer: {
@@ -2337,7 +2364,9 @@ async function loadExercise(id: number) {
  fillAfter: source.type === 'fill_blank' ? source.fillAfter : undefined,
  fillAccepted:
  source.type === 'fill_blank'
- ? source.fillAccepted.split(',').map((v) => v.trim()).filter(Boolean)
+ ? skillTags.includes('ege.18')
+ ? [normalizeNumberAnswerSignature(source.fillAccepted)].filter(Boolean)
+ : source.fillAccepted.split(',').map((v) => v.trim()).filter(Boolean)
  : undefined,
  fillCaseSensitive:
  source.type === 'fill_blank' ? source.fillCaseSensitive : undefined,
@@ -3738,9 +3767,7 @@ async function openExerciseWithAutosave(id: number) {
  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/80 ">
  Объяснение
  </div>
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>
- {renderEditorMarkdown(escapeMarkdownParenListMarkers(previewFeedbackSections.explanation))}
- </ReactMarkdown>
+ <FormattedFeedbackExplanation text={previewFeedbackSections.explanation} />
  </div>
  </div>
  ) : (

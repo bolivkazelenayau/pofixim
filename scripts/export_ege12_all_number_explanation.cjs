@@ -27,6 +27,8 @@ require('dotenv').config();
       const heading = r.ref_num ? String(r.ref_num) : `${r.seed_key ?? `id-${r.id}`}`;
       out.push(`## ${heading}`);
       out.push('');
+      out.push(`- ID в базе: ${r.id}`);
+      out.push('');
       out.push(String(r.explanation ?? ''));
       out.push('');
       count++;
@@ -39,7 +41,7 @@ require('dotenv').config();
     const dir = path.join(process.cwd(), 'exports');
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, 'ege12_all_number_explanation.md');
-    fs.writeFileSync(file, out.join('\n'), 'utf8');
+    fs.writeFileSync(file, `\uFEFF${out.join('\n')}`, 'utf8');
     console.log(file);
   } finally {
     await sql.end();

@@ -37,8 +37,22 @@ type ChatState = {
     scoreDelta: number;
     streak: number;
   }) => void;
+  recordBlitzScore: (scoreDelta: number) => void;
   resetProgress: () => void;
 };
+
+type PersistedChatState = Pick<
+  ChatState,
+  | 'messages'
+  | 'seenQuestionIds'
+  | 'seenExerciseIds'
+  | 'cooldownExerciseIds'
+  | 'answeredExerciseIds'
+  | 'sessionId'
+  | 'hasRequestedInitialExercise'
+  | 'score'
+  | 'streak'
+>;
 
 const WELCOME_TEXTS = [
   'Привет! Потренируем орфографию и пунктуацию: начнем с коротких заданий и постепенно усложним, если ответы будут уверенными.',
@@ -58,16 +72,53 @@ function pickRandom<T>(items: readonly T[]): T {
 
 const WELCOME_TEXT = WELCOME_TEXTS[0];
 
+function createWelcomeMessage(content: string = WELCOME_TEXT): Message {
+  return {
+    id: 'welcome',
+    isBot: true,
+    content,
+    type: 'text',
+  };
+}
+
+function integerArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((id): id is number => Number.isInteger(id))
+    : [];
+}
+
+function normalizePersistedChatState(
+  persistedState: unknown,
+): Partial<PersistedChatState> {
+  const state = (persistedState ?? {}) as Partial<ChatState>;
+  const messages = Array.isArray(state.messages)
+    ? state.messages.filter((message) => message.type !== 'question')
+    : [];
+
+  return {
+    messages: messages.length > 0 ? messages : [createWelcomeMessage()],
+    seenQuestionIds: integerArray(state.seenQuestionIds),
+    seenExerciseIds: integerArray(state.seenExerciseIds),
+    cooldownExerciseIds: integerArray(state.cooldownExerciseIds).slice(-200),
+    answeredExerciseIds: integerArray(state.answeredExerciseIds),
+    sessionId:
+      typeof state.sessionId === 'string' && state.sessionId.length > 0
+        ? state.sessionId
+        : undefined,
+    hasRequestedInitialExercise:
+      typeof state.hasRequestedInitialExercise === 'boolean'
+        ? state.hasRequestedInitialExercise
+        : false,
+    score: typeof state.score === 'number' ? state.score : 0,
+    streak: typeof state.streak === 'number' ? state.streak : 0,
+  };
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set) => ({
       messages: [
-        {
-          id: 'welcome',
-          isBot: true,
-          content: WELCOME_TEXT,
-          type: 'text',
-        },
+        createWelcomeMessage(),
       ],
       seenQuestionIds: [],
       seenExerciseIds: [],
@@ -127,15 +178,14 @@ export const useChatStore = create<ChatState>()(
             streak: isCorrect ? streak : 0,
           };
         }),
+      recordBlitzScore: (scoreDelta) =>
+        set((state) => ({
+          score: state.score + Math.max(0, Math.round(scoreDelta)),
+        })),
       resetProgress: () =>
         set({
           messages: [
-            {
-              id: 'welcome',
-              isBot: true,
-              content: pickRandom(RESTART_TEXTS),
-              type: 'text',
-            },
+            createWelcomeMessage(pickRandom(RESTART_TEXTS)),
           ],
           seenQuestionIds: [],
           seenExerciseIds: [],
@@ -149,30 +199,25 @@ export const useChatStore = create<ChatState>()(
     {
       name: 'literacy-chat-storage-v2',
       version: 3,
+      skipHydration: true,
+      partialize: (state): PersistedChatState => ({
+        messages: state.messages,
+        seenQuestionIds: state.seenQuestionIds,
+        seenExerciseIds: state.seenExerciseIds,
+        cooldownExerciseIds: state.cooldownExerciseIds,
+        answeredExerciseIds: state.answeredExerciseIds,
+        sessionId: state.sessionId,
+        hasRequestedInitialExercise: state.hasRequestedInitialExercise,
+        score: state.score,
+        streak: state.streak,
+      }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...normalizePersistedChatState(persistedState),
+        isTyping: false,
+      }),
       migrate: (persistedState) => {
-        const state = (persistedState ?? {}) as Partial<ChatState>;
-        const messages = Array.isArray(state.messages)
-          ? state.messages.filter((message) => message.type !== 'question')
-          : [];
-
-        return {
-          ...state,
-          messages:
-            messages.length > 0
-              ? messages
-              : [
-                  {
-                    id: 'welcome',
-                    isBot: true,
-                    content: WELCOME_TEXT,
-                    type: 'text' as const,
-                  },
-                ],
-          seenQuestionIds: [],
-          cooldownExerciseIds: Array.isArray(state.cooldownExerciseIds)
-            ? state.cooldownExerciseIds.filter((id): id is number => Number.isInteger(id))
-            : [],
-        };
+        return normalizePersistedChatState(persistedState);
       },
     },
   ),

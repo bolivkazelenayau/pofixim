@@ -15,6 +15,7 @@ import {
 } from '../schemas';
 import { calculateScoreDelta } from '../scoring';
 import type { CheckMistake, CheckResult } from '../types';
+import { normalizeNumberAnswerSignature } from '@/lib/exercise-type-conversion';
 
 type Pedagogy = Pick<
   CheckResult,
@@ -145,13 +146,20 @@ function checkFillBlank(
   submittedAnswer: Extract<SubmittedAnswer, { type: 'fill_blank' }>,
   options: { streak?: number; usedHint?: boolean },
 ) {
-  const normalizedValue = normalizeText(
-    submittedAnswer.value,
-    exercise.answer.caseSensitive,
-  );
-  const accepted = exercise.answer.accepted.map((value) =>
-    normalizeText(value, exercise.answer.caseSensitive),
-  );
+  const isEge18 = exercise.skillTags.includes('ege.18');
+  const normalizedValue = isEge18
+    ? normalizeNumberAnswerSignature(submittedAnswer.value)
+    : normalizeText(
+        submittedAnswer.value,
+        exercise.answer.caseSensitive,
+      );
+  const accepted = exercise.answer.accepted
+    .map((value) =>
+      isEge18
+        ? normalizeNumberAnswerSignature(value)
+        : normalizeText(value, exercise.answer.caseSensitive),
+    )
+    .filter(Boolean);
   const isCorrect = accepted.includes(normalizedValue);
 
   return buildResult({
@@ -470,6 +478,21 @@ function buildResult({
 function extractStructuredFeedback(
   exercise: Exercise,
 ): { correctAnswer: string; detailedExplanation: string } | null {
+  if (exercise.type === 'fill_blank' && exercise.skillTags.includes('ege.18')) {
+    const correctAnswer = [
+      ...new Set(
+        exercise.answer.accepted
+          .map((value) => normalizeNumberAnswerSignature(value) || value.trim())
+          .filter(Boolean),
+      ),
+    ].join('\n\n');
+    const detailedExplanation = exercise.explanation.trim();
+    if (correctAnswer && detailedExplanation) {
+      return { correctAnswer, detailedExplanation };
+    }
+    return null;
+  }
+
   if (exercise.type !== 'ege_multi_select') return null;
   const isEge10 = exercise.skillTags.includes('ege.10');
   const isEge9 = exercise.skillTags.includes('ege.9');

@@ -17,8 +17,10 @@ import {
   submittedAnswerSchema,
   type Exercise,
 } from '@/features/exercises/schemas';
+import { buildEge9BlitzCards, shuffleBlitzCards } from '@/features/exercises/ege9Blitz';
 import { ratingDeltaForAttempt } from '@/features/exercises/scoring';
 import type { ExerciseCategory } from '@/features/exercises/types';
+import { stripEge18PromptFromFillBefore } from '@/lib/exercise-type-conversion';
 import { logSlowServerAction } from '@/lib/slow-action-log';
 import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
@@ -33,6 +35,11 @@ type SubmitExerciseAnswerInput = {
   exerciseId: number;
   submittedAnswer: unknown;
   timeSpentMs?: number;
+};
+
+type GetBlitzPoolInput = {
+  limit?: number;
+  seenExerciseIds?: number[];
 };
 
 export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
@@ -182,6 +189,51 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
         input.submittedAnswer && typeof input.submittedAnswer === 'object'
           ? String((input.submittedAnswer as { type?: unknown }).type ?? 'unknown')
           : typeof input.submittedAnswer,
+    });
+  }
+}
+
+export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
+  const startedAt = Date.now();
+  const limit = Math.min(Math.max(input.limit ?? 80, 10), 160);
+
+  try {
+    const conditions = [
+      eq(exercises.isActive, true),
+      eq(exercises.type, 'ege_multi_select'),
+      sql`${exercises.skillTags} @> array['ege.9']::text[]`,
+    ];
+    const uniqueSeenIds = [...new Set(input.seenExerciseIds ?? [])].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+
+    if (uniqueSeenIds.length > 0) {
+      conditions.push(notInArray(exercises.id, uniqueSeenIds));
+    }
+
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(and(...conditions))
+      .limit(limit);
+
+    const cards = rows
+      .map(dbExerciseToDomainExercise)
+      .flatMap((exercise) =>
+        exercise?.type === 'ege_multi_select' ? buildEge9BlitzCards(exercise) : [],
+      );
+
+    return {
+      success: true,
+      cards: shuffleBlitzCards(cards, `${Date.now()}:${cards.length}`).slice(0, 90),
+    };
+  } catch (error) {
+    console.error('Failed to fetch blitz pool:', error);
+    return { success: false, error: 'Blitz pool fetch failed', cards: [] };
+  } finally {
+    logSlowServerAction('getBlitzPoolAction', startedAt, {
+      limit,
+      seenExerciseIds: input.seenExerciseIds?.length ?? 0,
     });
   }
 }
@@ -372,6 +424,24 @@ function dbExerciseToDomainExercise(row: typeof exercises.$inferSelect | undefin
     return null;
   }
 
+  const payload =
+    row.type === 'fill_blank' &&
+    row.skillTags.includes('ege.18') &&
+    row.payload &&
+    typeof row.payload === 'object' &&
+    !Array.isArray(row.payload)
+      ? {
+          ...(row.payload as Record<string, unknown>),
+          before:
+            typeof (row.payload as Record<string, unknown>).before === 'string'
+              ? stripEge18PromptFromFillBefore(
+                  (row.payload as Record<string, unknown>).before as string,
+                  row.prompt,
+                )
+              : (row.payload as Record<string, unknown>).before,
+        }
+      : row.payload;
+
   const parsed = exerciseSchema.safeParse({
     id: row.id,
     seedKey: row.seedKey,
@@ -380,7 +450,7 @@ function dbExerciseToDomainExercise(row: typeof exercises.$inferSelect | undefin
     difficulty: row.difficulty,
     skillTags: row.skillTags,
     prompt: row.prompt,
-    payload: row.payload,
+    payload,
     answer: row.answer,
     explanation: row.explanation,
     sourceAlignment: row.sourceAlignment ?? extractLegacySourceAlignment(row.visualHint),

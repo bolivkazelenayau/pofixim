@@ -9,6 +9,10 @@ import { exerciseAttempts, exercises } from '@/db/schema';
 import { exerciseSchema } from '@/features/exercises/schemas';
 import type { ExerciseCategory, ExerciseType } from '@/features/exercises/types';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
+import {
+  normalizeNumberAnswerSignature,
+  stripEge18PromptFromFillBefore,
+} from '@/lib/exercise-type-conversion';
 import { logSlowServerAction } from '@/lib/slow-action-log';
 
 export type ExerciseEditorInput = {
@@ -473,11 +477,21 @@ function buildExercisePayload(input: ExerciseEditorInput) {
   }
 
   if (input.type === 'fill_blank') {
-    const accepted = (input.fillAccepted ?? []).map((v) => v.trim()).filter(Boolean);
+    const isEge18 = input.skillTags.some((tag) => tag.trim() === 'ege.18');
+    const fillBefore = isEge18
+      ? stripEge18PromptFromFillBefore(input.fillBefore ?? '', input.prompt)
+      : input.fillBefore ?? '';
+    const accepted = isEge18
+      ? [
+          normalizeNumberAnswerSignature(
+            (input.fillAccepted ?? []).map((v) => v.trim()).filter(Boolean).join(','),
+          ),
+        ].filter(Boolean)
+      : (input.fillAccepted ?? []).map((v) => v.trim()).filter(Boolean);
     return {
       ...base,
       payload: {
-        before: input.fillBefore ?? '',
+        before: fillBefore,
         after: input.fillAfter ?? '',
       },
       answer: {
@@ -1345,11 +1359,15 @@ export async function getExerciseByIdAction(id: number) {
     }
 
     if (row.type === 'fill_blank') {
+      const isEge18 = row.skillTags.includes('ege.18');
+      const fillBefore = typeof payload.before === 'string' ? payload.before : '';
       return {
         success: true,
         item: {
           ...base,
-          fillBefore: typeof payload.before === 'string' ? payload.before : '',
+          fillBefore: isEge18
+            ? stripEge18PromptFromFillBefore(fillBefore, row.prompt)
+            : fillBefore,
           fillAfter: typeof payload.after === 'string' ? payload.after : '',
           fillAccepted: Array.isArray(answer.accepted) ? answer.accepted.filter((v): v is string => typeof v === 'string') : [],
           fillCaseSensitive: Boolean(answer.caseSensitive),

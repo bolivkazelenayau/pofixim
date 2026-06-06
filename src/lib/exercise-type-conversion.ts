@@ -39,6 +39,55 @@ export function parseIndexCsv(raw: string) {
     .filter((value) => Number.isInteger(value) && value > 0);
 }
 
+export function normalizeNumberAnswerSignature(raw: string) {
+  const clean = raw.trim();
+  if (!clean) return '';
+
+  const values = /[,;\s|/.\-]/u.test(clean)
+    ? clean.split(/[^\d]+/u).map((value) => Number(value))
+    : clean
+        .replace(/[^\d]/g, '')
+        .split('')
+        .map((value) => Number(value));
+
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))]
+    .sort((a, b) => a - b)
+    .join('');
+}
+
+const EGE18_PROMPT_PREFIX_RE =
+  /^\s*у(?:\u00ad)?ка(?:\u00ad)?жи(?:\u00ad)?те\s+цифр[уы]\(-ы\)\s*,?\s*на\s+месте\s+ко(?:\u00ad)?то(?:\u00ad)?рой\(-ых\)\s+долж(?:\u00ad)?на\(-ы\)\s+сто(?:\u00ad)?ять\s+за(?:\u00ad)?пя(?:\u00ad)?тая\(-ые\)\s*\.?\s*/iu;
+
+function normalizePromptLeakText(value: string) {
+  return String(value ?? '')
+    .replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+export function stripEge18PromptFromFillBefore(fillBefore: string, prompt?: string) {
+  const raw = String(fillBefore ?? '');
+  const withoutKnownPrompt = raw.replace(EGE18_PROMPT_PREFIX_RE, '').trimStart();
+  if (withoutKnownPrompt !== raw) {
+    return withoutKnownPrompt;
+  }
+
+  const cleanPrompt = String(prompt ?? '').trim();
+  if (!cleanPrompt || !normalizePromptLeakText(raw).startsWith(normalizePromptLeakText(cleanPrompt))) {
+    return raw;
+  }
+
+  const directPrefix = raw.slice(0, cleanPrompt.length);
+  if (normalizePromptLeakText(directPrefix) === normalizePromptLeakText(cleanPrompt)) {
+    return raw.slice(cleanPrompt.length).trimStart();
+  }
+
+  return raw;
+}
+
 export function serializeMultiAnswerForFillBlank(raw: string) {
   return [...new Set(parseIndexCsv(raw))].sort((a, b) => a - b).join('');
 }
