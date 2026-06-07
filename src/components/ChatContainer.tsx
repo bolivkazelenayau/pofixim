@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { RotateCcw, Zap } from 'lucide-react';
+import { BarChart3, RotateCcw, Zap } from 'lucide-react';
 import {
   getBlitzPoolAction,
   getNextExerciseAction,
@@ -26,6 +26,11 @@ const SLASH_COMMANDS = [
     command: '/blitz',
     title: 'Блиц',
     description: 'Открыть быстрый тестовый режим',
+  },
+  {
+    command: '/stats',
+    title: 'Рейтинг',
+    description: 'Посмотреть таблицу лидеров',
   },
   {
     command: '/start',
@@ -391,6 +396,58 @@ export default function ChatContainer() {
     [addMessage, seenExerciseIds],
   );
 
+  function showStats() {
+    const FAKE_NAMES = [
+      'Алиса М.', 'Борис К.', 'Вера С.', 'Глеб Н.', 'Дарья Л.',
+      'Егор Ш.', 'Жанна Р.', 'Захар В.', 'Ирина Т.', 'Кирилл О.',
+      'Лена П.', 'Максим Д.', 'Нина А.', 'Олег Б.', 'Полина Г.',
+      'Руслан Ж.', 'Света Е.', 'Тимур И.', 'Ульяна Ф.', 'Фёдор Х.',
+      'Хана Ц.', 'Эмиль Щ.',
+    ];
+    const fakeRows = FAKE_NAMES.map((name) => ({
+      name,
+      score: Math.floor(Math.random() * 1800 + 200),
+      streak: Math.floor(Math.random() * 18 + 1),
+    }));
+    fakeRows.push({ name: '🫵 Ты', score, streak });
+    fakeRows.sort((a, b) => b.score - a.score);
+
+    const lines = fakeRows.map((row, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      const isYou = row.name === '🫵 Ты';
+      const trClass = isYou ? 'bg-primary/15 font-bold' : 'hover:bg-[var(--surface)] transition-colors';
+      return `<tr class="${trClass} border-b border-[var(--stroke)] last:border-0">
+        <td class="py-1.5 pr-3 text-center w-10">${medal}</td>
+        <td class="py-1.5 px-3">${row.name}</td>
+        <td class="py-1.5 px-3 text-right">${row.score}</td>
+        <td class="py-1.5 pl-3 text-right text-foreground/60">${row.streak}</td>
+      </tr>`;
+    });
+
+    const tableHtml = `<div class="w-full max-h-[280px] overflow-y-auto overflow-x-auto mt-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)]">
+      <table class="w-full text-sm text-left relative">
+        <thead class="bg-[var(--surface)] sticky top-0 z-10 shadow-sm">
+          <tr class="border-b border-[var(--stroke)] text-foreground/60 text-[11px] uppercase tracking-wider">
+            <th class="py-1.5 px-3 font-semibold text-center w-10 bg-[var(--surface)]">#</th>
+            <th class="py-1.5 px-3 font-semibold bg-[var(--surface)]">Имя</th>
+            <th class="py-1.5 px-3 font-semibold text-right bg-[var(--surface)]">Очки</th>
+            <th class="py-1.5 px-3 font-semibold text-right bg-[var(--surface)]">Серия</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lines.join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+    addMessage({
+      id: createMessageId('stats'),
+      isBot: true,
+      content: `📊 **Таблица лидеров**\n\n${tableHtml}`,
+      type: 'text',
+    });
+  }
+
   function runSlashCommand(command: SlashCommand) {
     setGlobalInputValue('');
 
@@ -401,6 +458,11 @@ export default function ChatContainer() {
 
     if (command === '/blitz') {
       void openBlitz();
+      return;
+    }
+
+    if (command === '/stats') {
+      showStats();
     }
   }
 
@@ -410,8 +472,8 @@ export default function ChatContainer() {
     if (!text) return;
 
     const command = text.toLowerCase();
-    if (command === '/start' || command === '/blitz') {
-      runSlashCommand(command);
+    if (command === '/start' || command === '/blitz' || command === '/stats') {
+      runSlashCommand(command as SlashCommand);
       return;
     }
 
@@ -419,7 +481,7 @@ export default function ChatContainer() {
       addMessage({
         id: createMessageId('unsupported-input'),
         isBot: true,
-        content: 'Сейчас это поле принимает команды: /blitz или /start.',
+        content: 'Сейчас это поле принимает команды: /blitz, /stats или /start.',
         type: 'text',
       });
       setGlobalInputValue('');
@@ -552,6 +614,7 @@ export default function ChatContainer() {
                   content={msg.content}
                   isBot={msg.isBot}
                   isQuestion={msg.type === 'exercise'}
+                  createdAt={msg.createdAt}
                 />
                 {isExerciseMessage(msg) && (
                   <ExerciseRenderer
@@ -594,7 +657,7 @@ export default function ChatContainer() {
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
                   {visibleSlashCommands.map((item) => {
-                    const Icon = item.command === '/blitz' ? Zap : RotateCcw;
+                    const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : RotateCcw;
                     return (
                       <button
                         key={item.command}
@@ -629,7 +692,7 @@ export default function ChatContainer() {
                 type="text"
                 value={globalInputValue}
                 onChange={(e) => setGlobalInputValue(e.target.value)}
-                placeholder={supportsGlobalInput ? 'Введите ваш ответ...' : 'Команды: /blitz, /start'}
+                placeholder={supportsGlobalInput ? 'Введите ваш ответ...' : 'Команды: /blitz, /stats, /start'}
                 className="h-11 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
                 autoFocus
               />

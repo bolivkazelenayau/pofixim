@@ -41,8 +41,8 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
   const [scoreDelta, setScoreDelta] = useState(0);
-  const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
   const [lastAnswerDirection, setLastAnswerDirection] = useState<-1 | 1 | null>(null);
+  const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const finishedRef = useRef(false);
   const answerLockedRef = useRef(false);
@@ -55,29 +55,39 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   const timeLeftSeconds = Math.ceil(timeLeftMs / 1000);
   const currentCard = cards[index % Math.max(cards.length, 1)];
-  const archivedCards = [1, 2]
+  const archivedCards = [1, 2, 3]
     .map((offset) => cards[(index + offset) % Math.max(cards.length, 1)])
     .filter((card): card is Ege9BlitzCard => Boolean(card && card.id !== currentCard?.id));
   const progress = status === 'running' ? timeLeftMs / (duration * 1000) : 1;
   const choiceWords = currentCard
     ? currentCard.choices.map((letter) => `${currentCard.before}${letter}${currentCard.after}`)
     : ['', ''];
+  const wordLength = currentCard ? currentCard.before.length + 1 + currentCard.after.length : 0;
+  const wordFontClass = wordLength > 14
+    ? 'text-[clamp(1.3rem,6.5vw,2rem)] sm:text-[clamp(1.3rem,2.8vw,2rem)]'
+    : wordLength > 10
+      ? 'text-[clamp(1.6rem,8vw,2.5rem)] sm:text-[clamp(1.5rem,3.2vw,2.4rem)]'
+      : 'text-[clamp(2.05rem,10.4vw,3.2rem)] sm:text-[clamp(1.75rem,3.8vw,2.7rem)]';
   const dragX = useMotionValue(0);
+  const nextY = useTransform(dragX, [-180, 0, 180], [0, 14, 0]);
+  const nextScale = useTransform(dragX, [-180, 0, 180], [1, 0.95, 1]);
+  const nextRotateX = useTransform(dragX, [-180, 0, 180], [0, 5, 0]);
+  const nextOpacity = useTransform(dragX, [-180, 0, 180], [1, 0.8, 1]);
+
+  const thirdY = useTransform(dragX, [-180, 0, 180], [14, 28, 14]);
+  const thirdScale = useTransform(dragX, [-180, 0, 180], [0.95, 0.9, 0.95]);
+  const thirdRotateX = useTransform(dragX, [-180, 0, 180], [5, 10, 5]);
+  const thirdOpacity = useTransform(dragX, [-180, 0, 180], [0.8, 0.5, 0.8]);
+
+  const fourthY = useTransform(dragX, [-180, 0, 180], [28, 42, 28]);
+  const fourthScale = useTransform(dragX, [-180, 0, 180], [0.9, 0.85, 0.9]);
+  const fourthRotateX = useTransform(dragX, [-180, 0, 180], [10, 15, 10]);
+  const fourthOpacity = useTransform(dragX, [-180, 0, 180], [0.5, 0, 0.5]);
+
   const dragLift = useTransform(dragX, [-180, 0, 180], [-24, 0, -24]);
   const dragRotate = useTransform(dragX, [-180, 0, 180], [-9, 0, 9]);
   const dragRotateY = useTransform(dragX, [-180, 0, 180], [18, 0, -18]);
   const dragOpacity = useTransform(dragX, [-170, -96, 0, 96, 170], [0.38, 0.78, 1, 0.78, 0.38]);
-  const cardExit = lastAnswerDirection
-    ? {
-        opacity: 0,
-        x: lastAnswerDirection * 190,
-        y: -88,
-        scale: 0.94,
-        rotateZ: lastAnswerDirection * 13,
-        rotateY: lastAnswerDirection * -24,
-        filter: 'blur(2px)',
-      }
-    : { opacity: 0, y: -10, scale: 0.98 };
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
@@ -94,6 +104,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   function start() {
     if (cards.length === 0) return;
+    if (feedbackTimeoutRef.current !== null) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
     const started = Date.now();
     finishedRef.current = false;
     setStartedAt(started);
@@ -104,9 +118,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     setCombo(0);
     setBestCombo(0);
     setScoreDelta(0);
-    setFlash(null);
     setLastAnswerDirection(null);
+    setLastAnswerCorrect(null);
     setIsDraggingCard(false);
+    dragX.stop();
     dragX.set(0);
     answerLockedRef.current = false;
     setStatus('running');
@@ -114,12 +129,11 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   const answer = useCallback((choiceIndex: 0 | 1) => {
     if (status !== 'running' || !currentCard || answerLockedRef.current) return;
+    answerLockedRef.current = true;
 
     const isCorrect = choiceIndex === currentCard.correctChoiceIndex;
-    answerLockedRef.current = true;
-    setIsDraggingCard(false);
-    setLastAnswerDirection(choiceIndex === 0 ? -1 : 1);
-
+    const direction = choiceIndex === 0 ? -1 : 1;
+    
     if (isCorrect) {
       setCorrectCount((value) => value + 1);
       setCombo((value) => {
@@ -128,28 +142,36 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         setScoreDelta((score) => score + scoreForAnswer(nextCombo));
         return nextCombo;
       });
-      setFlash('correct');
     } else {
       setWrongCount((value) => value + 1);
       setCombo(0);
-      setFlash('wrong');
     }
 
-    if (feedbackTimeoutRef.current !== null) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-    }
+    setLastAnswerCorrect(isCorrect);
+    setLastAnswerDirection(direction);
+    setIsDraggingCard(false);
 
+    // Animate card off-screen
+    animate(dragX, direction * 600, {
+      type: 'spring',
+      stiffness: 440,
+      damping: 28,
+      mass: 0.82,
+    });
+
+    // After card flies away, advance index so card+buttons stay in sync
     feedbackTimeoutRef.current = window.setTimeout(() => {
-      setIndex((value) => value + 1);
-      setFlash(null);
-      setLastAnswerDirection(null);
-      setIsDraggingCard(false);
+      dragX.stop();
       dragX.set(0);
+      setIndex((value) => value + 1);
+      setLastAnswerDirection(null);
+      setLastAnswerCorrect(null);
       answerLockedRef.current = false;
       feedbackTimeoutRef.current = null;
-    }, 420);
+    }, 190);
   }, [currentCard, dragX, status]);
 
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (feedbackTimeoutRef.current !== null) {
@@ -280,20 +302,15 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                 <motion.div
                   key={`${card.id}-archive-${archiveIndex}`}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-0 flex min-h-[336px] select-none flex-col items-center overflow-hidden rounded-[20px] border border-[var(--stroke)] bg-[radial-gradient(circle_at_50%_0%,rgba(51,144,236,0.08),transparent_42%),linear-gradient(180deg,var(--surface-strong),var(--surface))] px-4 pb-8 pt-7 text-center shadow-sm sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7"
-                  initial={false}
-                  animate={{
-                    y: archiveIndex === 0 ? 18 : 34,
-                    scale: archiveIndex === 0 ? 0.965 : 0.93,
-                    rotateX: archiveIndex === 0 ? 5 : 8,
-                    opacity: archiveIndex === 0 ? 0.62 : 0.34,
-                    filter: archiveIndex === 0 ? 'blur(0.2px)' : 'blur(0.8px)',
-                  }}
-                  transition={{ type: 'spring', stiffness: 360, damping: 30, mass: 0.8 }}
+                  className="pointer-events-none absolute inset-x-0 top-0 flex min-h-[336px] select-none flex-col items-center overflow-hidden rounded-[20px] border border-[var(--stroke)] bg-[var(--surface)] px-4 pb-8 pt-7 text-center shadow-sm sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7"
                   style={{
-                    zIndex: archiveIndex === 0 ? 2 : 1,
+                    y: archiveIndex === 0 ? nextY : archiveIndex === 1 ? thirdY : fourthY,
+                    scale: archiveIndex === 0 ? nextScale : archiveIndex === 1 ? thirdScale : fourthScale,
+                    rotateX: archiveIndex === 0 ? nextRotateX : archiveIndex === 1 ? thirdRotateX : fourthRotateX,
+                    opacity: archiveIndex === 0 ? nextOpacity : archiveIndex === 1 ? thirdOpacity : fourthOpacity,
+                    zIndex: 3 - archiveIndex,
                     transformPerspective: 900,
-                    transformOrigin: '50% 100%',
+                    transformOrigin: 'bottom center',
                   }}
                 >
                   <div className="absolute left-3 top-3 rounded-full border border-[var(--stroke)] bg-[var(--surface-strong)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-foreground/35 shadow-sm sm:left-4 sm:top-4 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.12em]">
@@ -314,33 +331,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                   <div className="mb-auto mt-12 h-[74px] w-full max-w-[286px] rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)]/75 shadow-sm sm:mb-0 sm:mt-6 sm:h-7 sm:max-w-none sm:rounded-full" />
                 </motion.div>
               ))}
-              <AnimatePresence mode="popLayout">
-                <motion.div
+              <motion.div
                   key={currentCard.id}
-                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                    scale: 1,
-                    backgroundColor:
-                      flash === 'correct'
-                        ? 'rgba(16, 185, 129, 0.14)'
-                        : flash === 'wrong'
-                          ? 'rgba(239, 68, 68, 0.13)'
-                          : 'rgba(255, 255, 255, 0)',
-                    borderColor:
-                      flash === 'correct'
-                        ? 'rgba(16, 185, 129, 0.75)'
-                        : flash === 'wrong'
-                          ? 'rgba(239, 68, 68, 0.78)'
-                          : 'var(--stroke)',
-                    boxShadow:
-                      flash === 'correct'
-                        ? '0 18px 46px rgba(16, 185, 129, 0.18)'
-                        : flash === 'wrong'
-                          ? '0 18px 46px rgba(239, 68, 68, 0.18)'
-                          : '0 1px 2px rgba(15, 23, 42, 0.08)',
-                  }}
+                  initial={{ y: 10, scale: 0.96, opacity: 0.85 }}
+                  animate={{ y: 0, scale: 1, opacity: 1 }}
                   drag="x"
                   style={{
                     x: dragX,
@@ -358,47 +352,33 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                   onDragStart={() => setIsDraggingCard(true)}
                   onDragEnd={(_, info) => {
                     if (info.offset.x < -64) {
-                      animate(dragX, -240, {
-                        type: 'spring',
-                        stiffness: 260,
-                        damping: 30,
-                        mass: 0.8,
-                      });
                       answer(0);
                       return;
                     }
                     if (info.offset.x > 64) {
-                      animate(dragX, 240, {
-                        type: 'spring',
-                        stiffness: 260,
-                        damping: 30,
-                        mass: 0.8,
-                      });
                       answer(1);
                       return;
                     }
                     setIsDraggingCard(false);
                   }}
-                  exit={cardExit}
                   transition={{
                     type: 'spring',
-                    stiffness: 300,
-                    damping: 32,
-                    mass: 0.8,
-                    backgroundColor: { duration: 0.12 },
-                    borderColor: { duration: 0.12 },
-                    boxShadow: { duration: 0.12 },
-                    filter: { duration: 0.16 },
+                    stiffness: 390,
+                    damping: 27,
+                    mass: 0.78,
                   }}
-                  className="relative z-10 flex min-h-[336px] cursor-grab select-none flex-col items-center overflow-hidden rounded-[20px] border border-[var(--stroke)] bg-[radial-gradient(circle_at_50%_0%,rgba(51,144,236,0.12),transparent_42%),linear-gradient(180deg,var(--surface-strong),var(--surface))] px-4 pb-8 pt-7 text-center shadow-sm active:cursor-grabbing sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7"
+                  className={`relative z-10 flex min-h-[336px] cursor-grab select-none flex-col items-center overflow-hidden rounded-[20px] border-2 px-4 pb-8 pt-7 text-center shadow-sm active:cursor-grabbing sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7 ${
+                    lastAnswerCorrect === true
+                      ? 'border-emerald-400 bg-emerald-50 shadow-[0_0_28px_rgba(16,185,129,0.3)] dark:bg-emerald-950/40'
+                      : lastAnswerCorrect === false
+                        ? 'border-red-400 bg-red-50 shadow-[0_0_28px_rgba(239,68,68,0.3)] dark:bg-red-950/40'
+                        : 'border-[var(--stroke)] bg-[radial-gradient(circle_at_50%_0%,rgba(51,144,236,0.12),transparent_42%),linear-gradient(180deg,var(--surface-strong),var(--surface))]'
+                  }`}
                 >
-                  <div className="absolute left-3 top-3 rounded-full border border-[var(--stroke)] bg-[var(--surface-strong)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-foreground/45 shadow-sm sm:left-4 sm:top-4 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.12em]">
-                    Ряд {currentCard.rowIndex}
-                  </div>
                   <div className="absolute right-3 top-3 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-primary sm:right-4 sm:top-4 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.12em]">
                     Свайп
                   </div>
-                  <div className="mt-auto flex max-w-full items-center justify-center gap-x-1.5 whitespace-nowrap px-1 text-[clamp(2.05rem,10.4vw,3.2rem)] font-black leading-[1.02] text-foreground sm:mt-0 sm:gap-x-1 sm:text-[clamp(1.75rem,3.8vw,2.7rem)]">
+                  <div className={`mt-auto flex max-w-full items-center justify-center gap-x-1.5 whitespace-nowrap px-1 ${wordFontClass} font-black leading-[1.02] text-foreground sm:mt-0 sm:gap-x-1`}>
                     <span className="min-w-0">{currentCard.before}</span>
                     <span
                       className="inline-flex h-[1.08em] min-w-[1.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_rgba(51,144,236,0.22)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]"
@@ -419,35 +399,44 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                     <span className="hidden sm:inline">Свайпни карточку или выбери букву ниже</span>
                   </div>
                 </motion.div>
-              </AnimatePresence>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4">
+            <div className="mt-2 grid grid-cols-[auto_1fr_1fr_auto] gap-2 sm:mt-4">
               <button
                 type="button"
                 onClick={() => answer(0)}
-                className="flex h-16 min-w-0 items-center justify-center gap-2 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-2 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
+                className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 shadow-sm transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary active:scale-95"
+                aria-label="Выбрать левый вариант"
               >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="flex min-w-0 flex-col items-start leading-tight">
-                  <span className="text-lg font-black">{currentCard.choices[0]}</span>
-                  <span className="max-w-full truncate text-xs font-bold text-foreground/50">
-                    {choiceWords[0]}
-                  </span>
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => answer(0)}
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
+              >
+                <span className="text-xl font-black leading-tight">{currentCard.choices[0]}</span>
+                <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
+                  {choiceWords[0]}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => answer(1)}
-                className="flex h-16 min-w-0 items-center justify-center gap-2 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-2 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
               >
-                <span className="flex min-w-0 flex-col items-end leading-tight">
-                  <span className="text-lg font-black">{currentCard.choices[1]}</span>
-                  <span className="max-w-full truncate text-xs font-bold text-foreground/50">
-                    {choiceWords[1]}
-                  </span>
+                <span className="text-xl font-black leading-tight">{currentCard.choices[1]}</span>
+                <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
+                  {choiceWords[1]}
                 </span>
-                <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => answer(1)}
+                className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 shadow-sm transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary active:scale-95"
+                aria-label="Выбрать правый вариант"
+              >
+                <ArrowRight className="h-5 w-5" />
               </button>
             </div>
 

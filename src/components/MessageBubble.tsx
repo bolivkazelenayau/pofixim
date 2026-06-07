@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
+import { CheckCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import FormattedFeedbackExplanation from './FormattedFeedbackExplanation';
@@ -10,6 +11,7 @@ type MessageBubbleProps = {
   content: string;
   isBot: boolean;
   isQuestion?: boolean;
+  createdAt?: number;
 };
 
 type FeedbackSections = {
@@ -42,8 +44,12 @@ function renderEditorMarkdown(value: string) {
     .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
 }
 
-export default function MessageBubble({ content, isBot, isQuestion }: MessageBubbleProps) {
+export default function MessageBubble({ content, isBot, isQuestion, createdAt }: MessageBubbleProps) {
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
+  const timeString = useMemo(() => {
+    if (!createdAt) return '';
+    return new Date(createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }, [createdAt]);
   const sections = useMemo(
     () => (isBot && !isQuestion ? splitFeedbackSections(markdownContent) : null),
     [isBot, isQuestion, markdownContent],
@@ -85,7 +91,17 @@ export default function MessageBubble({ content, isBot, isQuestion }: MessageBub
             </div>
           </div>
         ) : (
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(markdownContent)}</ReactMarkdown>
+          <div className="relative">
+            <div className={!isBot ? 'pr-12' : ''}>
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(markdownContent)}</ReactMarkdown>
+            </div>
+            {!isBot && (
+              <div className="absolute -bottom-1 -right-2 flex items-center gap-1 text-[11px] font-medium text-[#7EAC55] dark:text-emerald-500/80">
+                {timeString && <span>{timeString}</span>}
+                <CheckCheck className="h-[14px] w-[14px]" strokeWidth={2.5} />
+              </div>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

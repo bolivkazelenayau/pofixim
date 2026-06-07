@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Exercise } from '@/features/exercises/schemas';
 
@@ -12,6 +12,7 @@ export type Message = {
   correctOptionIndex?: number;
   explanation?: string;
   exercise?: Exercise;
+  createdAt?: number;
 };
 
 type ChatState = {
@@ -78,6 +79,7 @@ function createWelcomeMessage(content: string = WELCOME_TEXT): Message {
     isBot: true,
     content,
     type: 'text',
+    createdAt: Date.now(),
   };
 }
 
@@ -143,7 +145,9 @@ export const useChatStore = create<ChatState>()(
             return state;
           }
 
-          return { messages: [...state.messages, msg] };
+          const messageWithTimestamp = msg.createdAt ? msg : { ...msg, createdAt: Date.now() };
+
+          return { messages: [...state.messages, messageWithTimestamp] };
         }),
       markExercisePresented: (exerciseId) =>
         set((state) => ({
