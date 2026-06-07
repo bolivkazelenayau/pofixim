@@ -25,6 +25,7 @@ export const exerciseTypeEnum = pgEnum('exercise_type', [
   'text_correction',
   'dictation',
   'word_search',
+  'punctuation_constructor',
 ]);
 
 export const questions = pgTable('questions', {

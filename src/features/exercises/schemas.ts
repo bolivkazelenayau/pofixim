@@ -222,6 +222,31 @@ export const wordSearchExerciseSchema = baseExerciseSchema
 
 const punctuationMarkSchema = z.enum([',', ':', ';', '-', '—']);
 
+const punctuationConstructorMarkSchema = z.enum([
+  'comma',
+  'colon',
+  'semicolon',
+  'dash',
+  'quote_open',
+  'quote_close',
+  'paren_open',
+  'paren_close',
+  'period',
+  'exclamation',
+  'question',
+  'ellipsis',
+]);
+
+const punctuationConstructorSegmentKindSchema = z.enum([
+  'author_words',
+  'direct_speech',
+  'main_clause',
+  'subordinate_clause',
+  'introductory',
+  'enumeration',
+  'other',
+]);
+
 export const punctuationInsertExerciseSchema = baseExerciseSchema.extend({
   type: z.literal('punctuation_insert'),
   payload: z.object({
@@ -237,6 +262,103 @@ export const punctuationInsertExerciseSchema = baseExerciseSchema.extend({
     ),
   }),
 });
+
+export const punctuationConstructorExerciseSchema = baseExerciseSchema
+  .extend({
+    type: z.literal('punctuation_constructor'),
+    payload: z.object({
+      tokens: z.array(z.string().min(1)).min(2),
+      markBank: z.array(punctuationConstructorMarkSchema).min(1),
+      hints: z.array(z.string().min(1)).optional(),
+      guidedSteps: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            title: z.string().min(1),
+            slotIndex: z.number().int().min(0),
+            marks: z.array(punctuationConstructorMarkSchema).optional(),
+          }),
+        )
+        .optional(),
+      segments: z
+        .array(
+          z.object({
+            label: z.string().min(1),
+            tokenStart: z.number().int().min(0),
+            tokenEnd: z.number().int().min(0),
+            kind: punctuationConstructorSegmentKindSchema,
+          }),
+        )
+        .optional(),
+    }),
+    answer: z.object({
+      placements: z.array(
+        z.object({
+          slotIndex: z.number().int().min(0),
+          mark: punctuationConstructorMarkSchema,
+        }),
+      ),
+      slotExplanations: z
+        .array(
+          z.object({
+            slotIndex: z.number().int().min(0),
+            marks: z.array(punctuationConstructorMarkSchema).optional(),
+            text: z.string().min(1),
+          }),
+        )
+        .optional(),
+    }),
+  })
+  .superRefine((value, ctx) => {
+    const maxSlotIndex = value.payload.tokens.length;
+    const markBank = new Set(value.payload.markBank);
+
+    for (const placement of value.answer.placements) {
+      if (placement.slotIndex > maxSlotIndex) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['answer', 'placements'],
+          message: `slotIndex ${placement.slotIndex} is outside token slot bounds`,
+        });
+      }
+
+      if (!markBank.has(placement.mark)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['answer', 'placements'],
+          message: `answer uses mark ${placement.mark} that is not present in markBank`,
+        });
+      }
+    }
+
+    for (const segment of value.payload.segments ?? []) {
+      if (segment.tokenEnd < segment.tokenStart) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['payload', 'segments'],
+          message: 'segment tokenEnd must be greater than or equal to tokenStart',
+        });
+      }
+
+      if (segment.tokenEnd >= value.payload.tokens.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['payload', 'segments'],
+          message: `segment tokenEnd ${segment.tokenEnd} is outside token bounds`,
+        });
+      }
+    }
+
+    for (const step of value.payload.guidedSteps ?? []) {
+      if (step.slotIndex > maxSlotIndex) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['payload', 'guidedSteps'],
+          message: `guided step slotIndex ${step.slotIndex} is outside token slot bounds`,
+        });
+      }
+    }
+  });
 
 const ege21TargetPunctuationSchema = z.enum([
   'comma',
@@ -312,6 +434,7 @@ export const exerciseSchema = z.discriminatedUnion('type', [
   orderFragmentsExerciseSchema,
   wordSearchExerciseSchema,
   punctuationInsertExerciseSchema,
+  punctuationConstructorExerciseSchema,
   ege20ComplexSentencePunctuationExerciseSchema,
   ege21PunctuationAnalysisExerciseSchema,
 ]);
@@ -353,6 +476,15 @@ export const submittedAnswerSchema = z.discriminatedUnion('type', [
     ),
   }),
   z.object({
+    type: z.literal('punctuation_constructor'),
+    placements: z.array(
+      z.object({
+        slotIndex: z.number().int().min(0),
+        mark: punctuationConstructorMarkSchema,
+      }),
+    ),
+  }),
+  z.object({
     type: z.literal('ege21_punctuation_analysis'),
     value: z.string().min(1),
   }),
@@ -370,6 +502,9 @@ export type OrderFragmentsExercise = z.infer<typeof orderFragmentsExerciseSchema
 export type WordSearchExercise = z.infer<typeof wordSearchExerciseSchema>;
 export type EgeMultiSelectExercise = z.infer<typeof egeMultiSelectExerciseSchema>;
 export type PunctuationInsertExercise = z.infer<typeof punctuationInsertExerciseSchema>;
+export type PunctuationConstructorExercise = z.infer<
+  typeof punctuationConstructorExerciseSchema
+>;
 export type Ege21PunctuationAnalysisExercise = z.infer<
   typeof ege21PunctuationAnalysisExerciseSchema
 >;

@@ -5,7 +5,7 @@ import { AnimatePresence, animate, motion, useMotionValue, useTransform } from '
 import { ArrowLeft, ArrowRight, Timer, Trophy, X, Zap } from 'lucide-react';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
 
-type BlitzDuration = 10 | 30 | 60;
+type BlitzDuration = 30 | 60 | 120;
 
 type BlitzGameProps = {
   cards: Ege9BlitzCard[];
@@ -21,13 +21,13 @@ export type BlitzResult = {
   scoreDelta: number;
 };
 
-const DURATIONS: BlitzDuration[] = [10, 30, 60];
-const BASE_POINTS = 20;
+const DURATIONS: BlitzDuration[] = [30, 60, 120];
+const BASE_POINTS = 10;
 
 function scoreForAnswer(combo: number) {
-  if (combo >= 10) return BASE_POINTS * 3;
-  if (combo >= 5) return BASE_POINTS * 2;
-  return BASE_POINTS;
+  // +30 bonus every 10th correct answer in a row
+  const streakBonus = (combo > 0 && combo % 10 === 0) ? 30 : 0;
+  return BASE_POINTS + streakBonus;
 }
 
 export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) {
@@ -144,6 +144,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
       });
     } else {
       setWrongCount((value) => value + 1);
+      setScoreDelta((score) => score - 5);
       setCombo(0);
     }
 
@@ -169,7 +170,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
       answerLockedRef.current = false;
       feedbackTimeoutRef.current = null;
     }, 190);
-  }, [currentCard, dragX, status]);
+  }, [currentCard, dragX, status, combo]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -257,7 +258,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                       : 'border-[var(--stroke)] bg-[var(--surface)] text-foreground hover:border-primary/60'
                   }`}
                 >
-                  {item === 60 ? '1 мин' : `${item} сек`}
+                  {item === 60 ? '1 мин' : item === 120 ? '2 мин' : `${item} сек`}
                 </button>
               ))}
             </div>
@@ -280,10 +281,12 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <div className="justify-self-start rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black text-foreground shadow-sm sm:px-3 sm:text-sm">
                 {timeLeftSeconds} c
               </div>
-              <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:gap-1.5 sm:px-3 sm:text-sm">
-                <Zap className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
-                x{combo >= 10 ? 3 : combo >= 5 ? 2 : 1}
-              </div>
+              {combo > 0 && (
+                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:gap-1.5 sm:px-3 sm:text-sm">
+                  <Zap className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
+                  {combo}
+                </div>
+              )}
               <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
@@ -324,7 +327,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                     <span className="min-w-0">{card.after}</span>
                   </div>
                   {card.contextHint && (
-                    <div className="mt-4 max-w-full rounded-full bg-primary/5 px-3 py-1 text-xs font-black text-primary/45 sm:mt-3">
+                    <div className="mt-8 max-w-full rounded-full bg-primary/5 px-5 py-2 text-base font-black text-primary/45 sm:mt-6">
                       {card.contextHint}
                     </div>
                   )}
@@ -388,7 +391,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                     <span className="min-w-0">{currentCard.after}</span>
                   </div>
                   {currentCard.contextHint && (
-                    <div className="mt-4 max-w-full rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary sm:mt-3">
+                    <div className="mt-8 max-w-full rounded-full bg-primary/10 px-5 py-2 text-base font-black text-primary sm:mt-6">
                       {currentCard.contextHint}
                     </div>
                   )}
@@ -401,15 +404,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                 </motion.div>
             </div>
 
-            <div className="mt-2 grid grid-cols-[auto_1fr_1fr_auto] gap-2 sm:mt-4">
-              <button
-                type="button"
-                onClick={() => answer(0)}
-                className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 shadow-sm transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary active:scale-95"
-                aria-label="Выбрать левый вариант"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4">
               <button
                 type="button"
                 onClick={() => answer(0)}
@@ -429,14 +424,6 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
                   {choiceWords[1]}
                 </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => answer(1)}
-                className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 shadow-sm transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary active:scale-95"
-                aria-label="Выбрать правый вариант"
-              >
-                <ArrowRight className="h-5 w-5" />
               </button>
             </div>
 

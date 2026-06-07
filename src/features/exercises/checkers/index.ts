@@ -10,6 +10,7 @@ import {
   type Ege21PunctuationAnalysisExercise,
   type Ege20ComplexSentencePunctuationExercise,
   type PunctuationInsertExercise,
+  type PunctuationConstructorExercise,
   submittedAnswerSchema,
   type SubmittedAnswer,
 } from '../schemas';
@@ -82,6 +83,11 @@ export function checkExerciseAnswer(
         return buildTypeMismatchResult(exercise, submittedAnswer, options);
       }
       return checkPunctuationInsert(exercise, submittedAnswer, options);
+    case 'punctuation_constructor':
+      if (submittedAnswer.type !== 'punctuation_constructor') {
+        return buildTypeMismatchResult(exercise, submittedAnswer, options);
+      }
+      return checkPunctuationConstructor(exercise, submittedAnswer, options);
     case 'ege21_punctuation_analysis':
       if (submittedAnswer.type !== 'ege21_punctuation_analysis') {
         return buildTypeMismatchResult(exercise, submittedAnswer, options);
@@ -350,6 +356,33 @@ function checkPunctuationInsert(
     mistakes: isCorrect
       ? []
       : buildPunctuationMistakes(exercise, submittedAnswer),
+    options,
+  });
+}
+
+function checkPunctuationConstructor(
+  exercise: PunctuationConstructorExercise,
+  submittedAnswer: Extract<SubmittedAnswer, { type: 'punctuation_constructor' }>,
+  options: { streak?: number; usedHint?: boolean },
+) {
+  const expected = normalizeConstructorPlacements(exercise.answer.placements);
+  const submitted = normalizeConstructorPlacements(submittedAnswer.placements);
+  const isCorrect = expected === submitted;
+
+  return buildResult({
+    exercise,
+    submittedAnswer,
+    isCorrect,
+    normalizedAnswer: {
+      ...submittedAnswer,
+      rendered: renderConstructorSentence(
+        exercise.payload.tokens,
+        submittedAnswer.placements,
+      ),
+    },
+    mistakes: isCorrect
+      ? []
+      : buildConstructorMistakes(exercise, submittedAnswer),
     options,
   });
 }
@@ -913,6 +946,106 @@ function buildPunctuationMistakes(
     ...extra.map((target) => ({
       kind: 'extra_punctuation',
       message: 'Unexpected punctuation mark was placed.',
+      target,
+    })),
+  ];
+}
+
+function punctuationConstructorGlyph(
+  mark: PunctuationConstructorExercise['answer']['placements'][number]['mark'],
+) {
+  const glyphs = {
+    comma: ',',
+    colon: ':',
+    semicolon: ';',
+    dash: '—',
+    quote_open: '«',
+    quote_close: '»',
+    period: '.',
+    exclamation: '!',
+    question: '?',
+  } satisfies Record<
+    PunctuationConstructorExercise['answer']['placements'][number]['mark'],
+    string
+  >;
+
+  return glyphs[mark];
+}
+
+function normalizeConstructorPlacements(
+  placements: PunctuationConstructorExercise['answer']['placements'],
+) {
+  return placements
+    .map((placement) => `${placement.slotIndex}:${placement.mark}`)
+    .join('|');
+}
+
+function renderConstructorSentence(
+  tokens: string[],
+  placements: PunctuationConstructorExercise['answer']['placements'],
+) {
+  const parts: string[] = [];
+
+  for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex += 1) {
+    const beforeMarks = placements
+      .filter((placement) => placement.slotIndex === tokenIndex)
+      .map((placement) => punctuationConstructorGlyph(placement.mark))
+      .join('');
+
+    if (beforeMarks) {
+      parts.push(beforeMarks);
+    }
+    parts.push(tokens[tokenIndex]);
+  }
+
+  const tailMarks = placements
+    .filter((placement) => placement.slotIndex === tokens.length)
+    .map((placement) => punctuationConstructorGlyph(placement.mark))
+    .join('');
+
+  if (tailMarks) {
+    parts.push(tailMarks);
+  }
+
+  return parts
+    .join(' ')
+    .replace(/\s+([,;:.!?»])/g, '$1')
+    .replace(/([:;])«/g, '$1 «')
+    .trim();
+}
+
+function buildConstructorMistakes(
+  exercise: PunctuationConstructorExercise,
+  submittedAnswer: Extract<SubmittedAnswer, { type: 'punctuation_constructor' }>,
+): CheckMistake[] {
+  const expected = exercise.answer.placements.map(
+    (placement) => `${placement.slotIndex}:${placement.mark}`,
+  );
+  const submitted = submittedAnswer.placements.map(
+    (placement) => `${placement.slotIndex}:${placement.mark}`,
+  );
+
+  const remainingSubmitted = [...submitted];
+  const missing: string[] = [];
+
+  for (const target of expected) {
+    const foundAt = remainingSubmitted.indexOf(target);
+    if (foundAt >= 0) {
+      remainingSubmitted.splice(foundAt, 1);
+    } else {
+      missing.push(target);
+    }
+  }
+
+  return [
+    ...missing.map((target) => ({
+      kind: 'missing_punctuation_constructor_mark',
+      message: 'Expected constructor mark was not placed.',
+      target,
+    })),
+    ...remainingSubmitted.map((target) => ({
+      kind: 'extra_punctuation_constructor_mark',
+      message: 'Unexpected constructor mark was placed.',
       target,
     })),
   ];

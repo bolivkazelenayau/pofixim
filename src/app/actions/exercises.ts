@@ -394,6 +394,14 @@ function exerciseFingerprint(exercise: Exercise) {
         .join('|');
       return `pi::${prompt}::${tokens}::${marks}`;
     }
+    case 'punctuation_constructor': {
+      const tokens = exercise.payload.tokens.map(normalizeForFingerprint).join('|');
+      const bank = exercise.payload.markBank.join('|');
+      const placements = exercise.answer.placements
+        .map((m) => `${m.slotIndex}:${m.mark}`)
+        .join('|');
+      return `pc::${prompt}::${tokens}::${bank}::${placements}`;
+    }
     case 'ege20_complex_sentence_punctuation': {
       const text = normalizeForFingerprint(exercise.payload.textWithSlots);
       const target = [...exercise.answer.targetSet].sort((a, b) => a - b).join(',');

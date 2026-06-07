@@ -39,6 +39,7 @@ type ChatState = {
     streak: number;
   }) => void;
   recordBlitzScore: (scoreDelta: number) => void;
+  spendScore: (amount: number) => void;
   resetProgress: () => void;
 };
 
@@ -178,13 +179,17 @@ export const useChatStore = create<ChatState>()(
             answeredExerciseIds: [
               ...new Set([...state.answeredExerciseIds, exerciseId]),
             ],
-            score: state.score + scoreDelta,
+            score: Math.max(0, state.score + scoreDelta),
             streak: isCorrect ? streak : 0,
           };
         }),
       recordBlitzScore: (scoreDelta) =>
         set((state) => ({
-          score: state.score + Math.max(0, Math.round(scoreDelta)),
+          score: Math.max(0, state.score + Math.round(scoreDelta)),
+        })),
+      spendScore: (amount) =>
+        set((state) => ({
+          score: state.score - amount,
         })),
       resetProgress: () =>
         set({

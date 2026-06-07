@@ -9,6 +9,7 @@ export const SUPPORTED_EXERCISE_TYPES = [
   'word_search',
   'order_fragments',
   'punctuation_insert',
+  'punctuation_constructor',
   'ege20_complex_sentence_punctuation',
   'ege21_punctuation_analysis',
 ] as const satisfies ExerciseType[];
@@ -21,6 +22,7 @@ const EXERCISE_TYPE_CYCLE = [
   'word_search',
   'order_fragments',
   'punctuation_insert',
+  'punctuation_constructor',
   'ege20_complex_sentence_punctuation',
   'ege21_punctuation_analysis',
 ] as const satisfies ExerciseType[];

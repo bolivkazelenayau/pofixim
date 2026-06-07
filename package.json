@@ -17,6 +17,7 @@
     "db:seed:ege9-21": "node scripts/seed-ege9-21-all.mjs",
     "db:apply:word-bank-cloze-enum": "node scripts/apply-word-bank-cloze-enum.mjs",
     "db:apply:word-search-enum": "node scripts/apply-word-search-enum.mjs",
+    "db:apply:punctuation-constructor-enum": "node scripts/apply-punctuation-constructor-enum.mjs",
     "db:seed:word-bank-cloze:ege14": "node scripts/seed-word-bank-cloze-from-ege14.mjs",
     "harvest:ege": "node scripts/harvest-ege.mjs",
     "harvest:ege:parse-live": "node scripts/parse-ege-live-html.mjs",

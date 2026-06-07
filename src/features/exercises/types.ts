@@ -12,6 +12,7 @@ export const EXERCISE_TYPES = [
   'text_correction',
   'dictation',
   'word_search',
+  'punctuation_constructor',
 ] as const;
 
 export const EXERCISE_CATEGORIES = ['orthography', 'punctuation', 'mixed'] as const;
@@ -100,6 +101,32 @@ export type PunctuationInsertAnswer = {
   marks: Array<{
     afterTokenIndex: number;
     mark: PunctuationMark;
+  }>;
+};
+
+export type PunctuationConstructorMark =
+  | 'comma'
+  | 'colon'
+  | 'semicolon'
+  | 'dash'
+  | 'quote_open'
+  | 'quote_close'
+  | 'paren_open'
+  | 'paren_close'
+  | 'period'
+  | 'exclamation'
+  | 'question'
+  | 'ellipsis';
+
+export type PunctuationConstructorPayload = {
+  tokens: string[];
+  markBank: PunctuationConstructorMark[];
+};
+
+export type PunctuationConstructorAnswer = {
+  placements: Array<{
+    slotIndex: number;
+    mark: PunctuationConstructorMark;
   }>;
 };
 

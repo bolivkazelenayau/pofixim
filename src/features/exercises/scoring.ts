@@ -14,12 +14,13 @@ export function calculateScoreDelta({
   usedHint = false,
 }: ScoreInput) {
   if (!isCorrect) {
-    return 0;
+    return -5;
   }
 
-  const base = 10 * difficulty;
-  const streakBonus = streak >= 3 ? 5 : 0;
-  const hintPenalty = usedHint ? 4 : 0;
+  const base = 10;
+  // +30 bonus every 10th correct answer in a row
+  const streakBonus = (streak > 0 && streak % 10 === 0) ? 30 : 0;
+  const hintPenalty = usedHint ? 2 : 0;
 
   return Math.max(1, base + streakBonus - hintPenalty);
 }

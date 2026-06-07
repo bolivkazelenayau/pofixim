@@ -4,6 +4,7 @@ import type { Exercise, SubmittedAnswer } from '../schemas';
 import MultipleChoiceCard from './MultipleChoiceCard';
 import FillBlankCard from './FillBlankCard';
 import PunctuationInsertCard from './PunctuationInsertCard';
+import PunctuationConstructorCard from './PunctuationConstructorCard';
 import Ege21PunctuationAnalysisCard from './Ege21PunctuationAnalysisCard';
 import Ege20ComplexSentenceCard from './Ege20ComplexSentenceCard';
 import EgeMultiSelectCard from './EgeMultiSelectCard';
@@ -15,12 +16,14 @@ type ExerciseRendererProps = {
   exercise: Exercise;
   disabled?: boolean;
   onSubmit: (answer: SubmittedAnswer, answerLabel: string) => void;
+  previewMode?: boolean;
 };
 
 export default function ExerciseRenderer({
   exercise,
   disabled,
   onSubmit,
+  previewMode,
 }: ExerciseRendererProps) {
   let content: React.ReactNode;
 
@@ -85,6 +88,16 @@ export default function ExerciseRenderer({
           exercise={exercise}
           disabled={disabled}
           onSubmit={onSubmit}
+        />
+      );
+      break;
+    case 'punctuation_constructor':
+      content = (
+        <PunctuationConstructorCard
+          exercise={exercise}
+          disabled={disabled}
+          onSubmit={onSubmit}
+          previewMode={previewMode}
         />
       );
       break;

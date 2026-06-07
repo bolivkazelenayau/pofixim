@@ -15,6 +15,20 @@ import {
 } from '@/lib/exercise-type-conversion';
 import { logSlowServerAction } from '@/lib/slow-action-log';
 
+type PunctuationConstructorMark =
+  | 'comma'
+  | 'colon'
+  | 'semicolon'
+  | 'dash'
+  | 'quote_open'
+  | 'quote_close'
+  | 'paren_open'
+  | 'paren_close'
+  | 'period'
+  | 'exclamation'
+  | 'question'
+  | 'ellipsis';
+
 export type ExerciseEditorInput = {
   id?: number;
   type: Extract<
@@ -26,6 +40,7 @@ export type ExerciseEditorInput = {
     | 'word_search'
     | 'order_fragments'
     | 'punctuation_insert'
+    | 'punctuation_constructor'
     | 'ege20_complex_sentence_punctuation'
     | 'ege21_punctuation_analysis'
   >;
@@ -61,6 +76,37 @@ export type ExerciseEditorInput = {
   punctuationMarks?: Array<{
     afterTokenIndex: number;
     mark: ',' | ':' | ';' | '-' | '—';
+  }>;
+  punctuationConstructorTokens?: string[];
+  punctuationConstructorMarkBank?: PunctuationConstructorMark[];
+  punctuationConstructorHints?: string[];
+  punctuationConstructorGuidedSteps?: Array<{
+    id: string;
+    title: string;
+    slotIndex: number;
+    marks?: PunctuationConstructorMark[];
+  }>;
+  punctuationConstructorSegments?: Array<{
+    label: string;
+    tokenStart: number;
+    tokenEnd: number;
+    kind:
+      | 'author_words'
+      | 'direct_speech'
+      | 'main_clause'
+      | 'subordinate_clause'
+      | 'introductory'
+      | 'enumeration'
+      | 'other';
+  }>;
+  punctuationConstructorPlacements?: Array<{
+    slotIndex: number;
+    mark: PunctuationConstructorMark;
+  }>;
+  punctuationConstructorSlotExplanations?: Array<{
+    slotIndex: number;
+    marks?: PunctuationConstructorMark[];
+    text: string;
   }>;
   ege20TextWithSlots?: string;
   ege20Slots?: number[];
@@ -572,6 +618,66 @@ function buildExercisePayload(input: ExerciseEditorInput) {
       ...base,
       payload: { fragments },
       answer: { correctOrder },
+    };
+  }
+
+  if (input.type === 'punctuation_constructor') {
+    const tokens =
+      (input.punctuationConstructorTokens ?? []).map((v) => v.trim()).filter(Boolean);
+    const safeTokens =
+      tokens.length >= 2 ? tokens : ['Мне', 'сказали', 'Ждите', 'придет'];
+    const markBank =
+      input.punctuationConstructorMarkBank && input.punctuationConstructorMarkBank.length > 0
+        ? [...new Set(input.punctuationConstructorMarkBank)]
+        : ([
+            'period',
+            'comma',
+            'semicolon',
+            'colon',
+            'question',
+            'exclamation',
+            'quote_open',
+            'quote_close',
+            'paren_open',
+            'paren_close',
+            'dash',
+            'ellipsis',
+          ] satisfies PunctuationConstructorMark[]);
+    const markSet = new Set(markBank);
+    const placements = (input.punctuationConstructorPlacements ?? [])
+      .filter(
+        (placement) =>
+          Number.isInteger(placement.slotIndex) &&
+          placement.slotIndex >= 0 &&
+          placement.slotIndex <= safeTokens.length &&
+          markSet.has(placement.mark),
+      )
+      .map((placement) => ({
+        slotIndex: placement.slotIndex,
+        mark: placement.mark,
+      }));
+
+    return {
+      ...base,
+      payload: {
+        tokens: safeTokens,
+        markBank,
+        ...((input.punctuationConstructorHints ?? []).length > 0
+          ? { hints: input.punctuationConstructorHints }
+          : {}),
+        ...((input.punctuationConstructorGuidedSteps ?? []).length > 0
+          ? { guidedSteps: input.punctuationConstructorGuidedSteps }
+          : {}),
+        ...((input.punctuationConstructorSegments ?? []).length > 0
+          ? { segments: input.punctuationConstructorSegments }
+          : {}),
+      },
+      answer: {
+        placements,
+        ...((input.punctuationConstructorSlotExplanations ?? []).length > 0
+          ? { slotExplanations: input.punctuationConstructorSlotExplanations }
+          : {}),
+      },
     };
   }
 
@@ -1430,6 +1536,90 @@ export async function getExerciseByIdAction(id: number) {
             : [],
           orderCorrectOrder: Array.isArray(answer.correctOrder)
             ? answer.correctOrder.filter((v): v is string => typeof v === 'string')
+            : [],
+        },
+      };
+    }
+
+    if (row.type === 'punctuation_constructor') {
+      return {
+        success: true,
+        item: {
+          ...base,
+          punctuationConstructorTokens: Array.isArray(payload.tokens)
+            ? payload.tokens.filter((v): v is string => typeof v === 'string')
+            : [],
+          punctuationConstructorMarkBank: Array.isArray(payload.markBank)
+            ? payload.markBank.filter((v): v is PunctuationConstructorMark =>
+                typeof v === 'string',
+              )
+            : [],
+          punctuationConstructorHints: Array.isArray(payload.hints)
+            ? payload.hints.filter((v): v is string => typeof v === 'string')
+            : [],
+          punctuationConstructorGuidedSteps: Array.isArray(payload.guidedSteps)
+            ? payload.guidedSteps
+                .map((s) => (s ?? {}) as Record<string, unknown>)
+                .filter(
+                  (s) =>
+                    typeof s.id === 'string' &&
+                    typeof s.title === 'string' &&
+                    typeof s.slotIndex === 'number',
+                )
+                .map((s) => ({
+                  id: String(s.id),
+                  title: String(s.title),
+                  slotIndex: Number(s.slotIndex),
+                  marks: Array.isArray(s.marks)
+                    ? s.marks
+                        .filter((mark): mark is string => typeof mark === 'string')
+                        .map((mark) => mark as PunctuationConstructorMark)
+                    : undefined,
+                }))
+            : [],
+          punctuationConstructorSegments: Array.isArray(payload.segments)
+            ? payload.segments
+                .map((s) => (s ?? {}) as Record<string, unknown>)
+                .filter(
+                  (s) =>
+                    typeof s.label === 'string' &&
+                    typeof s.tokenStart === 'number' &&
+                    typeof s.tokenEnd === 'number' &&
+                    typeof s.kind === 'string',
+                )
+                .map((s) => ({
+                  label: String(s.label),
+                  tokenStart: Number(s.tokenStart),
+                  tokenEnd: Number(s.tokenEnd),
+                  kind: String(s.kind),
+                }))
+            : [],
+          punctuationConstructorPlacements: Array.isArray(answer.placements)
+            ? answer.placements
+                .map((p) => (p ?? {}) as Record<string, unknown>)
+                .filter(
+                  (p) => typeof p.slotIndex === 'number' && typeof p.mark === 'string',
+                )
+                .map((p) => ({
+                  slotIndex: Number(p.slotIndex),
+                  mark: String(p.mark) as PunctuationConstructorMark,
+                }))
+            : [],
+          punctuationConstructorSlotExplanations: Array.isArray(answer.slotExplanations)
+            ? answer.slotExplanations
+                .map((s) => (s ?? {}) as Record<string, unknown>)
+                .filter(
+                  (s) => typeof s.slotIndex === 'number' && typeof s.text === 'string',
+                )
+                .map((s) => ({
+                  slotIndex: Number(s.slotIndex),
+                  marks: Array.isArray(s.marks)
+                    ? s.marks
+                        .filter((mark): mark is string => typeof mark === 'string')
+                        .map((mark) => mark as PunctuationConstructorMark)
+                    : undefined,
+                  text: String(s.text),
+                }))
             : [],
         },
       };

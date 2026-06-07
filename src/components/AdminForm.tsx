@@ -277,6 +277,19 @@ const categories: ExerciseCategory[] = ['orthography', 'punctuation', 'mixed'];
 const qualityStatuses = ['draft', 'review', 'approved', 'archived'] as const;
 
 type PMark = ',' | ':' | ';' | '-' | '—';
+type PCMark =
+ | 'comma'
+ | 'colon'
+ | 'semicolon'
+ | 'dash'
+ | 'quote_open'
+ | 'quote_close'
+ | 'paren_open'
+ | 'paren_close'
+ | 'period'
+ | 'exclamation'
+ | 'question'
+ | 'ellipsis';
 type FeedbackSections = {
  lead: string;
  correctAnswer: string;
@@ -434,6 +447,13 @@ type Form = {
  punctuationTokens: string;
  punctuationAllowedMarks: string;
  punctuationMarks: string;
+ punctuationConstructorTokens: string;
+ punctuationConstructorMarkBank: string;
+ punctuationConstructorHints: string;
+ punctuationConstructorGuidedSteps: string;
+ punctuationConstructorSegments: string;
+ punctuationConstructorPlacements: string;
+ punctuationConstructorSlotExplanations: string;
  ege20TextWithSlots: string;
  ege20Slots: string;
  ege20TargetSet: string;
@@ -474,6 +494,13 @@ const EMPTY: Form = {
  punctuationTokens: '',
  punctuationAllowedMarks: ',',
  punctuationMarks: '',
+ punctuationConstructorTokens: '',
+ punctuationConstructorMarkBank: 'period, comma, semicolon, colon, question, exclamation, quote_open, quote_close, paren_open, paren_close, dash, ellipsis',
+ punctuationConstructorHints: '',
+ punctuationConstructorGuidedSteps: '',
+ punctuationConstructorSegments: '',
+ punctuationConstructorPlacements: '',
+ punctuationConstructorSlotExplanations: '',
  ege20TextWithSlots: '',
  ege20Slots: '',
  ege20TargetSet: '',
@@ -500,6 +527,8 @@ function seedPrefixForType(type: Form['type']) {
  return 'ws';
  case 'punctuation_insert':
  return 'punc';
+ case 'punctuation_constructor':
+ return 'pc';
  default:
  return 'mc';
  }
@@ -1048,6 +1077,49 @@ function formFromExerciseItem(item: Record<string, unknown>): Form {
  ? (item.punctuationMarks as Array<{ afterTokenIndex: number; mark: string }>)
  .map((mark) => `${mark.afterTokenIndex}:${mark.mark}`)
  .join(', ')
+ : '',
+ punctuationConstructorTokens: Array.isArray(item.punctuationConstructorTokens)
+ ? (item.punctuationConstructorTokens as string[]).join(' | ')
+ : '',
+ punctuationConstructorMarkBank: Array.isArray(item.punctuationConstructorMarkBank)
+ ? (item.punctuationConstructorMarkBank as string[]).join(', ')
+ : 'comma, colon, dash',
+ punctuationConstructorHints: Array.isArray(item.punctuationConstructorHints)
+ ? (item.punctuationConstructorHints as string[]).join('\n')
+ : '',
+ punctuationConstructorGuidedSteps: Array.isArray(item.punctuationConstructorGuidedSteps)
+ ? (item.punctuationConstructorGuidedSteps as Array<{
+ id: string;
+ title: string;
+ slotIndex: number;
+ marks?: string[];
+ }>)
+ .map((step) => `${step.id} | ${step.title} | ${step.slotIndex} | ${(step.marks ?? []).join(',')}`)
+ .join('\n')
+ : '',
+ punctuationConstructorSegments: Array.isArray(item.punctuationConstructorSegments)
+ ? (item.punctuationConstructorSegments as Array<{
+ label: string;
+ tokenStart: number;
+ tokenEnd: number;
+ kind: string;
+ }>)
+ .map((segment) => `${segment.label} | ${segment.tokenStart} | ${segment.tokenEnd} | ${segment.kind}`)
+ .join('\n')
+ : '',
+ punctuationConstructorPlacements: Array.isArray(item.punctuationConstructorPlacements)
+ ? (item.punctuationConstructorPlacements as Array<{ slotIndex: number; mark: string }>)
+ .map((placement) => `${placement.slotIndex}:${placement.mark}`)
+ .join(', ')
+ : '',
+ punctuationConstructorSlotExplanations: Array.isArray(item.punctuationConstructorSlotExplanations)
+ ? (item.punctuationConstructorSlotExplanations as Array<{
+ slotIndex: number;
+ marks?: string[];
+ text: string;
+ }>)
+ .map((item) => `${item.slotIndex} | ${(item.marks ?? []).join(',')} | ${item.text}`)
+ .join('\n')
  : '',
  ege20TextWithSlots: String(item.ege20TextWithSlots ?? ''),
  ege20Slots: Array.isArray(item.ege20Slots) ? (item.ege20Slots as number[]).join(', ') : '',
@@ -1741,6 +1813,58 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  payload: { fragments: safeFragments },
  answer: { correctOrder },
  };
+ } else if (form.type === 'punctuation_constructor') {
+ const tokens = form.punctuationConstructorTokens
+ .split('|')
+ .map((value) => value.trim())
+ .filter(Boolean);
+ const markBank = parsePunctuationConstructorMarkBank(
+ form.punctuationConstructorMarkBank,
+ );
+
+ candidate = {
+ ...base,
+ payload: {
+ tokens:
+ tokens.length >= 2
+ ? tokens
+ : ['Мне', 'сказали', 'Ждите', 'придет'],
+ markBank:
+ markBank.length > 0
+ ? markBank
+ : (['comma', 'colon', 'dash'] satisfies PCMark[]),
+ ...(form.punctuationConstructorHints.trim()
+ ? {
+ hints: form.punctuationConstructorHints
+ .split('\n')
+ .map((value) => value.trim())
+ .filter(Boolean),
+ }
+ : {}),
+ ...(form.punctuationConstructorGuidedSteps.trim()
+ ? {
+ guidedSteps: parsePunctuationConstructorGuidedSteps(
+ form.punctuationConstructorGuidedSteps,
+ ),
+ }
+ : {}),
+ ...(form.punctuationConstructorSegments.trim()
+ ? { segments: parsePunctuationConstructorSegments(form.punctuationConstructorSegments) }
+ : {}),
+ },
+ answer: {
+ placements: parsePunctuationConstructorPlacements(
+ form.punctuationConstructorPlacements,
+ ),
+ ...(form.punctuationConstructorSlotExplanations.trim()
+ ? {
+ slotExplanations: parsePunctuationConstructorSlotExplanations(
+ form.punctuationConstructorSlotExplanations,
+ ),
+ }
+ : {}),
+ },
+ };
  } else if (form.type === 'ege20_complex_sentence_punctuation') {
  const slots = form.ege20Slots
  .split(',')
@@ -2290,26 +2414,216 @@ async function loadExercise(id: number) {
  }, [isDraftLoaded, initialSelectionPending]);
 
  function parsePunctuationMarks(raw: string) {
- return raw
- .split(',')
- .map((v) => v.trim())
- .filter(Boolean)
- .map((entry) => {
- const [idx, mark] = entry.split(':').map((v) => v.trim());
- return {
- afterTokenIndex: Number(idx),
- mark: mark as PMark,
- };
- })
- .filter(
- (v) =>
- Number.isInteger(v.afterTokenIndex) &&
- v.afterTokenIndex >= 0 &&
- v.mark.length > 0,
- );
- }
+  const regex = /(\d+)\s*:\s*([^\s]+)/g;
+  const matches = Array.from(raw.matchAll(regex));
 
- function applyHistoryState(next: Form) {
+  return matches
+    .map((m) => {
+      const idx = m[1];
+      let mark = m[2];
+      if (mark.length > 1 && mark.endsWith(',')) {
+        mark = mark.slice(0, -1);
+      }
+      return {
+        afterTokenIndex: Number(idx),
+        mark: mark as PMark,
+      };
+    })
+    .filter(
+      (v) =>
+        Number.isInteger(v.afterTokenIndex) &&
+        v.afterTokenIndex >= 0 &&
+        typeof v.mark === 'string' &&
+        v.mark.length > 0,
+    );
+}
+
+ function parsePunctuationConstructorMarkBank(raw: string): PCMark[] {
+  const allowed = new Set<PCMark>([
+    'comma',
+    'colon',
+    'semicolon',
+    'dash',
+    'quote_open',
+    'quote_close',
+    'paren_open',
+    'paren_close',
+    'period',
+    'exclamation',
+    'question',
+    'ellipsis',
+  ]);
+
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value): value is PCMark => allowed.has(value as PCMark));
+}
+
+ function parsePunctuationConstructorPlacements(raw: string) {
+  const markBank = new Set<PCMark>([
+    'comma',
+    'colon',
+    'semicolon',
+    'dash',
+    'quote_open',
+    'quote_close',
+    'paren_open',
+    'paren_close',
+    'period',
+    'exclamation',
+    'question',
+    'ellipsis',
+  ]);
+  const regex = /(\d+)\s*:\s*([a-z_]+)/g;
+  const matches = Array.from(raw.matchAll(regex));
+
+  return matches
+    .map((match) => ({
+      slotIndex: Number(match[1]),
+      mark: match[2] as PCMark,
+    }))
+    .filter(
+      (placement) =>
+        Number.isInteger(placement.slotIndex) &&
+        placement.slotIndex >= 0 &&
+      markBank.has(placement.mark),
+    );
+}
+
+ function parsePunctuationConstructorSegments(raw: string) {
+  const allowed = new Set([
+    'author_words',
+    'direct_speech',
+    'main_clause',
+    'subordinate_clause',
+    'introductory',
+    'enumeration',
+    'other',
+  ]);
+
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, tokenStart, tokenEnd, kind] = line
+        .split('|')
+        .map((part) => part.trim());
+      return {
+        label,
+        tokenStart: Number(tokenStart),
+        tokenEnd: Number(tokenEnd),
+        kind,
+      };
+    })
+    .filter(
+      (segment) =>
+        segment.label &&
+        Number.isInteger(segment.tokenStart) &&
+        segment.tokenStart >= 0 &&
+        Number.isInteger(segment.tokenEnd) &&
+        segment.tokenEnd >= segment.tokenStart &&
+        allowed.has(segment.kind),
+    )
+    .map((segment) => ({
+      ...segment,
+      kind: segment.kind as
+        | 'author_words'
+        | 'direct_speech'
+        | 'main_clause'
+        | 'subordinate_clause'
+        | 'introductory'
+        | 'enumeration'
+        | 'other',
+    }));
+}
+
+ function parsePunctuationConstructorGuidedSteps(raw: string) {
+  const markBank = new Set<PCMark>([
+    'comma',
+    'colon',
+    'semicolon',
+    'dash',
+    'quote_open',
+    'quote_close',
+    'paren_open',
+    'paren_close',
+    'period',
+    'exclamation',
+    'question',
+    'ellipsis',
+  ]);
+
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [idRaw, titleRaw, slotRaw, marksRaw] = line
+        .split('|')
+        .map((part) => part.trim());
+      const marks = (marksRaw ?? '')
+        .split(',')
+        .map((mark) => mark.trim())
+        .filter((mark): mark is PCMark => markBank.has(mark as PCMark));
+      return {
+        id: idRaw || `step_${index + 1}`,
+        title: titleRaw,
+        slotIndex: Number(slotRaw),
+        marks: marks.length > 0 ? marks : undefined,
+      };
+    })
+    .filter(
+      (step) =>
+        step.id &&
+        step.title &&
+        Number.isInteger(step.slotIndex) &&
+        step.slotIndex >= 0,
+    );
+}
+
+ function parsePunctuationConstructorSlotExplanations(raw: string) {
+  const markBank = new Set<PCMark>([
+    'comma',
+    'colon',
+    'semicolon',
+    'dash',
+    'quote_open',
+    'quote_close',
+    'paren_open',
+    'paren_close',
+    'period',
+    'exclamation',
+    'question',
+    'ellipsis',
+  ]);
+
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [slotIndexRaw, marksRaw, ...textParts] = line.split('|');
+      const marks = (marksRaw ?? '')
+        .split(',')
+        .map((mark) => mark.trim())
+        .filter((mark): mark is PCMark => markBank.has(mark as PCMark));
+      return {
+        slotIndex: Number(slotIndexRaw?.trim()),
+        marks: marks.length > 0 ? marks : undefined,
+        text: textParts.join('|').trim(),
+      };
+    })
+    .filter(
+      (item) =>
+        Number.isInteger(item.slotIndex) &&
+        item.slotIndex >= 0 &&
+        item.text.length > 0,
+    );
+}
+
+  function applyHistoryState(next: Form) {
  suppressHistoryRef.current = true;
  setForm(next);
  }
@@ -2429,6 +2743,34 @@ async function loadExercise(id: number) {
  punctuationMarks:
  source.type === 'punctuation_insert'
  ? parsePunctuationMarks(source.punctuationMarks)
+ : undefined,
+ punctuationConstructorTokens:
+ source.type === 'punctuation_constructor'
+ ? source.punctuationConstructorTokens.split('|').map((v) => v.trim()).filter(Boolean)
+ : undefined,
+ punctuationConstructorMarkBank:
+ source.type === 'punctuation_constructor'
+ ? parsePunctuationConstructorMarkBank(source.punctuationConstructorMarkBank)
+ : undefined,
+ punctuationConstructorHints:
+ source.type === 'punctuation_constructor'
+ ? source.punctuationConstructorHints.split('\n').map((v) => v.trim()).filter(Boolean)
+ : undefined,
+ punctuationConstructorGuidedSteps:
+ source.type === 'punctuation_constructor'
+ ? parsePunctuationConstructorGuidedSteps(source.punctuationConstructorGuidedSteps)
+ : undefined,
+ punctuationConstructorSegments:
+ source.type === 'punctuation_constructor'
+ ? parsePunctuationConstructorSegments(source.punctuationConstructorSegments)
+ : undefined,
+ punctuationConstructorPlacements:
+ source.type === 'punctuation_constructor'
+ ? parsePunctuationConstructorPlacements(source.punctuationConstructorPlacements)
+ : undefined,
+ punctuationConstructorSlotExplanations:
+ source.type === 'punctuation_constructor'
+ ? parsePunctuationConstructorSlotExplanations(source.punctuationConstructorSlotExplanations)
  : undefined,
  ege20TextWithSlots:
  source.type === 'ege20_complex_sentence_punctuation'
@@ -3537,6 +3879,94 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  )}
 
+ {form.type === 'punctuation_constructor' && (
+ <div className="mt-3 space-y-3">
+ <Input label="Токены предложения (через |)">
+ <textarea
+ className={inputClass}
+ rows={2}
+ value={form.punctuationConstructorTokens}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, punctuationConstructorTokens: e.target.value }))
+ }
+ placeholder="Мне | сказали | Ждите | приедет | другой | замерщик"
+ />
+ </Input>
+ <Input label="Банк знаков: period, comma, semicolon, colon, question, exclamation, quote_open, quote_close, paren_open, paren_close, dash, ellipsis">
+ <input
+ className={inputClass}
+ value={form.punctuationConstructorMarkBank}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, punctuationConstructorMarkBank: e.target.value }))
+ }
+ />
+ </Input>
+ <Input label="Подсказки (по одной на строку)">
+ <textarea
+ className={inputClass}
+ rows={3}
+ value={form.punctuationConstructorHints}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, punctuationConstructorHints: e.target.value }))
+ }
+ placeholder={'В предложении есть прямая речь.\nПосле слов автора нужен знак.'}
+ />
+ </Input>
+ <Input label="Пошаговый режим (id | title | slot | marks)">
+ <textarea
+ className={inputClass}
+ rows={4}
+ value={form.punctuationConstructorGuidedSteps}
+ onChange={(e) =>
+ setForm((f) => ({
+ ...f,
+ punctuationConstructorGuidedSteps: e.target.value,
+ }))
+ }
+ placeholder={'author_end | Где заканчиваются слова автора? | 2 | colon\nopen_quote | Где начинается прямая речь? | 2 | quote_open'}
+ />
+ </Input>
+ <Input label="Правильные слоты (slot:mark)">
+ <input
+ className={inputClass}
+ value={form.punctuationConstructorPlacements}
+ onChange={(e) =>
+ setForm((f) => ({
+ ...f,
+ punctuationConstructorPlacements: e.target.value,
+ }))
+ }
+ placeholder="2:colon, 2:quote_open, 3:comma, 6:quote_close, 6:period"
+ />
+ </Input>
+ <Input label="Разбор слотов (slot | marks | text)">
+ <textarea
+ className={inputClass}
+ rows={3}
+ value={form.punctuationConstructorSlotExplanations}
+ onChange={(e) =>
+ setForm((f) => ({
+ ...f,
+ punctuationConstructorSlotExplanations: e.target.value,
+ }))
+ }
+ placeholder={'2 | colon, quote_open | После слов автора ставится двоеточие и открываются кавычки.\n6 | quote_close, period | Реплика закрывается кавычкой, затем ставится точка.'}
+ />
+ </Input>
+ <Input label="Структура (label | tokenStart | tokenEnd | kind)">
+ <textarea
+ className={inputClass}
+ rows={2}
+ value={form.punctuationConstructorSegments}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, punctuationConstructorSegments: e.target.value }))
+ }
+ placeholder={'Слова автора | 0 | 1 | author_words\nПрямая речь | 2 | 5 | direct_speech'}
+ />
+ </Input>
+ </div>
+ )}
+
  {form.type === 'ege20_complex_sentence_punctuation' && (
  <div className="mt-3 space-y-3">
  <Input label="Текст со слотами (например: ... (1) ... (2) ...)">
@@ -3743,7 +4173,11 @@ async function openExerciseWithAutosave(id: number) {
  <div className="mb-2 rounded-xl bg-surface px-4 py-3 text-sm text-foreground shadow-sm [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0">
  <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(preview.exercise.prompt)}</ReactMarkdown>
  </div>
- <ExerciseRenderer exercise={preview.exercise} onSubmit={handlePreviewSubmit} />
+        <ExerciseRenderer
+          exercise={preview.exercise}
+          onSubmit={handlePreviewSubmit}
+          previewMode={true}
+        />
  {previewCheckResult && (
  <div
  className={`mt-3 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap ${
