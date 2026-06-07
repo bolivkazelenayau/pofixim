@@ -830,6 +830,10 @@ function buildPedagogy(
     };
   }
 
+  if (exercise.type === 'punctuation_constructor') {
+    return buildPunctuationConstructorPedagogy(exercise, mistakes);
+  }
+
   if (isEge14) {
     return {
       mistakeCode: 'fipi.ege14.homonymy_or_pos_confusion',
@@ -901,6 +905,112 @@ function buildPedagogy(
       reason: 'Нужна повторная попытка с опорой на алгоритм.',
     },
   };
+}
+
+function buildPunctuationConstructorPedagogy(
+  exercise: PunctuationConstructorExercise,
+  mistakes: CheckMistake[],
+): Pedagogy {
+  const messagesBySlot = new Map<number, string[]>();
+
+  for (const mistake of mistakes) {
+    const target = parseConstructorMistakeTarget(mistake.target);
+    if (!target) continue;
+
+    const mark = formatConstructorMarkForFeedback(target.mark);
+    const messages = messagesBySlot.get(target.slotIndex) ?? [];
+    if (mistake.kind === 'missing_punctuation_constructor_mark') {
+      messages.push(`В слоте ${target.slotIndex} нужен знак: ${mark}.`);
+    } else if (mistake.kind === 'extra_punctuation_constructor_mark') {
+      messages.push(`В слоте ${target.slotIndex} стоит лишний знак: ${mark}.`);
+    } else {
+      messages.push(`Проверь слот ${target.slotIndex}: место и порядок знаков.`);
+    }
+    messagesBySlot.set(target.slotIndex, messages);
+  }
+
+  const slotExplanations = exercise.answer.slotExplanations ?? [];
+  for (const item of slotExplanations) {
+    if (!messagesBySlot.has(item.slotIndex)) continue;
+    const messages = messagesBySlot.get(item.slotIndex) ?? [];
+    messages.push(item.text);
+    messagesBySlot.set(item.slotIndex, messages);
+  }
+
+  const failedStepIds =
+    messagesBySlot.size > 0
+      ? [...messagesBySlot.keys()]
+          .sort((left, right) => left - right)
+          .map((slotIndex) => `slot_${slotIndex}`)
+      : ['punctuation_constructor'];
+
+  const stepFeedback =
+    messagesBySlot.size > 0
+      ? failedStepIds.map((stepId) => {
+          const slotIndex = Number(stepId.replace('slot_', ''));
+          const messages = messagesBySlot.get(slotIndex) ?? [
+            `Проверь слот ${slotIndex}.`,
+          ];
+          return {
+            stepId,
+            ok: false,
+            message: [...new Set(messages)].join(' '),
+          };
+        })
+      : [
+          {
+            stepId: 'punctuation_constructor',
+            ok: false,
+            message: 'Проверь подсвеченные слоты: знак, место и порядок.',
+          },
+        ];
+
+  return {
+    mistakeCode: mistakes[0]?.kind ?? null,
+    failedStepIds,
+    stepFeedback,
+    nextRecommendation: {
+      mode: 'retry',
+      reason: 'Проверь подсвеченные слоты: знак, место и порядок внутри слота.',
+    },
+  };
+}
+
+function parseConstructorMistakeTarget(target: string | undefined):
+  | {
+      slotIndex: number;
+      mark: PunctuationConstructorExercise['answer']['placements'][number]['mark'];
+    }
+  | null {
+  if (!target) return null;
+  const [slotRaw, markRaw] = target.split(':');
+  const slotIndex = Number(slotRaw);
+  if (!Number.isInteger(slotIndex) || !markRaw) return null;
+  const mark = markRaw as PunctuationConstructorExercise['answer']['placements'][number]['mark'];
+  return { slotIndex, mark };
+}
+
+function formatConstructorMarkForFeedback(
+  mark: PunctuationConstructorExercise['answer']['placements'][number]['mark'],
+) {
+  const labels: Record<
+    PunctuationConstructorExercise['answer']['placements'][number]['mark'],
+    string
+  > = {
+    comma: 'запятая',
+    colon: 'двоеточие',
+    semicolon: 'точка с запятой',
+    dash: 'тире',
+    quote_open: 'открывающая кавычка',
+    quote_close: 'закрывающая кавычка',
+    paren_open: 'открывающая скобка',
+    paren_close: 'закрывающая скобка',
+    period: 'точка',
+    exclamation: 'восклицательный знак',
+    question: 'вопросительный знак',
+    ellipsis: 'многоточие',
+  };
+  return labels[mark] ?? punctuationConstructorGlyph(mark);
 }
 
 function normalizeText(value: string, caseSensitive = false) {

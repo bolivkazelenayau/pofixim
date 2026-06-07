@@ -1984,7 +1984,10 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  result: ReturnType<typeof checkExerciseAnswer>,
  exerciseType?: Exercise['type'],
  ) {
- if (exerciseType === 'ege_multi_select') {
+ if (
+ exerciseType === 'ege_multi_select' ||
+ exerciseType === 'punctuation_constructor'
+ ) {
  return '';
  }
  if (!result || result.stepFeedback.length === 0) {
@@ -2003,9 +2006,14 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  : undefined;
  const computedCorrectAnswer = result.feedback.correctAnswer?.trim();
  const fallbackCorrectAnswer = previewFeedback?.correctAnswer.join('\n\n');
+ const prefix =
+ preview.exercise.type === 'punctuation_constructor' && !result.isCorrect
+ ? ''
+ : answerFeedbackPrefix(result.isCorrect);
+ const prefixText = prefix ? `${prefix}\n\n` : '';
  setPreviewCheckResult({
  isCorrect: result.isCorrect,
- text: `${answerFeedbackPrefix(result.isCorrect)}\n\n${result.feedback.explanation}${buildStepFeedbackText(
+ text: `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(
  result,
  preview.exercise.type,
  )}`,
@@ -2489,6 +2497,60 @@ async function loadExercise(id: number) {
         placement.slotIndex >= 0 &&
       markBank.has(placement.mark),
     );
+}
+
+ function punctuationConstructorGlyph(mark: PCMark) {
+  const glyphs: Record<PCMark, string> = {
+    comma: ',',
+    colon: ':',
+    semicolon: ';',
+    dash: '—',
+    quote_open: '«',
+    quote_close: '»',
+    paren_open: '(',
+    paren_close: ')',
+    period: '.',
+    exclamation: '!',
+    question: '?',
+    ellipsis: '...',
+  };
+
+  return glyphs[mark];
+}
+
+ function renderPunctuationConstructorAnswer(
+  tokensRaw: string,
+  placementsRaw: string,
+) {
+  const tokens = tokensRaw
+    .split('|')
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const placements = parsePunctuationConstructorPlacements(placementsRaw);
+  const parts: string[] = [];
+
+  for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex += 1) {
+    const beforeMarks = placements
+      .filter((placement) => placement.slotIndex === tokenIndex)
+      .map((placement) => punctuationConstructorGlyph(placement.mark))
+      .join('');
+    if (beforeMarks) parts.push(beforeMarks);
+    parts.push(tokens[tokenIndex]);
+  }
+
+  const tailMarks = placements
+    .filter((placement) => placement.slotIndex === tokens.length)
+    .map((placement) => punctuationConstructorGlyph(placement.mark))
+    .join('');
+  if (tailMarks) parts.push(tailMarks);
+
+  return parts
+    .join(' ')
+    .replace(/\s+([,;:.!?»)\u2026])/g, '$1')
+    .replace(/([:;])«/g, '$1 «')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .trim();
 }
 
  function parsePunctuationConstructorSegments(raw: string) {
@@ -3939,6 +4001,17 @@ async function openExerciseWithAutosave(id: number) {
  placeholder="2:colon, 2:quote_open, 3:comma, 6:quote_close, 6:period"
  />
  </Input>
+ <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+ <div className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-emerald-700">
+ Правильный ответ
+ </div>
+ <div className="text-base font-semibold leading-7 text-emerald-950">
+ {renderPunctuationConstructorAnswer(
+ form.punctuationConstructorTokens,
+ form.punctuationConstructorPlacements,
+ ) || 'Заполните токены и правильные слоты'}
+ </div>
+ </div>
  <Input label="Разбор слотов (slot | marks | text)">
  <textarea
  className={inputClass}

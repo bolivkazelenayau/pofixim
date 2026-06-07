@@ -373,7 +373,10 @@ export default function PunctuationConstructorCard({
           setSelectedMark(null);
           setActiveSlotIndex(null);
         }
-        if (event.key === 'Backspace' && activeSlotIndex !== null) {
+        if (
+          (event.key === 'Backspace' || event.key === 'Delete') &&
+          activeSlotIndex !== null
+        ) {
           const slotItems = slotPlacements(activeSlotIndex);
           if (slotItems.length > 0) {
             event.preventDefault();
@@ -810,6 +813,13 @@ function Slot({
           event.preventDefault();
           onSelect(slotIndex);
         }
+        if (
+          (event.key === 'Backspace' || event.key === 'Delete') &&
+          placements.length > 0
+        ) {
+          event.preventDefault();
+          onRemoveMark(slotIndex, placements.length - 1);
+        }
       }}
       onDragOver={(event) => {
         event.preventDefault();
@@ -842,11 +852,37 @@ function Slot({
                 tabIndex={disabled ? -1 : 0}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onRemoveMark(slotIndex, index);
+                  onSelect(slotIndex);
                 }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  if (!disabled) onRemoveMark(slotIndex, index);
+                }}
+                onKeyDown={(event) => {
+                  if (disabled) return;
+                  if (event.key === 'Backspace' || event.key === 'Delete') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onRemoveMark(slotIndex, index);
+                  }
+                }}
+                title={`${MARK_META[placement.mark].label}. Delete — удалить`}
               >
                 {markGlyph(placement.mark)}
               </span>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRemoveMark(slotIndex, index);
+                }}
+                className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[12px] leading-none text-amber-900/55 transition hover:bg-amber-200 hover:text-amber-950 disabled:opacity-30"
+                aria-label={`Удалить знак ${MARK_META[placement.mark].label}`}
+                title="Удалить знак"
+              >
+                ×
+              </button>
               {placements.length > 1 && (
                 <span className="ml-1 hidden items-center gap-0.5 group-hover:inline-flex">
                   <button
