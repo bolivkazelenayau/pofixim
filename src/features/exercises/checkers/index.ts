@@ -4,6 +4,8 @@ import {
   type FillBlankExercise,
   type WordBankClozeExercise,
   type WordSearchExercise,
+  type DictationExercise,
+  type OrthographyRepairExercise,
   type OrderFragmentsExercise,
   type EgeMultiSelectExercise,
   type MultipleChoiceExercise,
@@ -73,6 +75,16 @@ export function checkExerciseAnswer(
         return buildTypeMismatchResult(exercise, submittedAnswer, options);
       }
       return checkWordSearch(exercise, submittedAnswer, options);
+    case 'dictation':
+      if (submittedAnswer.type !== 'dictation') {
+        return buildTypeMismatchResult(exercise, submittedAnswer, options);
+      }
+      return checkDictation(exercise, submittedAnswer, options);
+    case 'orthography_repair':
+      if (submittedAnswer.type !== 'orthography_repair') {
+        return buildTypeMismatchResult(exercise, submittedAnswer, options);
+      }
+      return checkOrthographyRepair(exercise, submittedAnswer, options);
     case 'ege_multi_select':
       if (submittedAnswer.type !== 'ege_multi_select') {
         return buildTypeMismatchResult(exercise, submittedAnswer, options);
@@ -294,6 +306,136 @@ function checkWordSearch(
   });
 }
 
+function checkDictation(
+  exercise: DictationExercise,
+  submittedAnswer: Extract<SubmittedAnswer, { type: 'dictation' }>,
+  options: { streak?: number; usedHint?: boolean },
+) {
+  const expectedDisplayTokens = tokenizeDictationText(
+    normalizeDictationText(exercise.answer.text, true),
+    exercise.answer.ignorePunctuation,
+  );
+  const submittedDisplayTokens = tokenizeDictationText(
+    normalizeDictationText(submittedAnswer.text, true),
+    exercise.answer.ignorePunctuation,
+  );
+  const expectedTokens = expectedDisplayTokens.map((token) =>
+    normalizeDictationText(token, exercise.answer.caseSensitive),
+  );
+  const submittedTokens = submittedDisplayTokens.map((token) =>
+    normalizeDictationText(token, exercise.answer.caseSensitive),
+  );
+  const diff = diffTokens(
+    expectedTokens,
+    submittedTokens,
+    expectedDisplayTokens,
+    submittedDisplayTokens,
+  );
+  const mistakes = diff
+    .filter((item) => item.kind !== 'equal')
+    .map((item): CheckMistake => {
+      if (item.kind === 'missing') {
+        return {
+          kind: 'missing_dictation_token',
+          message: 'Expected token was omitted in the dictation.',
+          target: item.expected,
+        };
+      }
+      if (item.kind === 'extra') {
+        return {
+          kind: 'extra_dictation_token',
+          message: 'Unexpected token was added in the dictation.',
+          target: item.actual,
+        };
+      }
+      return {
+        kind: 'wrong_dictation_token',
+        message: 'Submitted token does not match the dictated text.',
+        target: `${item.expected}:${item.actual}`,
+      };
+    });
+
+  return buildResult({
+    exercise,
+    submittedAnswer,
+    isCorrect: mistakes.length === 0,
+    normalizedAnswer: {
+      ...submittedAnswer,
+      text: normalizeDictationText(submittedAnswer.text, exercise.answer.caseSensitive),
+      diff,
+    },
+    mistakes,
+    options,
+  });
+}
+
+function checkOrthographyRepair(
+  exercise: OrthographyRepairExercise,
+  submittedAnswer: Extract<SubmittedAnswer, { type: 'orthography_repair' }>,
+  options: { streak?: number; usedHint?: boolean },
+) {
+  const normalize = (value: string) =>
+    value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const expected = new Map(
+    exercise.answer.repairs.map((repair) => [
+      repair.targetId,
+      normalize(repair.correct),
+    ]),
+  );
+  const submitted = new Map(
+    submittedAnswer.repairs.map((repair) => [
+      repair.targetId,
+      normalize(repair.value),
+    ]),
+  );
+
+  const mistakes: CheckMistake[] = [];
+  for (const [targetId, correct] of expected) {
+    const actual = submitted.get(targetId);
+    if (!actual) {
+      mistakes.push({
+        kind: 'missing_orthography_repair',
+        message: 'Expected repair target was not fixed.',
+        target: targetId,
+      });
+    } else if (actual !== correct) {
+      mistakes.push({
+        kind: 'wrong_orthography_repair',
+        message: 'Repair value does not match expected spelling.',
+        target: `${targetId}:${correct}`,
+      });
+    }
+  }
+
+  for (const targetId of submitted.keys()) {
+    if (!expected.has(targetId)) {
+      mistakes.push({
+        kind: 'extra_orthography_repair',
+        message: 'Unexpected repair target was submitted.',
+        target: targetId,
+      });
+    }
+  }
+
+  const isCorrect = mistakes.length === 0;
+
+  return buildResult({
+    exercise,
+    submittedAnswer,
+    isCorrect,
+    normalizedAnswer: {
+      ...submittedAnswer,
+      repairs: [...submitted.entries()].map(([targetId, value]) => ({
+        targetId,
+        value,
+      })),
+      correctText: exercise.answer.correctText,
+    },
+    mistakes,
+    options,
+  });
+}
+
 function checkEgeMultiSelect(
   exercise: EgeMultiSelectExercise,
   submittedAnswer: Extract<SubmittedAnswer, { type: 'ege_multi_select' }>,
@@ -511,6 +653,13 @@ function buildResult({
 function extractStructuredFeedback(
   exercise: Exercise,
 ): { correctAnswer: string; detailedExplanation: string } | null {
+  if (exercise.type === 'dictation') {
+    return {
+      correctAnswer: exercise.answer.text,
+      detailedExplanation: exercise.explanation,
+    };
+  }
+
   if (exercise.type === 'fill_blank' && exercise.skillTags.includes('ege.18')) {
     const correctAnswer = [
       ...new Set(
@@ -834,6 +983,14 @@ function buildPedagogy(
     return buildPunctuationConstructorPedagogy(exercise, mistakes);
   }
 
+  if (exercise.type === 'orthography_repair') {
+    return buildOrthographyRepairPedagogy(exercise, mistakes);
+  }
+
+  if (exercise.type === 'dictation') {
+    return buildDictationPedagogy(mistakes);
+  }
+
   if (isEge14) {
     return {
       mistakeCode: 'fipi.ege14.homonymy_or_pos_confusion',
@@ -1013,6 +1170,182 @@ function formatConstructorMarkForFeedback(
   return labels[mark] ?? punctuationConstructorGlyph(mark);
 }
 
+function buildOrthographyRepairPedagogy(
+  exercise: OrthographyRepairExercise,
+  mistakes: CheckMistake[],
+): Pedagogy {
+  const targetById = new Map(
+    exercise.payload.targets.map((target) => [target.id, target]),
+  );
+  const repairById = new Map(
+    exercise.answer.repairs.map((repair) => [repair.targetId, repair]),
+  );
+  const failedStepIds = [
+    ...new Set(
+      mistakes.map((mistake) => parseOrthographyRepairTargetId(mistake.target)),
+    ),
+  ].filter(Boolean);
+  const stepIds = failedStepIds.length > 0 ? failedStepIds : ['orthography_repair'];
+
+  return {
+    mistakeCode: mistakes[0]?.kind ?? null,
+    failedStepIds: stepIds,
+    stepFeedback: stepIds.map((stepId) => {
+      const target = targetById.get(stepId);
+      const repair = repairById.get(stepId);
+      const surface = target?.surface ?? 'выбранный фрагмент';
+      const correct = repair?.correct ?? target?.replacement;
+      const message = correct
+        ? `Проверь фрагмент «${surface}»: правильный вариант — «${correct}».`
+        : 'Проверь выбранный фрагмент и вариант исправления.';
+      return {
+        stepId,
+        ok: false,
+        message,
+      };
+    }),
+    nextRecommendation: {
+      mode: 'retry',
+      reason: 'Найди ошибочный фрагмент и выбери нормативное написание.',
+    },
+  };
+}
+
+function buildDictationPedagogy(mistakes: CheckMistake[]): Pedagogy {
+  const kinds = new Set(mistakes.map((mistake) => mistake.kind));
+  const failedStepIds = [
+    ...(kinds.has('missing_dictation_token') ? ['omissions'] : []),
+    ...(kinds.has('extra_dictation_token') ? ['extras'] : []),
+    ...(kinds.has('wrong_dictation_token') ? ['substitutions'] : []),
+  ];
+
+  return {
+    mistakeCode: mistakes[0]?.kind ?? null,
+    failedStepIds: failedStepIds.length > 0 ? failedStepIds : ['dictation'],
+    stepFeedback: [
+      ...(kinds.has('missing_dictation_token')
+        ? [
+            {
+              stepId: 'omissions',
+              ok: false,
+              message: 'Проверь пропущенные слова и знаки: часть диктовки не попала в текст.',
+            },
+          ]
+        : []),
+      ...(kinds.has('extra_dictation_token')
+        ? [
+            {
+              stepId: 'extras',
+              ok: false,
+              message: 'Убери лишние слова или знаки, которых не было в аудио.',
+            },
+          ]
+        : []),
+      ...(kinds.has('wrong_dictation_token')
+        ? [
+            {
+              stepId: 'substitutions',
+              ok: false,
+              message: 'Сверь подсвеченные замены с эталонной расшифровкой.',
+            },
+          ]
+        : []),
+    ],
+    nextRecommendation: {
+      mode: 'retry',
+      reason: 'Переслушай фрагмент и исправь подсвеченные места.',
+    },
+  };
+}
+
+function parseOrthographyRepairTargetId(target: string | undefined) {
+  if (!target) return '';
+  return target.split(':')[0] ?? '';
+}
+
+type DictationDiffItem =
+  | { kind: 'equal'; expected: string; actual: string }
+  | { kind: 'missing'; expected: string }
+  | { kind: 'extra'; actual: string }
+  | { kind: 'replace'; expected: string; actual: string };
+
+function normalizeDictationText(value: string, caseSensitive = false) {
+  const normalized = value
+    .replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/[«»“”„]/g, '"')
+    .replace(/[‐‑‒–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return caseSensitive ? normalized : normalized.toLowerCase();
+}
+
+function tokenizeDictationText(value: string, ignorePunctuation = false) {
+  const tokens = value.match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*|[.,!?;:"()]/gu) ?? [];
+  return ignorePunctuation ? tokens.filter((token) => /[\p{L}\p{N}]/u.test(token)) : tokens;
+}
+
+function diffTokens(
+  expected: string[],
+  actual: string[],
+  expectedDisplay = expected,
+  actualDisplay = actual,
+): DictationDiffItem[] {
+  const dp = Array.from({ length: expected.length + 1 }, () =>
+    Array<number>(actual.length + 1).fill(0),
+  );
+
+  for (let i = 0; i <= expected.length; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= actual.length; j += 1) dp[0][j] = j;
+
+  for (let i = 1; i <= expected.length; i += 1) {
+    for (let j = 1; j <= actual.length; j += 1) {
+      const cost = expected[i - 1] === actual[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      );
+    }
+  }
+
+  const result: DictationDiffItem[] = [];
+  let i = expected.length;
+  let j = actual.length;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && expected[i - 1] === actual[j - 1]) {
+      result.push({
+        kind: 'equal',
+        expected: expectedDisplay[i - 1],
+        actual: actualDisplay[j - 1],
+      });
+      i -= 1;
+      j -= 1;
+    } else if (
+      i > 0 &&
+      j > 0 &&
+      dp[i][j] === dp[i - 1][j - 1] + 1
+    ) {
+      result.push({
+        kind: 'replace',
+        expected: expectedDisplay[i - 1],
+        actual: actualDisplay[j - 1],
+      });
+      i -= 1;
+      j -= 1;
+    } else if (i > 0 && dp[i][j] === dp[i - 1][j] + 1) {
+      result.push({ kind: 'missing', expected: expectedDisplay[i - 1] });
+      i -= 1;
+    } else if (j > 0) {
+      result.push({ kind: 'extra', actual: actualDisplay[j - 1] });
+      j -= 1;
+    } else {
+      break;
+    }
+  }
+
+  return result.reverse();
+}
+
 function normalizeText(value: string, caseSensitive = false) {
   const trimmed = value.trim().replace(/\s+/g, ' ');
   return caseSensitive ? trimmed : trimmed.toLowerCase();
@@ -1071,9 +1404,12 @@ function punctuationConstructorGlyph(
     dash: '—',
     quote_open: '«',
     quote_close: '»',
+    paren_open: '(',
+    paren_close: ')',
     period: '.',
     exclamation: '!',
     question: '?',
+    ellipsis: '...',
   } satisfies Record<
     PunctuationConstructorExercise['answer']['placements'][number]['mark'],
     string

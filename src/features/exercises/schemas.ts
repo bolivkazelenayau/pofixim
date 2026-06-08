@@ -220,6 +220,103 @@ export const wordSearchExerciseSchema = baseExerciseSchema
     }
   });
 
+export const dictationExerciseSchema = baseExerciseSchema
+  .extend({
+    type: z.literal('dictation'),
+    payload: z.object({
+      title: z.string().min(1),
+      audioSrc: z.string().min(1),
+      waveform: z.array(z.number().min(0).max(1)).optional(),
+      playbackRates: z.array(z.number().positive()).optional(),
+    }),
+    answer: z.object({
+      text: z.string().min(1),
+      caseSensitive: z.boolean().optional(),
+      ignorePunctuation: z.boolean().optional(),
+    }),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.payload.audioSrc.startsWith('/voice_memos/')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['payload', 'audioSrc'],
+        message: 'audioSrc must point to /voice_memos/',
+      });
+    }
+  });
+
+const orthographyRepairTargetSchema = z.object({
+  id: z.string().min(1),
+  surface: z.string().min(1),
+  replacement: z.string().min(1),
+  type: z.enum(['word', 'span']),
+  options: z.array(z.string().min(1)).optional(),
+  occurrence: z.number().int().min(1).optional(),
+});
+
+export const orthographyRepairExerciseSchema = baseExerciseSchema
+  .extend({
+    type: z.literal('orthography_repair'),
+    payload: z.object({
+      text: z.string().min(1),
+      mode: z.enum(['click_then_choose', 'click_then_type']),
+      targets: z.array(orthographyRepairTargetSchema).min(1),
+      hints: z.array(z.string().min(1)).optional(),
+    }),
+    answer: z.object({
+      repairs: z
+        .array(
+          z.object({
+            targetId: z.string().min(1),
+            correct: z.string().min(1),
+          }),
+        )
+        .min(1),
+      correctText: z.string().min(1).optional(),
+    }),
+  })
+  .superRefine((value, ctx) => {
+    const targetIds = new Set(value.payload.targets.map((target) => target.id));
+    const repairIds = new Set(value.answer.repairs.map((repair) => repair.targetId));
+
+    for (const target of value.payload.targets) {
+      const occurrence = target.occurrence ?? 1;
+      let cursor = 0;
+      let foundCount = 0;
+      while (cursor <= value.payload.text.length) {
+        const foundAt = value.payload.text.indexOf(target.surface, cursor);
+        if (foundAt === -1) break;
+        foundCount += 1;
+        cursor = foundAt + target.surface.length;
+      }
+      if (foundCount < occurrence) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['payload', 'targets'],
+          message: `target surface "${target.surface}" was not found at occurrence ${occurrence}`,
+        });
+      }
+
+      if (!repairIds.has(target.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['answer', 'repairs'],
+          message: `missing repair for target "${target.id}"`,
+        });
+      }
+    }
+
+    for (const repair of value.answer.repairs) {
+      if (!targetIds.has(repair.targetId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['answer', 'repairs'],
+          message: `repair references unknown target "${repair.targetId}"`,
+        });
+      }
+    }
+  });
+
 const punctuationMarkSchema = z.enum([',', ':', ';', '-', '—']);
 
 const punctuationConstructorMarkSchema = z.enum([
@@ -433,6 +530,8 @@ export const exerciseSchema = z.discriminatedUnion('type', [
   wordBankClozeExerciseSchema,
   orderFragmentsExerciseSchema,
   wordSearchExerciseSchema,
+  dictationExerciseSchema,
+  orthographyRepairExerciseSchema,
   punctuationInsertExerciseSchema,
   punctuationConstructorExerciseSchema,
   ege20ComplexSentencePunctuationExerciseSchema,
@@ -461,6 +560,19 @@ export const submittedAnswerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('word_search'),
     foundWords: z.array(z.string().min(1)),
+  }),
+  z.object({
+    type: z.literal('dictation'),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal('orthography_repair'),
+    repairs: z.array(
+      z.object({
+        targetId: z.string().min(1),
+        value: z.string().min(1),
+      }),
+    ),
   }),
   z.object({
     type: z.literal('ege_multi_select'),
@@ -500,6 +612,10 @@ export type FillBlankExercise = z.infer<typeof fillBlankExerciseSchema>;
 export type WordBankClozeExercise = z.infer<typeof wordBankClozeExerciseSchema>;
 export type OrderFragmentsExercise = z.infer<typeof orderFragmentsExerciseSchema>;
 export type WordSearchExercise = z.infer<typeof wordSearchExerciseSchema>;
+export type DictationExercise = z.infer<typeof dictationExerciseSchema>;
+export type OrthographyRepairExercise = z.infer<
+  typeof orthographyRepairExerciseSchema
+>;
 export type EgeMultiSelectExercise = z.infer<typeof egeMultiSelectExerciseSchema>;
 export type PunctuationInsertExercise = z.infer<typeof punctuationInsertExerciseSchema>;
 export type PunctuationConstructorExercise = z.infer<

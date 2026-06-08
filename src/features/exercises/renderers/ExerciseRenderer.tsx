@@ -11,6 +11,8 @@ import EgeMultiSelectCard from './EgeMultiSelectCard';
 import OrderFragmentsCard from './OrderFragmentsCard';
 import WordBankClozeCard from './WordBankClozeCard';
 import WordSearchCard from './WordSearchCard';
+import DictationCard from './DictationCard';
+import OrthographyRepairCard from './OrthographyRepairCard';
 
 type ExerciseRendererProps = {
   exercise: Exercise;
@@ -67,6 +69,25 @@ export default function ExerciseRenderer({
     case 'word_search':
       content = (
         <WordSearchCard
+          exercise={exercise}
+          disabled={disabled}
+          onSubmit={onSubmit}
+        />
+      );
+      break;
+    case 'dictation':
+      content = (
+        <DictationCard
+          key={exercise.id ?? `dictation-${exercise.seedKey ?? 'unknown'}`}
+          exercise={exercise}
+          disabled={disabled}
+          onSubmit={onSubmit}
+        />
+      );
+      break;
+    case 'orthography_repair':
+      content = (
+        <OrthographyRepairCard
           exercise={exercise}
           disabled={disabled}
           onSubmit={onSubmit}

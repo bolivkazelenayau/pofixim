@@ -303,6 +303,7 @@ type ListItem = {
  seedKey: string | null;
  prompt: string;
  explanation: string;
+ searchText?: string;
  qualityStatus: string;
  updatedAt: string;
  updatedAtCursor: string;
@@ -442,6 +443,18 @@ type Form = {
  wordSearchGridRows: string;
  wordSearchWords: string;
  wordSearchCaseSensitive: boolean;
+ dictationTitle: string;
+ dictationAudioSrc: string;
+ dictationPlaybackRates: string;
+ dictationText: string;
+ dictationCaseSensitive: boolean;
+ dictationIgnorePunctuation: boolean;
+ orthographyRepairText: string;
+ orthographyRepairMode: 'click_then_choose' | 'click_then_type';
+ orthographyRepairTargets: string;
+ orthographyRepairHints: string;
+ orthographyRepairRepairs: string;
+ orthographyRepairCorrectText: string;
  orderFragments: string;
  orderCorrectOrder: string;
  punctuationTokens: string;
@@ -489,6 +502,18 @@ const EMPTY: Form = {
  wordSearchGridRows: '',
  wordSearchWords: '',
  wordSearchCaseSensitive: false,
+ dictationTitle: '',
+ dictationAudioSrc: '',
+ dictationPlaybackRates: '0.75, 1, 1.25, 1.5',
+ dictationText: '',
+ dictationCaseSensitive: false,
+ dictationIgnorePunctuation: false,
+ orthographyRepairText: '',
+ orthographyRepairMode: 'click_then_choose',
+ orthographyRepairTargets: '',
+ orthographyRepairHints: '',
+ orthographyRepairRepairs: '',
+ orthographyRepairCorrectText: '',
  orderFragments: '',
  orderCorrectOrder: '',
  punctuationTokens: '',
@@ -525,6 +550,10 @@ function seedPrefixForType(type: Form['type']) {
  return 'wbc';
  case 'word_search':
  return 'ws';
+ case 'dictation':
+ return 'dict';
+ case 'orthography_repair':
+ return 'or';
  case 'punctuation_insert':
  return 'punc';
  case 'punctuation_constructor':
@@ -1065,6 +1094,48 @@ function formFromExerciseItem(item: Record<string, unknown>): Form {
  wordSearchGridRows: Array.isArray(item.wordSearchGridRows) ? (item.wordSearchGridRows as string[]).join('\n') : '',
  wordSearchWords: Array.isArray(item.wordSearchWords) ? (item.wordSearchWords as string[]).join('\n') : '',
  wordSearchCaseSensitive: Boolean(item.wordSearchCaseSensitive),
+ dictationTitle: String(item.dictationTitle ?? ''),
+ dictationAudioSrc: String(item.dictationAudioSrc ?? ''),
+ dictationPlaybackRates: Array.isArray(item.dictationPlaybackRates)
+ ? (item.dictationPlaybackRates as number[]).join(', ')
+ : '0.75, 1, 1.25, 1.5',
+ dictationText: String(item.dictationText ?? ''),
+ dictationCaseSensitive: Boolean(item.dictationCaseSensitive),
+ dictationIgnorePunctuation: Boolean(item.dictationIgnorePunctuation),
+ orthographyRepairText: String(item.orthographyRepairText ?? ''),
+ orthographyRepairMode:
+ (item.orthographyRepairMode as 'click_then_choose' | 'click_then_type' | undefined) ??
+ 'click_then_choose',
+ orthographyRepairTargets: Array.isArray(item.orthographyRepairTargets)
+ ? (item.orthographyRepairTargets as Array<{
+ id: string;
+ surface: string;
+ replacement: string;
+ type: 'word' | 'span';
+ options?: string[];
+ occurrence?: number;
+ }>)
+ .map((target) =>
+ [
+ target.id,
+ target.surface,
+ target.replacement,
+ target.type,
+ (target.options ?? []).join(', '),
+ target.occurrence ?? '',
+ ].join(' | '),
+ )
+ .join('\n')
+ : '',
+ orthographyRepairHints: Array.isArray(item.orthographyRepairHints)
+ ? (item.orthographyRepairHints as string[]).join('\n')
+ : '',
+ orthographyRepairRepairs: Array.isArray(item.orthographyRepairRepairs)
+ ? (item.orthographyRepairRepairs as Array<{ targetId: string; correct: string }>)
+ .map((repair) => `${repair.targetId} | ${repair.correct}`)
+ .join('\n')
+ : '',
+ orthographyRepairCorrectText: String(item.orthographyRepairCorrectText ?? ''),
  orderFragments: Array.isArray(item.orderFragments)
  ? (item.orderFragments as Array<{ id: string; text: string }>).map((f) => `${f.id} | ${f.text}`).join('\n')
  : '',
@@ -1605,11 +1676,13 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  const seedNorm = normalizeSearchText(item.seedKey ?? '');
  const promptNorm = normalizeSearchText(item.prompt);
  const explanationNorm = normalizeSearchText(item.explanation ?? '');
+ const searchTextNorm = normalizeSearchText(item.searchText ?? '');
  return (
  String(item.id).includes(q) ||
  seedNorm.includes(q) ||
  promptNorm.includes(q) ||
- explanationNorm.includes(q)
+ explanationNorm.includes(q) ||
+ searchTextNorm.includes(q)
  );
  });
  return [...filtered].sort((a, b) => {
@@ -1776,6 +1849,76 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  answer: {
  words: words.length > 0 ? words : ['ДОМ'],
  caseSensitive: form.wordSearchCaseSensitive,
+ },
+ };
+ } else if (form.type === 'dictation') {
+ const playbackRates = form.dictationPlaybackRates
+ .split(',')
+ .map((value) => Number(value.trim()))
+ .filter((value) => Number.isFinite(value) && value > 0);
+
+ candidate = {
+ ...base,
+ payload: {
+ title: form.dictationTitle.trim() || form.prompt.trim() || 'Диктант',
+ audioSrc:
+ form.dictationAudioSrc.trim() ||
+ '/voice_memos/audio_2026-06-08_00-53-43.ogg',
+ ...(playbackRates.length > 0 ? { playbackRates } : {}),
+ },
+ answer: {
+ text: form.dictationText.trim() || 'Текст диктанта.',
+ caseSensitive: form.dictationCaseSensitive,
+ ignorePunctuation: form.dictationIgnorePunctuation,
+ },
+ };
+ } else if (form.type === 'orthography_repair') {
+ const targets = parseOrthographyRepairTargets(form.orthographyRepairTargets);
+ const safeTargets =
+ targets.length > 0
+ ? targets
+ : [
+ {
+ id: 'target_1',
+ surface: 'ошыбка',
+ replacement: 'ошибка',
+ type: 'word' as const,
+ options: ['ошыбка', 'ошибка'],
+ },
+ ];
+ const targetIds = new Set(safeTargets.map((target) => target.id));
+ const repairs = parseOrthographyRepairRepairs(form.orthographyRepairRepairs)
+ .filter((repair) => targetIds.has(repair.targetId));
+ const safeRepairs =
+ repairs.length > 0
+ ? repairs
+ : safeTargets.map((target) => ({
+ targetId: target.id,
+ correct: target.replacement,
+ }));
+
+ candidate = {
+ ...base,
+ payload: {
+ text:
+ form.orthographyRepairText.trim() ||
+ `Найдите слово: ${safeTargets[0]?.surface ?? 'ошыбка'}.`,
+ mode: form.orthographyRepairMode,
+ targets: safeTargets,
+ ...(form.orthographyRepairHints.trim()
+ ? {
+ hints: form.orthographyRepairHints
+ .split('\n')
+ .map((value) => value.trim())
+ .filter(Boolean),
+ }
+ : {}),
+ },
+ answer: {
+ repairs: safeRepairs,
+ ...(form.orthographyRepairCorrectText.trim()
+ ? { correctText: form.orthographyRepairCorrectText.trim() }
+ : {}),
  },
  };
  } else if (form.type === 'order_fragments') {
@@ -1986,7 +2129,8 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  ) {
  if (
  exerciseType === 'ege_multi_select' ||
- exerciseType === 'punctuation_constructor'
+ exerciseType === 'punctuation_constructor' ||
+ exerciseType === 'orthography_repair'
  ) {
  return '';
  }
@@ -2000,14 +2144,26 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
 function handlePreviewSubmit(answer: SubmittedAnswer) {
  if (!preview.exercise) return;
  const result = checkExerciseAnswer(preview.exercise, answer, { streak: 0 });
+ if (preview.exercise.type === 'dictation') {
+ setPreviewCheckResult({
+ isCorrect: result.isCorrect,
+ text: result.isCorrect
+ ? 'Верно.'
+ : 'Проверь подсветку в диктанте и попробуй ещё раз.',
+ });
+ return;
+ }
  const previewFeedback =
  preview.exercise.type === 'ege_multi_select'
  ? preview.exercise.payload.feedback
  : undefined;
  const computedCorrectAnswer = result.feedback.correctAnswer?.trim();
  const fallbackCorrectAnswer = previewFeedback?.correctAnswer.join('\n\n');
+ const usesInlineFeedback =
+ preview.exercise.type === 'punctuation_constructor' ||
+ preview.exercise.type === 'orthography_repair';
  const prefix =
- preview.exercise.type === 'punctuation_constructor' && !result.isCorrect
+ usesInlineFeedback && !result.isCorrect
  ? ''
  : answerFeedbackPrefix(result.isCorrect);
  const prefixText = prefix ? `${prefix}\n\n` : '';
@@ -2446,6 +2602,51 @@ async function loadExercise(id: number) {
     );
 }
 
+function parseOrthographyRepairTargets(raw: string) {
+ return raw
+ .split('\n')
+ .map((line) => line.trim())
+ .filter(Boolean)
+ .map((line, index) => {
+ const parts = line.split('|').map((part) => part.trim());
+ const [idRaw, surfaceRaw, replacementRaw, typeRaw, optionsRaw, occurrenceRaw] = parts;
+ return {
+ id: idRaw || `target_${index + 1}`,
+ surface: surfaceRaw ?? '',
+ replacement: replacementRaw ?? '',
+ type: typeRaw === 'span' ? 'span' as const : 'word' as const,
+ options: optionsRaw
+ ? optionsRaw
+ .split(',')
+ .map((option) => option.trim())
+ .filter(Boolean)
+ : undefined,
+ occurrence: occurrenceRaw ? Number(occurrenceRaw) : undefined,
+ };
+ })
+ .filter(
+ (target) =>
+ target.id.length > 0 &&
+ target.surface.length > 0 &&
+ target.replacement.length > 0,
+ );
+}
+
+function parseOrthographyRepairRepairs(raw: string) {
+ return raw
+ .split('\n')
+ .map((line) => line.trim())
+ .filter(Boolean)
+ .map((line) => {
+ const [targetIdRaw, correctRaw] = line.split('|').map((part) => part.trim());
+ return {
+ targetId: targetIdRaw ?? '',
+ correct: correctRaw ?? '',
+ };
+ })
+ .filter((repair) => repair.targetId.length > 0 && repair.correct.length > 0);
+}
+
  function parsePunctuationConstructorMarkBank(raw: string): PCMark[] {
   const allowed = new Set<PCMark>([
     'comma',
@@ -2771,6 +2972,43 @@ async function loadExercise(id: number) {
  : undefined,
  wordSearchCaseSensitive:
  source.type === 'word_search' ? source.wordSearchCaseSensitive : undefined,
+ dictationTitle:
+ source.type === 'dictation' ? source.dictationTitle : undefined,
+ dictationAudioSrc:
+ source.type === 'dictation' ? source.dictationAudioSrc : undefined,
+ dictationPlaybackRates:
+ source.type === 'dictation'
+ ? source.dictationPlaybackRates
+ .split(',')
+ .map((value) => Number(value.trim()))
+ .filter((value) => Number.isFinite(value) && value > 0)
+ : undefined,
+ dictationText:
+ source.type === 'dictation' ? source.dictationText : undefined,
+ dictationCaseSensitive:
+ source.type === 'dictation' ? source.dictationCaseSensitive : undefined,
+ dictationIgnorePunctuation:
+ source.type === 'dictation' ? source.dictationIgnorePunctuation : undefined,
+ orthographyRepairText:
+ source.type === 'orthography_repair' ? source.orthographyRepairText : undefined,
+ orthographyRepairMode:
+ source.type === 'orthography_repair' ? source.orthographyRepairMode : undefined,
+ orthographyRepairTargets:
+ source.type === 'orthography_repair'
+ ? parseOrthographyRepairTargets(source.orthographyRepairTargets)
+ : undefined,
+ orthographyRepairHints:
+ source.type === 'orthography_repair'
+ ? source.orthographyRepairHints.split('\n').map((v) => v.trim()).filter(Boolean)
+ : undefined,
+ orthographyRepairRepairs:
+ source.type === 'orthography_repair'
+ ? parseOrthographyRepairRepairs(source.orthographyRepairRepairs)
+ : undefined,
+ orthographyRepairCorrectText:
+ source.type === 'orthography_repair'
+ ? source.orthographyRepairCorrectText
+ : undefined,
  orderFragments:
  source.type === 'order_fragments'
  ? source.orderFragments
@@ -3882,6 +4120,154 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  )}
 
+ {form.type === 'dictation' && (
+ <div className="mt-3 space-y-3">
+ <Input label="Название диктанта">
+ <input
+ className={inputClass}
+ value={form.dictationTitle}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationTitle: e.target.value }))
+ }
+ placeholder="Цифровой след"
+ />
+ </Input>
+ <Input label="Путь к аудио">
+ <input
+ className={inputClass}
+ value={form.dictationAudioSrc}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationAudioSrc: e.target.value }))
+ }
+ placeholder="/voice_memos/audio_2026-06-08_00-53-43.ogg"
+ />
+ </Input>
+ <Input label="Скорости воспроизведения">
+ <input
+ className={inputClass}
+ value={form.dictationPlaybackRates}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationPlaybackRates: e.target.value }))
+ }
+ placeholder="0.75, 1, 1.25, 1.5"
+ />
+ </Input>
+ <Input label="Эталонная расшифровка">
+ <textarea
+ className={inputClass}
+ rows={6}
+ value={form.dictationText}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationText: e.target.value }))
+ }
+ placeholder="Текст, который должен повторить ученик."
+ />
+ </Input>
+ <div className="grid gap-3 sm:grid-cols-2">
+ <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
+ <input
+ type="checkbox"
+ checked={form.dictationCaseSensitive}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationCaseSensitive: e.target.checked }))
+ }
+ />
+ Учитывать регистр
+ </label>
+ <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
+ <input
+ type="checkbox"
+ checked={form.dictationIgnorePunctuation}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, dictationIgnorePunctuation: e.target.checked }))
+ }
+ />
+ Игнорировать пунктуацию
+ </label>
+ </div>
+ </div>
+ )}
+
+ {form.type === 'orthography_repair' && (
+ <div className="mt-3 space-y-3">
+ <Input label="Текст с ошибкой">
+ <textarea
+ className={inputClass}
+ rows={4}
+ value={form.orthographyRepairText}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, orthographyRepairText: e.target.value }))
+ }
+ placeholder="Имейте ввиду, что она займет у Вас целый день."
+ />
+ </Input>
+ <Input label="Режим">
+ <Select
+ value={form.orthographyRepairMode}
+ onValueChange={(value) =>
+ setForm((f) => ({
+ ...f,
+ orthographyRepairMode:
+ value === 'click_then_type' ? 'click_then_type' : 'click_then_choose',
+ }))
+ }
+ >
+ <SelectTrigger className={inputClass}>
+ <SelectValue />
+ </SelectTrigger>
+ <SelectContent>
+ <SelectItem value="click_then_choose">click_then_choose</SelectItem>
+ <SelectItem value="click_then_type">click_then_type</SelectItem>
+ </SelectContent>
+ </Select>
+ </Input>
+ <Input label="Targets (id | surface | replacement | type | options | occurrence)">
+ <textarea
+ className={inputClass}
+ rows={5}
+ value={form.orthographyRepairTargets}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, orthographyRepairTargets: e.target.value }))
+ }
+ placeholder="target_1 | ввиду | в виду | span | ввиду, в виду, в-виду"
+ />
+ </Input>
+ <Input label="Repairs (targetId | correct)">
+ <textarea
+ className={inputClass}
+ rows={3}
+ value={form.orthographyRepairRepairs}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, orthographyRepairRepairs: e.target.value }))
+ }
+ placeholder="target_1 | в виду"
+ />
+ </Input>
+ <Input label="Подсказки (по одной на строку)">
+ <textarea
+ className={inputClass}
+ rows={3}
+ value={form.orthographyRepairHints}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, orthographyRepairHints: e.target.value }))
+ }
+ placeholder={'Ошибка в устойчивом сочетании.\nПравильно: иметь в виду.'}
+ />
+ </Input>
+ <Input label="Правильный текст целиком (optional)">
+ <textarea
+ className={inputClass}
+ rows={3}
+ value={form.orthographyRepairCorrectText}
+ onChange={(e) =>
+ setForm((f) => ({ ...f, orthographyRepairCorrectText: e.target.value }))
+ }
+ placeholder="Полный текст после исправления, только для показа."
+ />
+ </Input>
+ </div>
+ )}
+
  {form.type === 'order_fragments' && (
  <div className="mt-3 space-y-3">
  <Input label="Фрагменты (каждая строка: id | text)">
@@ -4254,6 +4640,9 @@ async function openExerciseWithAutosave(id: number) {
  {previewCheckResult && (
  <div
  className={`mt-3 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap ${
+ preview.exercise.type === 'dictation'
+ ? 'border-cyan-200 bg-cyan-50 text-cyan-950 dark:border-cyan-600/30 dark:bg-cyan-950/30 dark:text-cyan-100'
+ :
  previewCheckResult.isCorrect
  ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/40 dark:text-emerald-200'
  : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-600/30 dark:bg-amber-950/40 dark:text-amber-200'

@@ -18,8 +18,16 @@ import {
   type Exercise,
 } from '@/features/exercises/schemas';
 import { buildEge9BlitzCards, shuffleBlitzCards } from '@/features/exercises/ege9Blitz';
+import {
+  buildEge13QuickCards,
+  shuffleEge13QuickCards,
+} from '@/features/exercises/ege13Quick';
+import {
+  buildEge15QuickCards,
+  shuffleEge15QuickCards,
+} from '@/features/exercises/ege15Quick';
 import { ratingDeltaForAttempt } from '@/features/exercises/scoring';
-import type { ExerciseCategory } from '@/features/exercises/types';
+import type { ExerciseCategory, ExerciseType } from '@/features/exercises/types';
 import { stripEge18PromptFromFillBefore } from '@/lib/exercise-type-conversion';
 import { logSlowServerAction } from '@/lib/slow-action-log';
 import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
@@ -28,6 +36,7 @@ type GetNextExerciseInput = {
   sessionId?: string;
   seenExerciseIds?: number[];
   category?: ExerciseCategory;
+  forceType?: ExerciseType;
 };
 
 type SubmitExerciseAnswerInput = {
@@ -38,6 +47,16 @@ type SubmitExerciseAnswerInput = {
 };
 
 type GetBlitzPoolInput = {
+  limit?: number;
+  seenExerciseIds?: number[];
+};
+
+type GetEge13QuickPoolInput = {
+  limit?: number;
+  seenExerciseIds?: number[];
+};
+
+type GetEge15QuickPoolInput = {
   limit?: number;
   seenExerciseIds?: number[];
 };
@@ -57,6 +76,7 @@ export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
     const targetDifficulty = targetDifficultyForSession(session);
     const candidates = await getExerciseCandidates({
       category: input.category,
+      forceType: input.forceType,
       seenExerciseIds,
       targetDifficulty,
       recentFingerprints,
@@ -238,6 +258,96 @@ export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
   }
 }
 
+export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}) {
+  const startedAt = Date.now();
+  const limit = Math.min(Math.max(input.limit ?? 80, 10), 160);
+
+  try {
+    const conditions = [
+      eq(exercises.isActive, true),
+      eq(exercises.type, 'ege_multi_select'),
+      sql`${exercises.skillTags} @> array['ege.13']::text[]`,
+    ];
+    const uniqueSeenIds = [...new Set(input.seenExerciseIds ?? [])].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+
+    if (uniqueSeenIds.length > 0) {
+      conditions.push(notInArray(exercises.id, uniqueSeenIds));
+    }
+
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(and(...conditions))
+      .limit(limit);
+
+    const cards = rows
+      .map(dbExerciseToDomainExercise)
+      .flatMap((exercise) =>
+        exercise?.type === 'ege_multi_select' ? buildEge13QuickCards(exercise) : [],
+      );
+
+    return {
+      success: true,
+      cards: shuffleEge13QuickCards(cards, `${Date.now()}:${cards.length}`).slice(0, 90),
+    };
+  } catch (error) {
+    console.error('Failed to fetch EGE-13 quick pool:', error);
+    return { success: false, error: 'EGE-13 quick pool fetch failed', cards: [] };
+  } finally {
+    logSlowServerAction('getEge13QuickPoolAction', startedAt, {
+      limit,
+      seenExerciseIds: input.seenExerciseIds?.length ?? 0,
+    });
+  }
+}
+
+export async function getEge15QuickPoolAction(input: GetEge15QuickPoolInput = {}) {
+  const startedAt = Date.now();
+  const limit = Math.min(Math.max(input.limit ?? 100, 10), 180);
+
+  try {
+    const conditions = [
+      eq(exercises.isActive, true),
+      eq(exercises.type, 'fill_blank'),
+      sql`${exercises.skillTags} @> array['ege.15']::text[]`,
+    ];
+    const uniqueSeenIds = [...new Set(input.seenExerciseIds ?? [])].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+
+    if (uniqueSeenIds.length > 0) {
+      conditions.push(notInArray(exercises.id, uniqueSeenIds));
+    }
+
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(and(...conditions))
+      .limit(limit);
+
+    const cards = rows
+      .map(dbExerciseToDomainExercise)
+      .flatMap((exercise) =>
+        exercise?.type === 'fill_blank' ? buildEge15QuickCards(exercise) : [],
+      );
+
+    return {
+      success: true,
+      cards: shuffleEge15QuickCards(cards, `${Date.now()}:${cards.length}`).slice(0, 100),
+    };
+  } catch (error) {
+    console.error('Failed to fetch EGE-15 quick pool:', error);
+    return { success: false, error: 'EGE-15 quick pool fetch failed', cards: [] };
+  } finally {
+    logSlowServerAction('getEge15QuickPoolAction', startedAt, {
+      limit,
+      seenExerciseIds: input.seenExerciseIds?.length ?? 0,
+    });
+  }
+}
+
 async function getOrCreateLearningSession(sessionId?: string) {
   const id = sessionId || crypto.randomUUID();
 
@@ -274,11 +384,13 @@ async function getRecentAttempts(sessionId: string) {
 
 async function getExerciseCandidates({
   category,
+  forceType,
   seenExerciseIds,
   targetDifficulty,
   recentFingerprints,
 }: {
   category?: ExerciseCategory;
+  forceType?: ExerciseType;
   seenExerciseIds: number[];
   targetDifficulty: number;
   recentFingerprints: Set<string>;
@@ -290,6 +402,10 @@ async function getExerciseCandidates({
 
   if (category) {
     conditions.push(eq(exercises.category, category));
+  }
+
+  if (forceType) {
+    conditions.push(eq(exercises.type, forceType));
   }
 
   const uniqueSeenIds = [...new Set(seenExerciseIds)];
@@ -386,6 +502,19 @@ function exerciseFingerprint(exercise: Exercise) {
         .join('|');
       return `ws::${prompt}::${grid}::${words}`;
     }
+    case 'dictation': {
+      const audio = normalizeForFingerprint(exercise.payload.audioSrc);
+      const text = normalizeForFingerprint(exercise.answer.text);
+      return `dict::${prompt}::${audio}::${text}`;
+    }
+    case 'orthography_repair': {
+      const text = normalizeForFingerprint(exercise.payload.text);
+      const repairs = exercise.answer.repairs
+        .map((repair) => `${repair.targetId}:${normalizeForFingerprint(repair.correct)}`)
+        .sort()
+        .join('|');
+      return `or::${prompt}::${text}::${repairs}`;
+    }
     case 'punctuation_insert': {
       const tokens = exercise.payload.tokens.map(normalizeForFingerprint).join('|');
       const marks = [...exercise.answer.marks]
@@ -471,7 +600,12 @@ function dbExerciseToDomainExercise(row: typeof exercises.$inferSelect | undefin
     isActive: row.isActive,
   });
 
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) {
+    console.error(`Failed to parse exercise ${row.id}:`, parsed.error);
+    return null;
+  }
+
+  return parsed.data;
 }
 
 function extractLegacySourceAlignment(visualHint: unknown) {

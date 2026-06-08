@@ -2,17 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { BarChart3, RotateCcw, Zap } from 'lucide-react';
+import { BarChart3, RotateCcw, Zap, PenTool } from 'lucide-react';
+import type { ExerciseType } from '@/features/exercises/types';
 import {
   getBlitzPoolAction,
+  getEge13QuickPoolAction,
+  getEge15QuickPoolAction,
   getNextExerciseAction,
   submitExerciseAnswerAction,
 } from '@/app/actions/exercises';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
+import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
+import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
 import { useChatStore, type Message } from '@/store/chatStore';
 import BlitzGame, { type BlitzResult } from './BlitzGame';
+import Ege13QuickGame, { type Ege13QuickResult } from './Ege13QuickGame';
+import Ege15QuickGame, { type Ege15QuickResult } from './Ege15QuickGame';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 
@@ -23,9 +30,34 @@ type ExerciseMessage = Message & {
 
 const SLASH_COMMANDS = [
   {
+    command: '/dictation',
+    title: 'Диктант',
+    description: 'Войс с проверкой расшифровки',
+  },
+  {
+    command: '/punctuation_constructor',
+    title: 'Конструктор пунктуации',
+    description: 'Случайное задание из пула',
+  },
+  {
+    command: '/orthography_repair',
+    title: 'Ремонт орфографии',
+    description: 'Случайное задание из пула',
+  },
+  {
     command: '/blitz',
     title: 'Блиц',
     description: 'Открыть быстрый тестовый режим',
+  },
+  {
+    command: '/ege13_quick',
+    title: 'Тип 13',
+    description: 'Слитно или раздельно',
+  },
+  {
+    command: '/ege15_quick',
+    title: 'Тип 15',
+    description: 'Одна Н или НН',
   },
   {
     command: '/stats',
@@ -85,6 +117,11 @@ function buildFeedbackText(
   exerciseType?: Exercise['type'],
 ) {
   if (!result) return '';
+  if (exerciseType === 'dictation') {
+    return result.isCorrect
+      ? 'Верно.'
+      : buildDictationFeedbackText(result.normalizedAnswer);
+  }
   const prefix =
     exerciseType === 'punctuation_constructor' && !result.isCorrect
       ? ''
@@ -98,6 +135,65 @@ function buildFeedbackText(
   }
 
   return `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(result, exerciseType)}`;
+}
+
+type DictationDiffItem =
+  | { kind: 'equal'; expected: string; actual: string }
+  | { kind: 'missing'; expected: string }
+  | { kind: 'extra'; actual: string }
+  | { kind: 'replace'; expected: string; actual: string };
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function dictationDisplayToken(item: DictationDiffItem) {
+  if (item.kind === 'extra') return item.actual;
+  if (item.kind === 'replace') return item.actual;
+  return item.expected;
+}
+
+function needsLeadingSpace(previous: string | null, current: string) {
+  if (!previous) return false;
+  if (/^[.,!?;:)]$/u.test(current)) return false;
+  if (/^[(]$/u.test(previous)) return false;
+  return true;
+}
+
+function buildDictationFeedbackText(normalizedAnswer: unknown) {
+  const diff = (
+    normalizedAnswer &&
+    typeof normalizedAnswer === 'object' &&
+    Array.isArray((normalizedAnswer as { diff?: unknown }).diff)
+      ? (normalizedAnswer as { diff: DictationDiffItem[] }).diff
+      : []
+  ).filter((item) => item && typeof item.kind === 'string');
+  const mistakeCount = diff.filter((item) => item.kind !== 'equal').length;
+
+  if (mistakeCount === 0) return 'Верно.';
+
+  const body = diff
+    .map((item, index) => {
+      const label = dictationDisplayToken(item);
+      const previous = index > 0 ? dictationDisplayToken(diff[index - 1]) : null;
+      const space = needsLeadingSpace(previous, label) ? ' ' : '';
+      if (item.kind === 'equal') return `${space}${escapeHtml(label)}`;
+      if (item.kind === 'missing') {
+        return `${space}<span class="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-950">[${escapeHtml(item.expected)}]</span>`;
+      }
+      if (item.kind === 'extra') {
+        return `${space}<span class="rounded-md border border-rose-300 bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-950 line-through">${escapeHtml(item.actual)}</span>`;
+      }
+      return `${space}<span class="rounded-md border border-orange-300 bg-orange-50 px-1.5 py-0.5 font-semibold text-orange-950" title="Должно быть: ${escapeHtml(item.expected)}">${escapeHtml(item.actual)}</span>`;
+    })
+    .join('');
+
+  return `<div class="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-sm leading-8 text-foreground"><div class="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-foreground/55">Ошибок: ${mistakeCount}</div>${body}</div>`;
 }
 
 function buildStepFeedbackText(
@@ -147,10 +243,17 @@ export default function ChatContainer() {
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
+  const globalInputRef = useRef<HTMLTextAreaElement>(null);
   const [blitzCards, setBlitzCards] = useState<Ege9BlitzCard[]>([]);
   const [isBlitzOpen, setIsBlitzOpen] = useState(false);
   const isLoadingBlitz = useRef(false);
   const lastBlitzPromptStreak = useRef(0);
+  const [ege13QuickCards, setEge13QuickCards] = useState<Ege13QuickCard[]>([]);
+  const [isEge13QuickOpen, setIsEge13QuickOpen] = useState(false);
+  const isLoadingEge13Quick = useRef(false);
+  const [ege15QuickCards, setEge15QuickCards] = useState<Ege15QuickCard[]>([]);
+  const [isEge15QuickOpen, setIsEge15QuickOpen] = useState(false);
+  const isLoadingEge15Quick = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -205,6 +308,7 @@ export default function ChatContainer() {
       'ege21_punctuation_analysis',
       'ege20_complex_sentence_punctuation',
       'fill_blank',
+      'dictation',
     ].includes(activeExerciseMessage.exercise.type);
 
   const handleResetProgress = () => {
@@ -214,13 +318,26 @@ export default function ChatContainer() {
     setTyping(false);
     setIsBlitzOpen(false);
     setBlitzCards([]);
+    setIsEge13QuickOpen(false);
+    setEge13QuickCards([]);
+    setIsEge15QuickOpen(false);
+    setEge15QuickCards([]);
     lastBlitzPromptStreak.current = 0;
     isLoadingBlitz.current = false;
+    isLoadingEge13Quick.current = false;
+    isLoadingEge15Quick.current = false;
     resetProgress();
   };
 
+  useEffect(() => {
+    const input = globalInputRef.current;
+    if (!input) return;
+    input.style.height = '44px';
+    input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+  }, [globalInputValue]);
+
   const fetchNextExercise = useCallback(
-    async (currentSeenIds: number[]) => {
+    async (currentSeenIds: number[], forceType?: ExerciseType) => {
       if (isFetchingExercise.current) return;
 
       isFetchingExercise.current = true;
@@ -233,6 +350,7 @@ export default function ChatContainer() {
           res = await getNextExerciseAction({
             sessionId,
             seenExerciseIds: dynamicBlocked,
+            forceType,
           });
           const returnedId = res.success ? res.exercise?.id : undefined;
           const isBlocked = typeof returnedId === 'number' && dynamicBlocked.includes(returnedId);
@@ -369,6 +487,32 @@ export default function ChatContainer() {
     [addMessage, recordBlitzScore],
   );
 
+  const handleEge13QuickFinish = useCallback(
+    (result: Ege13QuickResult) => {
+      recordBlitzScore(result.scoreDelta);
+      addMessage({
+        id: createMessageId('ege13-quick-result'),
+        isBot: true,
+        content: `Тип 13: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
+        type: 'text',
+      });
+    },
+    [addMessage, recordBlitzScore],
+  );
+
+  const handleEge15QuickFinish = useCallback(
+    (result: Ege15QuickResult) => {
+      recordBlitzScore(result.scoreDelta);
+      addMessage({
+        id: createMessageId('ege15-quick-result'),
+        isBot: true,
+        content: `Тип 15: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
+        type: 'text',
+      });
+    },
+    [addMessage, recordBlitzScore],
+  );
+
   const openBlitz = useCallback(
     async (promptStreak?: number) => {
       if (isLoadingBlitz.current) return;
@@ -398,6 +542,68 @@ export default function ChatContainer() {
         });
       } finally {
         isLoadingBlitz.current = false;
+      }
+    },
+    [addMessage, seenExerciseIds],
+  );
+
+  const openEge13Quick = useCallback(
+    async () => {
+      if (isLoadingEge13Quick.current) return;
+
+      isLoadingEge13Quick.current = true;
+
+      try {
+        const res = await getEge13QuickPoolAction({
+          limit: 80,
+          seenExerciseIds,
+        });
+
+        if (res.success && res.cards.length > 0) {
+          setEge13QuickCards(res.cards);
+          setIsEge13QuickOpen(true);
+          return;
+        }
+
+        addMessage({
+          id: createMessageId('ege13-quick-empty'),
+          isBot: true,
+          content: 'Быстрый тип 13 пока не нашёл строки со слитным или раздельным написанием.',
+          type: 'text',
+        });
+      } finally {
+        isLoadingEge13Quick.current = false;
+      }
+    },
+    [addMessage, seenExerciseIds],
+  );
+
+  const openEge15Quick = useCallback(
+    async () => {
+      if (isLoadingEge15Quick.current) return;
+
+      isLoadingEge15Quick.current = true;
+
+      try {
+        const res = await getEge15QuickPoolAction({
+          limit: 100,
+          seenExerciseIds,
+        });
+
+        if (res.success && res.cards.length > 0) {
+          setEge15QuickCards(res.cards);
+          setIsEge15QuickOpen(true);
+          return;
+        }
+
+        addMessage({
+          id: createMessageId('ege15-quick-empty'),
+          isBot: true,
+          content: 'Быстрый тип 15 пока не нашёл позиции с Н/НН.',
+          type: 'text',
+        });
+      } finally {
+        isLoadingEge15Quick.current = false;
       }
     },
     [addMessage, seenExerciseIds],
@@ -463,8 +669,28 @@ export default function ChatContainer() {
       return;
     }
 
+    if (
+      command === '/dictation' ||
+      command === '/punctuation_constructor' ||
+      command === '/orthography_repair'
+    ) {
+      const exerciseType = command.replace('/', '') as ExerciseType;
+      fetchNextExercise([...seenExerciseIds], exerciseType);
+      return;
+    }
+
     if (command === '/blitz') {
       void openBlitz();
+      return;
+    }
+
+    if (command === '/ege13_quick') {
+      void openEge13Quick();
+      return;
+    }
+
+    if (command === '/ege15_quick') {
+      void openEge15Quick();
       return;
     }
 
@@ -479,7 +705,16 @@ export default function ChatContainer() {
     if (!text) return;
 
     const command = text.toLowerCase();
-    if (command === '/start' || command === '/blitz' || command === '/stats') {
+    if (
+      command === '/start' ||
+      command === '/blitz' ||
+      command === '/ege13_quick' ||
+      command === '/ege15_quick' ||
+      command === '/stats' ||
+      command === '/dictation' ||
+      command === '/punctuation_constructor' ||
+      command === '/orthography_repair'
+    ) {
       runSlashCommand(command as SlashCommand);
       return;
     }
@@ -488,7 +723,7 @@ export default function ChatContainer() {
       addMessage({
         id: createMessageId('unsupported-input'),
         isBot: true,
-        content: 'Сейчас это поле принимает команды: /blitz, /stats или /start.',
+        content: 'Сейчас это поле принимает команды: /dictation, /blitz, /ege13_quick, /ege15_quick, /stats, /start, /punctuation_constructor, /orthography_repair.',
         type: 'text',
       });
       setGlobalInputValue('');
@@ -504,6 +739,8 @@ export default function ChatContainer() {
       answer = { type, value: text.replace(/[^0-9]/g, '') };
     } else if (type === 'fill_blank') {
       answer = { type, value: text };
+    } else if (type === 'dictation') {
+      answer = { type, text };
     } else {
       return;
     }
@@ -542,7 +779,13 @@ export default function ChatContainer() {
   ]);
 
   useEffect(() => {
-    if (!hasHydrated || isBlitzOpen || isLoadingBlitz.current) {
+    if (
+      !hasHydrated ||
+      isBlitzOpen ||
+      isEge13QuickOpen ||
+      isEge15QuickOpen ||
+      isLoadingBlitz.current
+    ) {
       return;
     }
 
@@ -554,6 +797,8 @@ export default function ChatContainer() {
   }, [
     hasHydrated,
     isBlitzOpen,
+    isEge13QuickOpen,
+    isEge15QuickOpen,
     openBlitz,
     streak,
   ]);
@@ -566,6 +811,20 @@ export default function ChatContainer() {
             cards={blitzCards}
             onClose={() => setIsBlitzOpen(false)}
             onFinish={handleBlitzFinish}
+          />
+        )}
+        {isEge13QuickOpen && (
+          <Ege13QuickGame
+            cards={ege13QuickCards}
+            onClose={() => setIsEge13QuickOpen(false)}
+            onFinish={handleEge13QuickFinish}
+          />
+        )}
+        {isEge15QuickOpen && (
+          <Ege15QuickGame
+            cards={ege15QuickCards}
+            onClose={() => setIsEge15QuickOpen(false)}
+            onFinish={handleEge15QuickFinish}
           />
         )}
       </AnimatePresence>
@@ -664,7 +923,7 @@ export default function ChatContainer() {
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
                   {visibleSlashCommands.map((item) => {
-                    const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : RotateCcw;
+                    const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : item.command === '/ege13_quick' || item.command === '/ege15_quick' || item.command.startsWith('/punctuation') || item.command.startsWith('/orthography') ? PenTool : RotateCcw;
                     return (
                       <button
                         key={item.command}
@@ -694,13 +953,25 @@ export default function ChatContainer() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleGlobalSubmit} className="flex gap-2">
-              <input
-                type="text"
+            <form onSubmit={handleGlobalSubmit} className="flex items-end gap-2">
+              <textarea
+                ref={globalInputRef}
+                rows={1}
                 value={globalInputValue}
                 onChange={(e) => setGlobalInputValue(e.target.value)}
-                placeholder={supportsGlobalInput ? 'Введите ваш ответ...' : 'Команды: /blitz, /stats, /start'}
-                className="h-11 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowUp' && !globalInputValue.trim()) {
+                    event.preventDefault();
+                    setGlobalInputValue('/');
+                    return;
+                  }
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder={supportsGlobalInput ? 'Введите ваш ответ...' : 'Команды: /dictation, /blitz, /ege13_quick, /ege15_quick, /start, ...'}
+                className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm leading-5 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
                 autoFocus
               />
               <button
@@ -709,7 +980,7 @@ export default function ChatContainer() {
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:bg-primary-strong disabled:opacity-50"
                 title="Отправить"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 translate-x-0.5 rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>

@@ -434,31 +434,33 @@ export default function PunctuationConstructorCard({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-stretch gap-2">
-        {markGroups.map((group) => (
-          <div
-            key={group.id}
-            className="flex items-center gap-1 rounded-xl border border-stroke bg-surface px-1.5 py-1.5"
-            title={group.label}
-            aria-label={group.label}
-          >
-            {group.marks.map((mark) => (
-              <MarkButton
-                key={mark}
-                disabled={disabled}
-                isSelected={selectedMark === mark}
-                mark={mark}
-                onClick={handleMarkClick}
-              />
-            ))}
-          </div>
-        ))}
-        {activeSlotIndex === null && selectedMark && (
-          <span className="text-xs font-medium text-foreground/60">
-            Выбран знак {markGlyph(selectedMark)}. Нажмите на слот.
-          </span>
-        )}
-      </div>
+      {!disabled && (
+        <div className="mt-4 flex flex-wrap items-stretch gap-2">
+          {markGroups.map((group) => (
+            <div
+              key={group.id}
+              className="flex items-center gap-1 rounded-xl border border-stroke bg-surface px-1.5 py-1.5"
+              title={group.label}
+              aria-label={group.label}
+            >
+              {group.marks.map((mark) => (
+                <MarkButton
+                  key={mark}
+                  disabled={disabled}
+                  isSelected={selectedMark === mark}
+                  mark={mark}
+                  onClick={handleMarkClick}
+                />
+              ))}
+            </div>
+          ))}
+          {activeSlotIndex === null && selectedMark && (
+            <span className="text-xs font-medium text-foreground/60">
+              Выбран знак {markGlyph(selectedMark)}. Нажмите на слот.
+            </span>
+          )}
+        </div>
+      )}
 
       {(exercise.payload.hints?.length || hasStructure || guidedSteps.length) && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -650,26 +652,7 @@ export default function PunctuationConstructorCard({
         </div>
       )}
 
-      {checked && slotExplanations.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {slotExplanations.map((item) => (
-            <div
-              key={`${item.slotIndex}-${item.text}`}
-              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm text-foreground/80"
-            >
-              <span className="mr-2 font-mono text-xs text-foreground/50">
-                slot {item.slotIndex}
-              </span>
-              {item.marks?.length ? (
-                <span className="mr-2 font-bold text-foreground">
-                  {glyphs(item.marks)}
-                </span>
-              ) : null}
-              {item.text}
-            </div>
-          ))}
-        </div>
-      )}
+
 
       {previewMode && (
         <div className="mt-3 flex justify-end gap-2">
@@ -798,6 +781,8 @@ function Slot({
   const sizeClass = compact
     ? 'h-8 min-w-4 px-1'
     : 'h-11 min-w-11 px-1.5';
+
+  if (disabled && status === 'idle') return null;
 
   return (
     <div

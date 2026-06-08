@@ -13,6 +13,7 @@ export const EXERCISE_TYPES = [
   'dictation',
   'word_search',
   'punctuation_constructor',
+  'orthography_repair',
 ] as const;
 
 export const EXERCISE_CATEGORIES = ['orthography', 'punctuation', 'mixed'] as const;
@@ -77,6 +78,41 @@ export type WordSearchPayload = {
 export type WordSearchAnswer = {
   words: string[];
   caseSensitive?: boolean;
+};
+
+export type DictationPayload = {
+  title: string;
+  audioSrc: string;
+  waveform?: number[];
+  playbackRates?: number[];
+};
+
+export type DictationAnswer = {
+  text: string;
+  caseSensitive?: boolean;
+  ignorePunctuation?: boolean;
+};
+
+export type OrthographyRepairPayload = {
+  text: string;
+  mode: 'click_then_choose' | 'click_then_type';
+  targets: Array<{
+    id: string;
+    surface: string;
+    replacement: string;
+    type: 'word' | 'span';
+    options?: string[];
+    occurrence?: number;
+  }>;
+  hints?: string[];
+};
+
+export type OrthographyRepairAnswer = {
+  repairs: Array<{
+    targetId: string;
+    correct: string;
+  }>;
+  correctText?: string;
 };
 
 export type OrderFragmentsPayload = {

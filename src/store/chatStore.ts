@@ -198,6 +198,7 @@ export const useChatStore = create<ChatState>()(
           ],
           seenQuestionIds: [],
           seenExerciseIds: [],
+          cooldownExerciseIds: [],
           answeredExerciseIds: [],
           sessionId: undefined,
           hasRequestedInitialExercise: false,

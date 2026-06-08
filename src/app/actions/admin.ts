@@ -38,6 +38,8 @@ export type ExerciseEditorInput = {
     | 'fill_blank'
     | 'word_bank_cloze'
     | 'word_search'
+    | 'dictation'
+    | 'orthography_repair'
     | 'order_fragments'
     | 'punctuation_insert'
     | 'punctuation_constructor'
@@ -69,6 +71,29 @@ export type ExerciseEditorInput = {
   wordSearchGridRows?: string[];
   wordSearchWords?: string[];
   wordSearchCaseSensitive?: boolean;
+  dictationTitle?: string;
+  dictationAudioSrc?: string;
+  dictationWaveform?: number[];
+  dictationPlaybackRates?: number[];
+  dictationText?: string;
+  dictationCaseSensitive?: boolean;
+  dictationIgnorePunctuation?: boolean;
+  orthographyRepairText?: string;
+  orthographyRepairMode?: 'click_then_choose' | 'click_then_type';
+  orthographyRepairTargets?: Array<{
+    id: string;
+    surface: string;
+    replacement: string;
+    type: 'word' | 'span';
+    options?: string[];
+    occurrence?: number;
+  }>;
+  orthographyRepairHints?: string[];
+  orthographyRepairRepairs?: Array<{
+    targetId: string;
+    correct: string;
+  }>;
+  orthographyRepairCorrectText?: string;
   orderFragments?: Array<{ id: string; text: string }>;
   orderCorrectOrder?: string[];
   punctuationTokens?: string[];
@@ -123,6 +148,7 @@ type ExerciseListItem = {
   seedKey: string | null;
   prompt: string;
   explanation: string;
+  searchText?: string;
   qualityStatus: string;
   updatedAt: string;
   updatedAtCursor: string;
@@ -242,6 +268,15 @@ function validateAnswerCompleteness(input: ExerciseEditorInput): string | null {
     const accepted = (input.fillAccepted ?? []).map((value) => value.trim()).filter(Boolean);
     if (accepted.length === 0) {
       return 'Для fill_blank нужно указать допустимые ответы.';
+    }
+  }
+
+  if (input.type === 'dictation') {
+    if (!(input.dictationAudioSrc ?? '').trim()) {
+      return 'Для dictation нужно указать путь к аудио.';
+    }
+    if (!(input.dictationText ?? '').trim()) {
+      return 'Для dictation нужно указать эталонную расшифровку.';
     }
   }
 
@@ -590,6 +625,99 @@ function buildExercisePayload(input: ExerciseEditorInput) {
       answer: {
         words: words.length > 0 ? words : ['?'],
         caseSensitive: Boolean(input.wordSearchCaseSensitive),
+      },
+    };
+  }
+
+  if (input.type === 'dictation') {
+    const answerText = (input.dictationText ?? '').trim();
+    const audioSrc = (input.dictationAudioSrc ?? '').trim();
+    return {
+      ...base,
+      payload: {
+        title: (input.dictationTitle ?? '').trim() || base.prompt,
+        audioSrc: audioSrc || '/voice_memos/audio_2026-06-08_00-53-43.ogg',
+        ...((input.dictationWaveform ?? []).length > 0
+          ? { waveform: input.dictationWaveform }
+          : {}),
+        ...((input.dictationPlaybackRates ?? []).length > 0
+          ? { playbackRates: input.dictationPlaybackRates }
+          : {}),
+      },
+      answer: {
+        text: answerText || 'Текст диктанта.',
+        caseSensitive: Boolean(input.dictationCaseSensitive),
+        ignorePunctuation: Boolean(input.dictationIgnorePunctuation),
+      },
+    };
+  }
+
+  if (input.type === 'orthography_repair') {
+    const targets = (input.orthographyRepairTargets ?? [])
+      .map((target) => ({
+        id: target.id.trim(),
+        surface: target.surface.trim(),
+        replacement: target.replacement.trim(),
+        type: target.type,
+        options: target.options?.map((option) => option.trim()).filter(Boolean),
+        occurrence: target.occurrence,
+      }))
+      .filter(
+        (target) =>
+          target.id.length > 0 &&
+          target.surface.length > 0 &&
+          target.replacement.length > 0,
+      );
+    const safeTargets =
+      targets.length > 0
+        ? targets
+        : [
+            {
+              id: 'target_1',
+              surface: 'ошыбка',
+              replacement: 'ошибка',
+              type: 'word' as const,
+              options: ['ошыбка', 'ошибка'],
+            },
+          ];
+    const targetIds = new Set(safeTargets.map((target) => target.id));
+    const repairs = (input.orthographyRepairRepairs ?? [])
+      .map((repair) => ({
+        targetId: repair.targetId.trim(),
+        correct: repair.correct.trim(),
+      }))
+      .filter(
+        (repair) => repair.targetId.length > 0 && repair.correct.length > 0,
+      );
+    const safeRepairs =
+      repairs.length > 0
+        ? repairs.filter((repair) => targetIds.has(repair.targetId))
+        : safeTargets.map((target) => ({
+            targetId: target.id,
+            correct: target.replacement,
+          }));
+    return {
+      ...base,
+      payload: {
+        text:
+          (input.orthographyRepairText ?? '').trim() ||
+          `Найдите слово: ${safeTargets[0].surface}.`,
+        mode: input.orthographyRepairMode ?? 'click_then_choose',
+        targets: safeTargets,
+        ...((input.orthographyRepairHints ?? []).length > 0
+          ? { hints: input.orthographyRepairHints }
+          : {}),
+      },
+      answer: {
+        repairs: safeRepairs.length > 0
+          ? safeRepairs
+          : safeTargets.map((target) => ({
+              targetId: target.id,
+              correct: target.replacement,
+            })),
+        ...((input.orthographyRepairCorrectText ?? '').trim()
+          ? { correctText: input.orthographyRepairCorrectText?.trim() }
+          : {}),
       },
     };
   }
@@ -1049,6 +1177,7 @@ async function fetchExerciseListRows(input: {
       seedKey: exercises.seedKey,
       prompt: exercises.prompt,
       explanation: exercises.explanation,
+      searchText: sql<string>`(${exercises.payload}::text || ' ' || ${exercises.answer}::text)`,
       qualityStatus: exercises.qualityStatus,
       updatedAt: sql<string>`${exercises.updatedAt}::text`,
       updatedAtCursor: sql<string>`${exercises.updatedAt}::text`,
@@ -1158,11 +1287,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
     if (qualityStatus !== 'all') baseWhereParts.push(eq(exercises.qualityStatus, qualityStatus));
     if (examType !== 'all') {
       baseWhereParts.push(
-        sql`exists (
-          select 1
-          from unnest(${exercises.skillTags}) as tag
-          where tag = ${`ege.${examType}`}
-        )`,
+        sql`${exercises.skillTags} @> array[${`ege.${examType}`}]::text[]`,
       );
     }
 
@@ -1176,6 +1301,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
         seedKey: row.seedKey,
         prompt: row.prompt,
         explanation: row.explanation,
+        searchText: row.searchText,
         qualityStatus: row.qualityStatus,
         updatedAt: row.updatedAt,
         updatedAtCursor: row.updatedAtCursor,
@@ -1227,7 +1353,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
           ...baseWhereParts,
           sql`lower(
                 replace(
-                  coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                  coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, '') || ' ' || ${exercises.payload}::text || ' ' || ${exercises.answer}::text,
                   chr(173),
                   ''
                 )
@@ -1248,7 +1374,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
                     regexp_replace(
                       regexp_replace(
                         replace(
-                          coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                          coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, '') || ' ' || ${exercises.payload}::text || ' ' || ${exercises.answer}::text,
                           chr(173),
                           ''
                         ),
@@ -1290,7 +1416,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
             or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
             or lower(
               replace(
-                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, '') || ' ' || ${exercises.payload}::text || ' ' || ${exercises.answer}::text,
                 chr(173),
                 ''
               )
@@ -1299,7 +1425,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
               regexp_replace(
                 regexp_replace(
                   replace(
-                    coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                    coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, '') || ' ' || ${exercises.payload}::text || ' ' || ${exercises.answer}::text,
                     chr(173),
                     ''
                   ),
@@ -1321,7 +1447,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
             or lower(coalesce(${exercises.seedKey}, '')) like ${pattern}
             or lower(
               replace(
-                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, ''),
+                coalesce(${exercises.seedKey}, '') || ' ' || coalesce(${exercises.prompt}, '') || ' ' || coalesce(${exercises.explanation}, '') || ' ' || ${exercises.payload}::text || ' ' || ${exercises.answer}::text,
                 chr(173),
                 ''
               )
@@ -1367,6 +1493,7 @@ export async function listExercisesAction(params: ListExercisesParams = {}) {
       seedKey: row.seedKey,
       prompt: row.prompt,
       explanation: row.explanation,
+      searchText: row.searchText,
       qualityStatus: row.qualityStatus,
       updatedAt: row.updatedAt,
       updatedAtCursor: row.updatedAtCursor,
@@ -1519,6 +1646,82 @@ export async function getExerciseByIdAction(id: number) {
             ? answer.words.filter((v): v is string => typeof v === 'string')
             : [],
           wordSearchCaseSensitive: Boolean(answer.caseSensitive),
+        },
+      };
+    }
+
+    if (row.type === 'orthography_repair') {
+      return {
+        success: true,
+        item: {
+          ...base,
+          orthographyRepairText:
+            typeof payload.text === 'string' ? payload.text : '',
+          orthographyRepairMode:
+            payload.mode === 'click_then_type' ? 'click_then_type' : 'click_then_choose',
+          orthographyRepairTargets: Array.isArray(payload.targets)
+            ? payload.targets
+                .map((target) => (target ?? {}) as Record<string, unknown>)
+                .filter(
+                  (target) =>
+                    typeof target.id === 'string' &&
+                    typeof target.surface === 'string' &&
+                    typeof target.replacement === 'string' &&
+                    typeof target.type === 'string',
+                )
+                .map((target) => ({
+                  id: String(target.id),
+                  surface: String(target.surface),
+                  replacement: String(target.replacement),
+                  type: target.type === 'span' ? 'span' as const : 'word' as const,
+                  options: Array.isArray(target.options)
+                    ? target.options.filter((v): v is string => typeof v === 'string')
+                    : undefined,
+                  occurrence:
+                    typeof target.occurrence === 'number'
+                      ? Number(target.occurrence)
+                      : undefined,
+                }))
+            : [],
+          orthographyRepairHints: Array.isArray(payload.hints)
+            ? payload.hints.filter((v): v is string => typeof v === 'string')
+            : [],
+          orthographyRepairRepairs: Array.isArray(answer.repairs)
+            ? answer.repairs
+                .map((repair) => (repair ?? {}) as Record<string, unknown>)
+                .filter(
+                  (repair) =>
+                    typeof repair.targetId === 'string' &&
+                    typeof repair.correct === 'string',
+                )
+                .map((repair) => ({
+                  targetId: String(repair.targetId),
+                  correct: String(repair.correct),
+                }))
+            : [],
+          orthographyRepairCorrectText:
+            typeof answer.correctText === 'string' ? answer.correctText : '',
+        },
+      };
+    }
+
+    if (row.type === 'dictation') {
+      return {
+        success: true,
+        item: {
+          ...base,
+          dictationTitle: typeof payload.title === 'string' ? payload.title : '',
+          dictationAudioSrc:
+            typeof payload.audioSrc === 'string' ? payload.audioSrc : '',
+          dictationWaveform: Array.isArray(payload.waveform)
+            ? payload.waveform.filter((v): v is number => typeof v === 'number')
+            : [],
+          dictationPlaybackRates: Array.isArray(payload.playbackRates)
+            ? payload.playbackRates.filter((v): v is number => typeof v === 'number')
+            : [],
+          dictationText: typeof answer.text === 'string' ? answer.text : '',
+          dictationCaseSensitive: Boolean(answer.caseSensitive),
+          dictationIgnorePunctuation: Boolean(answer.ignorePunctuation),
         },
       };
     }

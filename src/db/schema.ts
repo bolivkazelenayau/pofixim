@@ -26,6 +26,7 @@ export const exerciseTypeEnum = pgEnum('exercise_type', [
   'dictation',
   'word_search',
   'punctuation_constructor',
+  'orthography_repair',
 ]);
 
 export const questions = pgTable('questions', {
@@ -65,6 +66,7 @@ export const exercises = pgTable(
     index('exercises_updated_at_idx').on(table.updatedAt),
     index('exercises_type_idx').on(table.type),
     index('exercises_quality_status_idx').on(table.qualityStatus),
+    index('exercises_skill_tags_gin_idx').using('gin', table.skillTags),
     index('exercises_type_quality_updated_id_idx').on(
       table.type,
       table.qualityStatus,
