@@ -86,14 +86,14 @@ const MARK_GROUPS: Array<{
 ];
 
 const STATUS_CLASS: Record<SlotStatus, string> = {
-  idle: 'border-dashed border-stroke bg-surface-strong hover:border-cyan-300',
-  selected: 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-100',
-  filled: 'border-amber-300 bg-amber-50',
-  correct: 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100',
-  missing: 'border-yellow-400 bg-yellow-50 ring-2 ring-yellow-100',
-  extra: 'border-rose-400 bg-rose-50 ring-2 ring-rose-100',
-  wrong: 'border-orange-400 bg-orange-50 ring-2 ring-orange-100',
-  wrong_order: 'border-fuchsia-400 bg-fuchsia-50 ring-2 ring-fuchsia-100',
+  idle: 'border-dashed border-stroke bg-surface-strong hover:border-cyan-300 dark:bg-foreground/5 dark:hover:border-cyan-300/60',
+  selected: 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-100 dark:border-cyan-300 dark:bg-cyan-300/12 dark:ring-cyan-300/20',
+  filled: 'border-amber-300 bg-amber-50 dark:border-amber-300/45 dark:bg-amber-300/12',
+  correct: 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100 dark:border-emerald-300/60 dark:bg-emerald-300/12 dark:ring-emerald-300/20',
+  missing: 'border-yellow-400 bg-yellow-50 ring-2 ring-yellow-100 dark:border-yellow-300/60 dark:bg-yellow-300/12 dark:ring-yellow-300/20',
+  extra: 'border-rose-400 bg-rose-50 ring-2 ring-rose-100 dark:border-rose-300/60 dark:bg-rose-300/12 dark:ring-rose-300/20',
+  wrong: 'border-orange-400 bg-orange-50 ring-2 ring-orange-100 dark:border-orange-300/60 dark:bg-orange-300/12 dark:ring-orange-300/20',
+  wrong_order: 'border-fuchsia-400 bg-fuchsia-50 ring-2 ring-fuchsia-100 dark:border-fuchsia-300/60 dark:bg-fuchsia-300/12 dark:ring-fuchsia-300/20',
 };
 
 function markGlyph(mark: ConstructorMark) {
@@ -410,7 +410,7 @@ export default function PunctuationConstructorCard({
                 <span
                   className={`mx-0.5 rounded-md bg-surface-strong px-2 py-0.5 ${
                     showStructure && hasStructure
-                      ? 'ring-2 ring-cyan-100'
+                      ? 'ring-2 ring-cyan-100 dark:ring-cyan-300/15'
                       : ''
                   }`}
                 >
@@ -476,7 +476,7 @@ export default function PunctuationConstructorCard({
                     setUnlockedHintsCount(1);
                     setHintIndex(0);
                   }}
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60"
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15"
                 >
                   💡 Подсказка (-50 баллов)
                 </button>
@@ -504,7 +504,7 @@ export default function PunctuationConstructorCard({
                       setUnlockedHintsCount((c) => c + 1);
                       setHintIndex(unlockedHintsCount);
                     }}
-                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60"
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15"
                   >
                     + Ещё (-50)
                   </button>
@@ -525,7 +525,7 @@ export default function PunctuationConstructorCard({
                     setUnlockedStructure(true);
                     setShowStructure(true);
                   }}
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60"
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15"
                 >
                   💡 Показать структуру (-50 баллов)
                 </button>
@@ -556,7 +556,7 @@ export default function PunctuationConstructorCard({
                     const step = guidedSteps[guidedStepIndex];
                     if (step) setActiveSlotIndex(step.slotIndex);
                   }}
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60"
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15"
                 >
                   💡 Пошагово (-100 баллов)
                 </button>
@@ -585,7 +585,7 @@ export default function PunctuationConstructorCard({
       )}
 
       {currentHint && (
-        <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-950">
+        <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-950 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-100">
           {currentHint}
         </div>
       )}
@@ -595,7 +595,7 @@ export default function PunctuationConstructorCard({
           {exercise.payload.segments.map((segment) => (
             <span
               key={`${segment.kind}-${segment.tokenStart}-${segment.tokenEnd}`}
-              className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-900"
+              className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-900 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-100"
             >
               {segment.label}
             </span>
@@ -604,7 +604,7 @@ export default function PunctuationConstructorCard({
       ) : null}
 
       {currentGuidedStep && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
           <div className="flex items-center justify-between gap-3">
             <div>
               <span className="mr-2 font-mono text-xs text-amber-700">
@@ -627,7 +627,7 @@ export default function PunctuationConstructorCard({
                   const step = guidedSteps[nextIndex];
                   if (step) setActiveSlotIndex(step.slotIndex);
                 }}
-                className="rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold disabled:opacity-40"
+                className="rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold disabled:opacity-40 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100"
               >
                 Назад
               </button>
@@ -643,7 +643,7 @@ export default function PunctuationConstructorCard({
                   const step = guidedSteps[nextIndex];
                   if (step) setActiveSlotIndex(step.slotIndex);
                 }}
-                className="rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold disabled:opacity-40"
+                className="rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold disabled:opacity-40 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100"
               >
                 Дальше
               </button>
@@ -741,8 +741,8 @@ function MarkButton({
       title={MARK_META[mark].label}
       className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-2.5 text-lg font-black text-foreground shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
         isSelected
-          ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200'
-          : 'border-cyan-300 bg-white hover:border-cyan-500 hover:bg-cyan-50'
+          ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200 dark:border-amber-300 dark:bg-amber-300/18 dark:text-amber-100 dark:ring-amber-300/20'
+          : 'border-cyan-300 bg-white hover:border-cyan-500 hover:bg-cyan-50 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10'
       }`}
     >
       {markGlyph(mark)}
@@ -829,7 +829,7 @@ function Slot({
           {placements.map((placement, index) => (
             <span
               key={`${placement.mark}-${slotIndex}-${index}`}
-              className="group inline-flex h-7 min-w-6 items-center justify-center rounded-md bg-amber-100 px-1 text-base font-black text-amber-900 shadow-inner"
+              className="group inline-flex h-7 min-w-6 items-center justify-center rounded-md bg-amber-100 px-1 text-base font-black text-amber-900 shadow-inner dark:bg-amber-300/18 dark:text-amber-100 dark:shadow-none"
               title={MARK_META[placement.mark].label}
             >
               <span
@@ -862,7 +862,7 @@ function Slot({
                   event.stopPropagation();
                   onRemoveMark(slotIndex, index);
                 }}
-                className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[12px] leading-none text-amber-900/55 transition hover:bg-amber-200 hover:text-amber-950 disabled:opacity-30"
+                className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[12px] leading-none text-amber-900/55 transition hover:bg-amber-200 hover:text-amber-950 disabled:opacity-30 dark:text-amber-100/55 dark:hover:bg-amber-300/20 dark:hover:text-amber-50"
                 aria-label={`Удалить знак ${MARK_META[placement.mark].label}`}
                 title="Удалить знак"
               >

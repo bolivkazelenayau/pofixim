@@ -31,6 +31,23 @@ function clampVolume(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
+function waveformBarHeight(value: number) {
+  return `${Math.max(4, value * 30).toFixed(3)}px`;
+}
+
+function getMediaDuration(audio: HTMLAudioElement | null, fallback = 0) {
+  if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+    return audio.duration;
+  }
+  if (audio?.seekable.length) {
+    const seekableEnd = audio.seekable.end(audio.seekable.length - 1);
+    if (Number.isFinite(seekableEnd) && seekableEnd > 0) {
+      return seekableEnd;
+    }
+  }
+  return fallback;
+}
+
 async function buildWaveform(audioSrc: string, barCount: number) {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextCtor) return null;
@@ -80,7 +97,8 @@ export default function DictationCard({ exercise }: Props) {
     ? exercise.payload.playbackRates
     : [0.75, 1, 1.25, 1.5];
   const waveform = decodedWaveform ?? exercise.payload.waveform ?? FALLBACK_WAVEFORM;
-  const progress = duration > 0 ? currentTime / duration : 0;
+  const displayDuration = getMediaDuration(audioRef.current, duration);
+  const progress = displayDuration > 0 ? currentTime / displayDuration : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -128,10 +146,12 @@ export default function DictationCard({ exercise }: Props) {
   function seekAtClientX(clientX: number) {
     const audio = audioRef.current;
     const box = waveformRef.current?.getBoundingClientRect();
-    if (!audio || !box || duration <= 0) return;
+    const seekDuration = getMediaDuration(audio, duration);
+    if (!audio || !box || seekDuration <= 0) return;
     const ratio = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
-    audio.currentTime = ratio * duration;
+    audio.currentTime = ratio * seekDuration;
     setCurrentTime(audio.currentTime);
+    if (duration <= 0) setDuration(seekDuration);
   }
 
   function cancelVolumeFade() {
@@ -189,8 +209,12 @@ export default function DictationCard({ exercise }: Props) {
         ref={audioRef}
         src={exercise.payload.audioSrc}
         preload="metadata"
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => setDuration(getMediaDuration(event.currentTarget))}
+        onDurationChange={(event) => setDuration(getMediaDuration(event.currentTarget))}
+        onTimeUpdate={(event) => {
+          setCurrentTime(event.currentTarget.currentTime);
+          setDuration((current) => getMediaDuration(event.currentTarget, current));
+        }}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
@@ -252,31 +276,33 @@ export default function DictationCard({ exercise }: Props) {
               }}
               onKeyDown={(event) => {
                 const audio = audioRef.current;
-                if (!audio || duration <= 0) return;
+                const seekDuration = getMediaDuration(audio, duration);
+                if (!audio || seekDuration <= 0) return;
                 if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
                   event.preventDefault();
                   const delta = event.key === 'ArrowLeft' ? -3 : 3;
-                  audio.currentTime = Math.min(duration, Math.max(0, audio.currentTime + delta));
+                  audio.currentTime = Math.min(seekDuration, Math.max(0, audio.currentTime + delta));
+                  if (duration <= 0) setDuration(seekDuration);
                 }
               }}
-              className="group flex h-10 cursor-ew-resize touch-none select-none items-center gap-px rounded-lg px-1 outline-none focus:ring-2 focus:ring-primary/30 sm:gap-[3px]"
+              className="group flex h-10 cursor-ew-resize touch-none select-none items-center gap-px overflow-hidden rounded-lg px-1 outline-none focus:ring-2 focus:ring-primary/30 sm:gap-px md:gap-[3px]"
             >
               {waveform.map((height, index) => {
                 const active = index / waveform.length <= progress;
                 return (
                   <span
                     key={`${index}-${height}`}
-                    className={`${index % 2 === 1 ? 'hidden sm:block' : 'block'} min-w-0 flex-1 rounded-full transition ${
+                    className={`${index % 2 === 1 ? 'hidden md:block' : 'block'} w-px min-w-px flex-1 rounded-full transition ${
                       active ? 'bg-primary' : 'bg-foreground/18'
                     }`}
-                    style={{ height: `${Math.max(4, height * 30)}px` }}
+                    style={{ height: waveformBarHeight(height) }}
                   />
                 );
               })}
             </div>
             <div className="mt-1 flex items-center justify-between text-xs font-medium text-foreground/55">
               <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+              <span>{formatTime(displayDuration)}</span>
             </div>
           </div>
         </div>

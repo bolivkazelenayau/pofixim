@@ -194,13 +194,13 @@ export default function OrthographyRepairCard({
                 onClick={() => chooseTarget(segment.target)}
                 className={`rounded-md border px-0.5 py-0.5 transition ${
                   isCorrect
-                    ? 'mx-0.5 border-emerald-400 bg-emerald-50 px-1.5 font-bold text-emerald-900'
+                    ? 'mx-0.5 border-emerald-400 bg-emerald-50 px-1.5 font-bold text-emerald-900 dark:border-emerald-300/60 dark:bg-emerald-300/12 dark:text-emerald-100'
                     : isWrong
-                      ? 'mx-0.5 border-rose-400 bg-rose-50 px-1.5 font-bold text-rose-900'
+                      ? 'mx-0.5 border-rose-400 bg-rose-50 px-1.5 font-bold text-rose-900 dark:border-rose-300/60 dark:bg-rose-300/12 dark:text-rose-100'
                       : repair
-                        ? 'mx-0.5 border-cyan-300 bg-cyan-50 px-1.5 font-bold text-cyan-950'
+                        ? 'mx-0.5 border-cyan-300 bg-cyan-50 px-1.5 font-bold text-cyan-950 dark:border-cyan-300/45 dark:bg-cyan-300/12 dark:text-cyan-100'
                         : isSelected
-                          ? 'mx-0.5 border-amber-400 bg-amber-100 px-1.5 font-bold text-amber-950 ring-2 ring-amber-200'
+                          ? 'mx-0.5 border-amber-400 bg-amber-100 px-1.5 font-bold text-amber-950 ring-2 ring-amber-200 dark:border-amber-300 dark:bg-amber-300/18 dark:text-amber-100 dark:ring-amber-300/20'
                           : 'border-transparent bg-transparent text-foreground hover:bg-surface-strong'
                 }`}
               >
@@ -221,7 +221,7 @@ export default function OrthographyRepairCard({
                 onClick={() => markWrongClick(key)}
                 className={`rounded px-0.5 transition ${
                   wrongClickKey === key
-                    ? 'bg-rose-100 text-rose-900 ring-2 ring-rose-200'
+                    ? 'bg-rose-100 text-rose-900 ring-2 ring-rose-200 dark:bg-rose-300/12 dark:text-rose-100 dark:ring-rose-300/20'
                     : 'hover:bg-surface-strong'
                 }`}
                 title="Это не отмеченный фрагмент"
@@ -234,8 +234,8 @@ export default function OrthographyRepairCard({
       </div>
 
       {selectedTarget ? (
-        <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-3">
-          <div className="mb-2 text-sm font-semibold text-cyan-950">
+        <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-3 dark:border-cyan-300/20 dark:bg-cyan-300/10">
+          <div className="mb-2 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
             Исправьте: <span className="font-bold">«{selectedTarget.surface}»</span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -245,7 +245,7 @@ export default function OrthographyRepairCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => chooseRepair(option)}
-                className="rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-cyan-500 hover:bg-cyan-100"
+                className="rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-cyan-500 hover:bg-cyan-100 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10"
               >
                 {option}
               </button>

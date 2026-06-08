@@ -15,11 +15,11 @@
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #ededed;
-  --surface: #0a0a0a;
-  --surface-strong: #141414;
-  --stroke: #262626;
+  --background: #11100f;
+  --foreground: #f0ece5;
+  --surface: #171512;
+  --surface-strong: #201d19;
+  --stroke: #34302a;
   --primary: #f59e0b;
   --primary-strong: #d97706;
 }
@@ -242,6 +242,85 @@ ins.du {
   text-decoration-line: underline;
   text-decoration-style: double;
   text-decoration-skip-ink: none;
+}
+
+.dictation-diff {
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--stroke));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 92%, var(--primary) 8%);
+  color: var(--foreground);
+  padding: 12px;
+  font-size: 14px;
+  line-height: 2;
+  letter-spacing: 0.012em;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+.dictation-diff__title {
+  margin-bottom: 8px;
+  color: color-mix(in srgb, var(--foreground) 62%, var(--primary));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dictation-diff__token {
+  display: inline;
+  border-radius: 6px;
+  border: 1px solid;
+  padding: 2px 6px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.dictation-diff__token--missing {
+  border-color: #f59e0b;
+  background: #fff3c4;
+  color: #713f12;
+}
+
+.dictation-diff__token--extra {
+  border-color: #fb7185;
+  background: #ffe4e6;
+  color: #881337;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.dictation-diff__token--replace {
+  border-color: #fb923c;
+  background: #ffedd5;
+  color: #7c2d12;
+}
+
+.dark .dictation-diff {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: color-mix(in srgb, var(--surface-strong) 82%, #f59e0b 18%);
+  color: #f8f3ea;
+  box-shadow: inset 3px 0 0 #d69a18;
+}
+
+.dark .dictation-diff__title {
+  color: #f7d37d;
+}
+
+.dark .dictation-diff__token--missing {
+  border-color: rgba(251, 191, 36, 0.78);
+  background: rgba(251, 191, 36, 0.18);
+  color: #ffe8a3;
+}
+
+.dark .dictation-diff__token--extra {
+  border-color: rgba(251, 113, 133, 0.72);
+  background: rgba(251, 113, 133, 0.16);
+  color: #fecdd3;
+}
+
+.dark .dictation-diff__token--replace {
+  border-color: rgba(251, 146, 60, 0.76);
+  background: rgba(251, 146, 60, 0.17);
+  color: #fed7aa;
 }
 
 @keyframes admin-md-skeleton-pulse {

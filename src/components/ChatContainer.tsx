@@ -16,6 +16,7 @@ import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
 import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
 import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
+import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
 import { useChatStore, type Message } from '@/store/chatStore';
 import BlitzGame, { type BlitzResult } from './BlitzGame';
 import Ege13QuickGame, { type Ege13QuickResult } from './Ege13QuickGame';
@@ -135,65 +136,6 @@ function buildFeedbackText(
   }
 
   return `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(result, exerciseType)}`;
-}
-
-type DictationDiffItem =
-  | { kind: 'equal'; expected: string; actual: string }
-  | { kind: 'missing'; expected: string }
-  | { kind: 'extra'; actual: string }
-  | { kind: 'replace'; expected: string; actual: string };
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function dictationDisplayToken(item: DictationDiffItem) {
-  if (item.kind === 'extra') return item.actual;
-  if (item.kind === 'replace') return item.actual;
-  return item.expected;
-}
-
-function needsLeadingSpace(previous: string | null, current: string) {
-  if (!previous) return false;
-  if (/^[.,!?;:)]$/u.test(current)) return false;
-  if (/^[(]$/u.test(previous)) return false;
-  return true;
-}
-
-function buildDictationFeedbackText(normalizedAnswer: unknown) {
-  const diff = (
-    normalizedAnswer &&
-    typeof normalizedAnswer === 'object' &&
-    Array.isArray((normalizedAnswer as { diff?: unknown }).diff)
-      ? (normalizedAnswer as { diff: DictationDiffItem[] }).diff
-      : []
-  ).filter((item) => item && typeof item.kind === 'string');
-  const mistakeCount = diff.filter((item) => item.kind !== 'equal').length;
-
-  if (mistakeCount === 0) return 'Верно.';
-
-  const body = diff
-    .map((item, index) => {
-      const label = dictationDisplayToken(item);
-      const previous = index > 0 ? dictationDisplayToken(diff[index - 1]) : null;
-      const space = needsLeadingSpace(previous, label) ? ' ' : '';
-      if (item.kind === 'equal') return `${space}${escapeHtml(label)}`;
-      if (item.kind === 'missing') {
-        return `${space}<span class="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-950">[${escapeHtml(item.expected)}]</span>`;
-      }
-      if (item.kind === 'extra') {
-        return `${space}<span class="rounded-md border border-rose-300 bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-950 line-through">${escapeHtml(item.actual)}</span>`;
-      }
-      return `${space}<span class="rounded-md border border-orange-300 bg-orange-50 px-1.5 py-0.5 font-semibold text-orange-950" title="Должно быть: ${escapeHtml(item.expected)}">${escapeHtml(item.actual)}</span>`;
-    })
-    .join('');
-
-  return `<div class="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 text-sm leading-8 text-foreground"><div class="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-foreground/55">Ошибок: ${mistakeCount}</div>${body}</div>`;
 }
 
 function buildStepFeedbackText(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
@@ -10,6 +10,7 @@ import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, CheckSquare, Search, ArrowUp, ArrowDown, X, XSquare, History } from "lucide-react";
 import rehypeRaw from 'rehype-raw';
+import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
 import {
@@ -1294,7 +1295,8 @@ const [previewCheckResult, setPreviewCheckResult] = useState<{
  text: string;
  correctAnswer?: string;
  detailedExplanation?: string;
- } | null>(null);
+  } | null>(null);
+ const [previewDictationText, setPreviewDictationText] = useState('');
  const historyPastRef = useRef<Form[]>([]);
  const historyFutureRef = useRef<Form[]>([]);
  const suppressHistoryRef = useRef(false);
@@ -1616,6 +1618,8 @@ useEffect(() => {
  useEffect(() => {
  // eslint-disable-next-line react-hooks/set-state-in-effect
  setPreviewCheckResult(null);
+ // eslint-disable-next-line react-hooks/set-state-in-effect
+ setPreviewDictationText('');
  }, [form]);
 
  const isEdit = typeof form.id === 'number';
@@ -2141,15 +2145,13 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  return `\n\nРазбор по шагам:\n${lines.join('\n')}\n\nДальше: ${result.nextRecommendation.reason}`;
  }
 
-function handlePreviewSubmit(answer: SubmittedAnswer) {
+ function handlePreviewSubmit(answer: SubmittedAnswer) {
  if (!preview.exercise) return;
  const result = checkExerciseAnswer(preview.exercise, answer, { streak: 0 });
  if (preview.exercise.type === 'dictation') {
  setPreviewCheckResult({
  isCorrect: result.isCorrect,
- text: result.isCorrect
- ? 'Верно.'
- : 'Проверь подсветку в диктанте и попробуй ещё раз.',
+ text: buildDictationFeedbackText(result.normalizedAnswer),
  });
  return;
  }
@@ -2179,6 +2181,13 @@ function handlePreviewSubmit(answer: SubmittedAnswer) {
  previewFeedback?.explanation.join('\n') ?? result.feedback.detailedExplanation,
  });
 }
+
+ function handlePreviewDictationSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+  const text = previewDictationText.trim();
+  if (!text) return;
+  handlePreviewSubmit({ type: 'dictation', text });
+ }
 
  function generateSeedKey() {
  const prefix = seedPrefixForType(form.type);
@@ -3330,27 +3339,27 @@ async function openExerciseWithAutosave(id: number) {
    detail: databaseSavedAt
     ? `сохранено ${formatAdminTime(databaseSavedAt)}`
     : 'актуальная версия',
-   box: 'border-emerald-200 bg-emerald-50/80 text-emerald-800',
+    box: 'border-emerald-200 bg-emerald-50/80 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200',
    dot: 'bg-emerald-500',
   }
   : databaseSaveState === 'saving'
    ? {
     label: 'Сохранение...',
     detail: 'запись в БД',
-    box: 'border-sky-200 bg-sky-50/80 text-sky-800',
+     box: 'border-sky-200 bg-sky-50/80 text-sky-800 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200',
     dot: 'animate-pulse bg-sky-500',
    }
    : databaseSaveState === 'local'
     ? {
      label: 'Только локально',
      detail: 'ждёт записи в БД',
-     box: 'border-amber-200 bg-amber-50/80 text-amber-800',
+      box: 'border-amber-200 bg-amber-50/80 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200',
      dot: 'bg-amber-500',
     }
     : {
      label: 'Новый черновик',
      detail: 'ещё не в БД',
-     box: 'border-stroke bg-surface text-foreground/65',
+      box: 'border-stroke bg-surface text-foreground/65 dark:bg-foreground/5',
      dot: 'bg-foreground/25',
     };
 
@@ -3405,7 +3414,7 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  <div
   aria-live="polite"
-  className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide ${databaseIndicator.box.replace('border-stroke', 'border-transparent').replace('bg-surface', 'bg-surface-strong')}`}
+   className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${databaseIndicator.box}`}
  >
   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${databaseIndicator.dot}`} />
   <span>{databaseIndicator.label}</span>
@@ -4637,17 +4646,38 @@ async function openExerciseWithAutosave(id: number) {
           onSubmit={handlePreviewSubmit}
           previewMode={true}
         />
- {previewCheckResult && (
- <div
- className={`mt-3 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap ${
- preview.exercise.type === 'dictation'
- ? 'border-cyan-200 bg-cyan-50 text-cyan-950 dark:border-cyan-600/30 dark:bg-cyan-950/30 dark:text-cyan-100'
- :
- previewCheckResult.isCorrect
- ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/40 dark:text-emerald-200'
- : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-600/30 dark:bg-amber-950/40 dark:text-amber-200'
- }`}
- >
+        {preview.exercise.type === 'dictation' ? (
+          <form onSubmit={handlePreviewDictationSubmit} className="mt-3 space-y-2">
+            <textarea
+              rows={3}
+              value={previewDictationText}
+              onChange={(event) => {
+                setPreviewDictationText(event.target.value);
+                setPreviewCheckResult(null);
+              }}
+              placeholder="Введите услышанный текст для проверки..."
+              className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              disabled={!previewDictationText.trim()}
+              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)]"
+            >
+              Проверить диктант
+            </button>
+          </form>
+        ) : null}
+  {previewCheckResult && (
+  <div
+  className={`relative mt-3 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
+  preview.exercise.type === 'dictation'
+  ? 'border-cyan-200 bg-cyan-50 text-cyan-950 before:bg-cyan-400 dark:border-cyan-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-cyan-300/65'
+  :
+  previewCheckResult.isCorrect
+  ? 'border-emerald-200 bg-emerald-50 text-emerald-900 before:bg-emerald-400 dark:border-emerald-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-emerald-300/65 [&>p:first-child]:dark:text-emerald-200'
+  : 'border-amber-200 bg-amber-50 text-amber-900 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/70 [&>p:first-child]:dark:text-amber-200'
+  }`}
+  >
  {previewFeedbackSections ? (
  <div className="space-y-3">
  {previewFeedbackSections.lead ? (
