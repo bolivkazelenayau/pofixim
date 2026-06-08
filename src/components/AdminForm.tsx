@@ -1,38 +1,64 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
-import { commands, type ICommand } from '@uiw/react-md-editor';
 import FormattedFeedbackExplanation from '@/components/FormattedFeedbackExplanation';
+import {
+ fetchExerciseById,
+ fetchExerciseList,
+ getExerciseIdFromHash,
+ getExerciseIdFromSearch,
+} from '@/components/admin-form/api';
+import { categories, inputClass, qualityStatuses } from '@/components/admin-form/constants';
+import { EMPTY } from '@/components/admin-form/defaults';
+import {
+ buildTypeChangeMessage,
+ convertFormForTypeChange,
+ seedPrefixForType,
+} from '@/components/admin-form/formTypeConversion';
+import { buildPayloadFromForm, formFromExerciseItem } from '@/components/admin-form/formMapping';
+import AdminMarkdownEditor from '@/components/admin-form/markdown/AdminMarkdownEditor';
+import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
+import {
+ parseEge21SentencesText,
+ parseOrthographyRepairRepairs,
+ parseOrthographyRepairTargets,
+ parsePunctuationConstructorGuidedSteps,
+ parsePunctuationConstructorMarkBank,
+ parsePunctuationConstructorPlacements,
+ parsePunctuationConstructorSegments,
+ parsePunctuationConstructorSlotExplanations,
+ parsePunctuationMarks,
+ renderPunctuationConstructorAnswer,
+} from '@/components/admin-form/parsers';
+import type {
+ AdminFormProps,
+ ExerciseListResponse,
+ FeedbackSections,
+ Form,
+ ListItem,
+ PCMark,
+ RawPreviewItem,
+} from '@/components/admin-form/types';
 import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, CheckSquare, Search, ArrowUp, ArrowDown, X, XSquare, History } from "lucide-react";
 import rehypeRaw from 'rehype-raw';
 import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
-import '@uiw/react-md-editor/markdown-editor.css';
-import '@uiw/react-markdown-preview/markdown.css';
 import {
  batchUpdateExercisesMetaAction,
  createExerciseAction,
  deleteExerciseAction,
  previewRawNormalizationAction,
  updateExerciseAction,
- type ExerciseEditorInput,
 } from '@/app/actions/admin';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import { checkExerciseAnswer } from '@/features/exercises/checkers';
 import { formatAdminDateTime, formatAdminTime } from '@/lib/date-time';
 import {
- buildFillBlankQuestionText,
- describeAnswerTransfer,
- extractOptionsFromQuestionText,
- extractPromptFromQuestionText,
  normalizeNumberAnswerSignature,
- parseFillAcceptedSignature,
  parseIndexCsv,
- serializeMultiAnswerForFillBlank,
  stripEge18PromptFromFillBefore,
 } from '@/lib/exercise-type-conversion';
 import {
@@ -41,589 +67,6 @@ import {
  type SubmittedAnswer,
 } from '@/features/exercises/schemas';
 import { EXERCISE_TYPES, type ExerciseCategory } from '@/features/exercises/types';
-
-const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
- ssr: false,
- loading: () => (
- <div className="admin-md-skeleton h-[205px] rounded-lg border border-stroke bg-surface-strong p-3">
- <div className="admin-md-skeleton-bar mb-3 h-8 w-full rounded-md bg-slate-100 dark:bg-slate-800" />
- <div className="admin-md-skeleton-panel h-[147px] w-full rounded-md bg-surface dark:bg-slate-800/70" />
- </div>
- ),
-});
-
-type TextSelState = {
- selectedText: string;
- text: string;
- selection: { start: number; end: number };
-};
-
-function selectWord(params: {
- text: string;
- selection: { start: number; end: number };
- prefix: string;
- suffix?: string;
-}) {
- const { text, selection, prefix } = params;
- const suffix = params.suffix ?? prefix;
- const result = { ...selection };
-
- if (text && text.length && selection.start === selection.end) {
- const isWordDelimiter = (c: string) => c === ' ' || c.charCodeAt(0) === 10;
- let start = 0;
- let end = text.length;
- for (let i = selection.start; i - 1 > -1; i--) {
- if (isWordDelimiter(text[i - 1])) {
- start = i;
- break;
- }
- }
- for (let i = selection.start; i < text.length; i++) {
- if (isWordDelimiter(text[i])) {
- end = i;
- break;
- }
- }
- result.start = start;
- result.end = end;
- }
-
- if (result.start >= prefix.length && result.end <= text.length - suffix.length) {
- const wrapped = text.slice(result.start - prefix.length, result.end + suffix.length);
- if (wrapped.startsWith(prefix) && wrapped.endsWith(suffix)) {
- return {
- start: result.start - prefix.length,
- end: result.end + suffix.length,
- };
- }
- }
- return result;
-}
-
-function executeMarkdownToggle(params: {
- api: { replaceSelection: (text: string) => void; setSelectionRange: (r: { start: number; end: number }) => void };
- selectedText: string;
- selection: { start: number; end: number };
- prefix: string;
- suffix?: string;
-}) {
- const { api, selectedText, selection, prefix } = params;
- const suffix = params.suffix ?? prefix;
- const leading = selectedText.match(/^\s*/u)?.[0] ?? '';
- const trailing = selectedText.match(/\s*$/u)?.[0] ?? '';
- const core = selectedText.slice(leading.length, selectedText.length - trailing.length);
-
- if (core.startsWith(prefix) && core.endsWith(suffix) && core.length >= prefix.length + suffix.length) {
- const unwrapped = core.slice(prefix.length, suffix.length ? -suffix.length : undefined);
- const next = `${leading}${unwrapped}${trailing}`;
- api.replaceSelection(next);
- api.setSelectionRange({
- start: selection.start + leading.length,
- end: selection.start + leading.length + unwrapped.length,
- });
- return;
- }
-
- const safeCore = core || 'text';
- const next = `${leading}${prefix}${safeCore}${suffix}${trailing}`;
- api.replaceSelection(next);
- api.setSelectionRange({
- start: selection.start + leading.length + prefix.length,
- end: selection.start + leading.length + prefix.length + safeCore.length,
- });
-}
-
-function executeHtmlToggle(params: {
- api: { replaceSelection: (text: string) => void; setSelectionRange: (r: { start: number; end: number }) => void };
- selectedText: string;
- selection: { start: number; end: number };
- openTag: string;
- closeTag: string;
-}) {
- const { api, selectedText, selection, openTag, closeTag } = params;
- const leading = selectedText.match(/^\s*/u)?.[0] ?? '';
- const trailing = selectedText.match(/\s*$/u)?.[0] ?? '';
- const core = selectedText.slice(leading.length, selectedText.length - trailing.length);
-
- if (core.startsWith(openTag) && core.endsWith(closeTag) && core.length >= openTag.length + closeTag.length) {
- const unwrapped = core.slice(openTag.length, -closeTag.length);
- const next = `${leading}${unwrapped}${trailing}`;
- api.replaceSelection(next);
- api.setSelectionRange({
- start: selection.start + leading.length,
- end: selection.start + leading.length + unwrapped.length,
- });
- return;
- }
-
- const safeCore = core || 'text';
- const next = `${leading}${openTag}${safeCore}${closeTag}${trailing}`;
- api.replaceSelection(next);
- api.setSelectionRange({
- start: selection.start + leading.length + openTag.length,
- end: selection.start + leading.length + openTag.length + safeCore.length,
- });
-}
-
-type ActiveMarks = {
- bold: boolean;
- italic: boolean;
- strike: boolean;
- underline: boolean;
- doubleUnderline: boolean;
-};
-
-const EMPTY_ACTIVE_MARKS: ActiveMarks = {
- bold: false,
- italic: false,
- strike: false,
- underline: false,
- doubleUnderline: false,
-};
-
-function renderEditorMarkdown(value: string) {
- return value
- .replace(/==([\s\S]+?)==/g, '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>')
- .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
-}
-
-function isWrappedSelection(state: TextSelState, prefix: string, suffix = prefix) {
- const { start, end } = state.selection;
- if (start < prefix.length || end + suffix.length > state.text.length) return false;
- return (
- state.text.slice(start - prefix.length, start) === prefix
- && state.text.slice(end, end + suffix.length) === suffix
- );
-}
-
-function getActiveMarksFromState(state: TextSelState): ActiveMarks {
- const sample = state.selectedText.length > 0
- ? state.selectedText
- : state.text.slice(Math.max(0, state.selection.start - 24), Math.min(state.text.length, state.selection.end + 24));
- return {
- bold: isWrappedSelection(state, '**') || /\*\*[\s\S]+?\*\*/.test(sample),
- italic: isWrappedSelection(state, '*') || /\*[\s\S]+?\*/.test(sample),
- strike: isWrappedSelection(state, '~~') || /~~[\s\S]+?~~/.test(sample),
- underline:
- isWrappedSelection(state, '<u>', '</u>')
- || /<u>[\s\S]+?<\/u>/.test(sample),
- doubleUnderline:
- isWrappedSelection(state, '<ins class="du">', '</ins>')
- || /<ins class="du">[\s\S]+?<\/ins>/.test(sample),
- };
-}
-
-function commandButtonClass(active: boolean) {
- return active ? 'wmde-markdown-active' : undefined;
-}
-
-function makeToggleCommand(
- name: string,
- keyCommand: string,
- icon: JSX.Element,
- title: string,
- style: { kind: 'markdown'; prefix: string; suffix?: string } | { kind: 'html'; openTag: string; closeTag: string },
- active: boolean,
-): ICommand {
- return {
- name,
- keyCommand,
- buttonProps: {
- 'aria-label': title,
- title,
- className: commandButtonClass(active),
- style: active ? { backgroundColor: '#e2e8f0' } : undefined,
- },
- icon,
- prefix: style.kind === 'markdown' ? style.prefix : undefined,
- suffix: style.kind === 'markdown' ? (style.suffix ?? style.prefix) : undefined,
- value: 'text',
- execute: (state, api) => {
- const range = selectWord({
- text: state.text,
- selection: state.selection,
- prefix: style.kind === 'markdown' ? style.prefix : style.openTag,
- suffix: style.kind === 'markdown' ? (style.suffix ?? style.prefix) : style.closeTag,
- });
- const state1 = api.setSelectionRange(range);
- if (style.kind === 'markdown') {
- executeMarkdownToggle({
- api,
- selectedText: state1.selectedText,
- selection: range,
- prefix: style.prefix,
- suffix: style.suffix ?? style.prefix,
- });
- } else {
- executeHtmlToggle({
- api,
- selectedText: state1.selectedText,
- selection: range,
- openTag: style.openTag,
- closeTag: style.closeTag,
- });
- }
- },
- };
-}
-
-const markdownExtraCommands = [
- commands.codeEdit,
- commands.codeLive,
- commands.codePreview,
- commands.fullscreen,
-];
-
-const categories: ExerciseCategory[] = ['orthography', 'punctuation', 'mixed'];
-const qualityStatuses = ['draft', 'review', 'approved', 'archived'] as const;
-
-type PMark = ',' | ':' | ';' | '-' | '—';
-type PCMark =
- | 'comma'
- | 'colon'
- | 'semicolon'
- | 'dash'
- | 'quote_open'
- | 'quote_close'
- | 'paren_open'
- | 'paren_close'
- | 'period'
- | 'exclamation'
- | 'question'
- | 'ellipsis';
-type FeedbackSections = {
- lead: string;
- correctAnswer: string;
- explanation: string;
-};
-
-type ListItem = {
- id: number;
- type: string;
- skillTags: string[];
- seedKey: string | null;
- prompt: string;
- explanation: string;
- searchText?: string;
- qualityStatus: string;
- updatedAt: string;
- updatedAtCursor: string;
- isActive: boolean;
-};
-
-type ExerciseListRequest = {
-  limit: number;
-  offset: number;
-  cursorId?: number | null;
-  cursorUpdatedAt?: string | null;
-  query: string;
-  type: string;
-  qualityStatus: string;
-  examType: string;
-  sortBy: 'id' | 'updatedAt';
-  sortDir: 'asc' | 'desc';
-  includeTotal: boolean;
-  signal?: AbortSignal;
-};
-
-type ExerciseListResponse = {
-  success: boolean;
-  error?: string;
-  items: ListItem[];
-  total: number;
-  hasMore: boolean;
-  nextOffset: number;
-  nextCursorId: number | null;
-  nextCursorUpdatedAt: string | null;
-};
-
-type ExerciseDetailResponse = {
-  success: boolean;
-  error?: string;
-  item?: Record<string, unknown>;
-};
-
-async function fetchExerciseList(input: ExerciseListRequest): Promise<ExerciseListResponse> {
-  const params = new URLSearchParams({
-    limit: String(input.limit),
-    offset: String(input.offset),
-    query: input.query,
-    type: input.type,
-    qualityStatus: input.qualityStatus,
-    examType: input.examType,
-    sortBy: input.sortBy,
-    sortDir: input.sortDir,
-    includeTotal: String(input.includeTotal),
-  });
-  if (input.cursorId) params.set('cursorId', String(input.cursorId));
-  if (input.cursorUpdatedAt) params.set('cursorUpdatedAt', input.cursorUpdatedAt);
-
-  const response = await fetch(`/api/admin/exercises?${params.toString()}`, {
-    cache: 'no-store',
-    signal: input.signal,
-  });
-  const result = await response.json() as ExerciseListResponse;
-  if (response.status === 401) {
-    return { ...result, error: 'Сессия администратора истекла. Обновите страницу и войдите снова.' };
-  }
-  return result;
-}
-
-async function fetchExerciseById(id: number): Promise<ExerciseDetailResponse> {
-  const response = await fetch(`/api/admin/exercises/${id}`, { cache: 'no-store' });
-  const result = await response.json() as ExerciseDetailResponse;
-  if (response.status === 401) {
-    return { ...result, error: 'Сессия администратора истекла. Обновите страницу и войдите снова.' };
-  }
-  return result;
-}
-
-function getExerciseIdFromHash(hash: string) {
-  const params = new URLSearchParams(hash.replace(/^#/, ''));
-  const id = Number(params.get('exercise') ?? NaN);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function getExerciseIdFromSearch(search: string) {
-  const params = new URLSearchParams(search);
-  const id = Number(params.get('exercise') ?? params.get('id') ?? params.get('exerciseId') ?? NaN);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-type RawPreviewItem = {
-  file: string;
-  beforeIssues: {
-    spacesBeforePunct: number;
-    softHyphen: number;
-    zeroWidth: number;
-    tripleBreaks: number;
-  };
-  afterIssues: {
-    spacesBeforePunct: number;
-    softHyphen: number;
-    zeroWidth: number;
-    tripleBreaks: number;
-  };
-  changed: boolean;
-  beforeSnippet: string;
-  afterSnippet: string;
-};
-
-type AdminFormProps = {
- initialItems: ListItem[];
- initialTotalItems?: number | null;
- initialSelectedId?: number | null;
- initialSelectedExercise?: Record<string, unknown> | null;
-};
-
-type Form = {
- id?: number;
- type: ExerciseEditorInput['type'];
- seedKey: string;
- category: ExerciseCategory;
- difficulty: 1 | 2;
- qualityStatus: (typeof qualityStatuses)[number];
- prompt: string;
- explanation: string;
- skillTags: string;
- sourceAlignment: string;
- typicalMistake: string;
- algorithmSteps: string;
- isActive: boolean;
- options: string[];
- correctOptionIndex: number;
- multiCorrectOptionIndexes: string;
- fillBefore: string;
- fillAfter: string;
- fillAccepted: string;
- fillCaseSensitive: boolean;
- wordBankTextWithSlots: string;
- wordBankWords: string;
- wordBankCorrectBySlot: string;
- wordBankCaseSensitive: boolean;
- wordSearchGridRows: string;
- wordSearchWords: string;
- wordSearchCaseSensitive: boolean;
- dictationTitle: string;
- dictationAudioSrc: string;
- dictationPlaybackRates: string;
- dictationText: string;
- dictationCaseSensitive: boolean;
- dictationIgnorePunctuation: boolean;
- orthographyRepairText: string;
- orthographyRepairMode: 'click_then_choose' | 'click_then_type';
- orthographyRepairTargets: string;
- orthographyRepairHints: string;
- orthographyRepairRepairs: string;
- orthographyRepairCorrectText: string;
- orderFragments: string;
- orderCorrectOrder: string;
- punctuationTokens: string;
- punctuationAllowedMarks: string;
- punctuationMarks: string;
- punctuationConstructorTokens: string;
- punctuationConstructorMarkBank: string;
- punctuationConstructorHints: string;
- punctuationConstructorGuidedSteps: string;
- punctuationConstructorSegments: string;
- punctuationConstructorPlacements: string;
- punctuationConstructorSlotExplanations: string;
- ege20TextWithSlots: string;
- ege20Slots: string;
- ege20TargetSet: string;
- ege21TargetPunctuation: 'comma' | 'dash' | 'colon' | 'semicolon';
- ege21Sentences: string;
- ege21TargetSet: string;
-};
-
-const EMPTY: Form = {
- type: 'multiple_choice',
- seedKey: '',
- category: 'orthography',
- difficulty: 1,
- qualityStatus: 'draft',
- prompt: '',
- explanation: '',
- skillTags: 'ege.14',
- sourceAlignment: '',
- typicalMistake: '',
- algorithmSteps: '',
- isActive: true,
- options: ['', ''],
- correctOptionIndex: 0,
- multiCorrectOptionIndexes: '',
- fillBefore: '',
- fillAfter: '',
- fillAccepted: '',
- fillCaseSensitive: false,
- wordBankTextWithSlots: '',
- wordBankWords: '',
- wordBankCorrectBySlot: '',
- wordBankCaseSensitive: false,
- wordSearchGridRows: '',
- wordSearchWords: '',
- wordSearchCaseSensitive: false,
- dictationTitle: '',
- dictationAudioSrc: '',
- dictationPlaybackRates: '0.75, 1, 1.25, 1.5',
- dictationText: '',
- dictationCaseSensitive: false,
- dictationIgnorePunctuation: false,
- orthographyRepairText: '',
- orthographyRepairMode: 'click_then_choose',
- orthographyRepairTargets: '',
- orthographyRepairHints: '',
- orthographyRepairRepairs: '',
- orthographyRepairCorrectText: '',
- orderFragments: '',
- orderCorrectOrder: '',
- punctuationTokens: '',
- punctuationAllowedMarks: ',',
- punctuationMarks: '',
- punctuationConstructorTokens: '',
- punctuationConstructorMarkBank: 'period, comma, semicolon, colon, question, exclamation, quote_open, quote_close, paren_open, paren_close, dash, ellipsis',
- punctuationConstructorHints: '',
- punctuationConstructorGuidedSteps: '',
- punctuationConstructorSegments: '',
- punctuationConstructorPlacements: '',
- punctuationConstructorSlotExplanations: '',
- ege20TextWithSlots: '',
- ege20Slots: '',
- ege20TargetSet: '',
- ege21TargetPunctuation: 'comma',
- ege21Sentences: '',
- ege21TargetSet: '',
-};
-
-const inputClass = 'w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
-
-function seedPrefixForType(type: Form['type']) {
- switch (type) {
- case 'ege21_punctuation_analysis':
- return 'ege21';
- case 'ege20_complex_sentence_punctuation':
- return 'ege20';
- case 'ege_multi_select':
- return 'ege-ms';
- case 'fill_blank':
- return 'fill';
- case 'word_bank_cloze':
- return 'wbc';
- case 'word_search':
- return 'ws';
- case 'dictation':
- return 'dict';
- case 'orthography_repair':
- return 'or';
- case 'punctuation_insert':
- return 'punc';
- case 'punctuation_constructor':
- return 'pc';
- default:
- return 'mc';
- }
-}
-
-function convertFormForTypeChange(form: Form, nextType: Form['type']): Form {
- if (form.type === nextType) return form;
-
- if (form.type === 'ege_multi_select' && nextType === 'fill_blank') {
- const signature = serializeMultiAnswerForFillBlank(form.multiCorrectOptionIndexes);
- const fillBefore =
- form.fillBefore.trim() || buildFillBlankQuestionText(form.prompt, form.options);
- return {
- ...form,
- type: nextType,
- fillBefore,
- fillAfter: form.fillAfter,
- fillAccepted: form.fillAccepted.trim() || signature,
- };
- }
-
- if (form.type === 'fill_blank' && nextType === 'ege_multi_select') {
- const sourceText = form.fillBefore.trim() || form.prompt.trim();
- const parsedPrompt = extractPromptFromQuestionText(sourceText);
- const parsedOptions = extractOptionsFromQuestionText(sourceText);
- const multiCorrectOptionIndexes =
- form.multiCorrectOptionIndexes.trim() || parseFillAcceptedSignature(form.fillAccepted);
- return {
- ...form,
- type: nextType,
- prompt: parsedPrompt || form.prompt,
- options: parsedOptions.length >= 2 ? parsedOptions : form.options,
- multiCorrectOptionIndexes,
- };
- }
-
- return {
- ...form,
- type: nextType,
- };
-}
-
-function buildTypeChangeMessage(previousForm: Form, nextForm: Form) {
- if (previousForm.type === nextForm.type) return '';
-
- if (previousForm.type === 'ege_multi_select' && nextForm.type === 'fill_blank') {
- return describeAnswerTransfer(
- previousForm.type,
- nextForm.type,
- previousForm.multiCorrectOptionIndexes,
- nextForm.fillAccepted,
- );
- }
-
- if (previousForm.type === 'fill_blank' && nextForm.type === 'ege_multi_select') {
- return describeAnswerTransfer(
- previousForm.type,
- nextForm.type,
- previousForm.fillAccepted,
- nextForm.multiCorrectOptionIndexes,
- );
- }
-
- return '';
-}
 
 function slugFromPrompt(prompt: string) {
  const translitMap: Record<string, string> = {
@@ -1062,155 +505,6 @@ function formatUpdatedAt(value: string) {
  return formatAdminDateTime(value);
 }
 
-function formFromExerciseItem(item: Record<string, unknown>): Form {
- return {
- id: item.id as number,
- type: item.type as Form['type'],
- seedKey: String(item.seedKey ?? ''),
- category: item.category as ExerciseCategory,
- difficulty: item.difficulty as 1 | 2,
- qualityStatus: item.qualityStatus as Form['qualityStatus'],
- prompt: String(item.prompt ?? ''),
- explanation: String(item.explanation ?? ''),
- skillTags: Array.isArray(item.skillTags) ? (item.skillTags as string[]).join(', ') : '',
- sourceAlignment: String(item.sourceAlignment ?? ''),
- typicalMistake: String(item.typicalMistake ?? ''),
- algorithmSteps: Array.isArray(item.algorithmSteps) ? (item.algorithmSteps as string[]).join('\n') : '',
- isActive: Boolean(item.isActive),
- options: Array.isArray(item.options) ? (item.options as string[]) : ['', ''],
- correctOptionIndex: Number(item.correctOptionIndex ?? 0),
- multiCorrectOptionIndexes: Array.isArray(item.multiCorrectOptionIndexes)
- ? (item.multiCorrectOptionIndexes as number[]).join(', ')
- : '',
- fillBefore: String(item.fillBefore ?? ''),
- fillAfter: String(item.fillAfter ?? ''),
- fillAccepted: Array.isArray(item.fillAccepted) ? (item.fillAccepted as string[]).join(', ') : '',
- fillCaseSensitive: Boolean(item.fillCaseSensitive),
- wordBankTextWithSlots: String(item.wordBankTextWithSlots ?? ''),
- wordBankWords: Array.isArray(item.wordBankWords) ? (item.wordBankWords as string[]).join('\n') : '',
- wordBankCorrectBySlot: Array.isArray(item.wordBankCorrectBySlot)
- ? (item.wordBankCorrectBySlot as string[]).join('\n')
- : '',
- wordBankCaseSensitive: Boolean(item.wordBankCaseSensitive),
- wordSearchGridRows: Array.isArray(item.wordSearchGridRows) ? (item.wordSearchGridRows as string[]).join('\n') : '',
- wordSearchWords: Array.isArray(item.wordSearchWords) ? (item.wordSearchWords as string[]).join('\n') : '',
- wordSearchCaseSensitive: Boolean(item.wordSearchCaseSensitive),
- dictationTitle: String(item.dictationTitle ?? ''),
- dictationAudioSrc: String(item.dictationAudioSrc ?? ''),
- dictationPlaybackRates: Array.isArray(item.dictationPlaybackRates)
- ? (item.dictationPlaybackRates as number[]).join(', ')
- : '0.75, 1, 1.25, 1.5',
- dictationText: String(item.dictationText ?? ''),
- dictationCaseSensitive: Boolean(item.dictationCaseSensitive),
- dictationIgnorePunctuation: Boolean(item.dictationIgnorePunctuation),
- orthographyRepairText: String(item.orthographyRepairText ?? ''),
- orthographyRepairMode:
- (item.orthographyRepairMode as 'click_then_choose' | 'click_then_type' | undefined) ??
- 'click_then_choose',
- orthographyRepairTargets: Array.isArray(item.orthographyRepairTargets)
- ? (item.orthographyRepairTargets as Array<{
- id: string;
- surface: string;
- replacement: string;
- type: 'word' | 'span';
- options?: string[];
- occurrence?: number;
- }>)
- .map((target) =>
- [
- target.id,
- target.surface,
- target.replacement,
- target.type,
- (target.options ?? []).join(', '),
- target.occurrence ?? '',
- ].join(' | '),
- )
- .join('\n')
- : '',
- orthographyRepairHints: Array.isArray(item.orthographyRepairHints)
- ? (item.orthographyRepairHints as string[]).join('\n')
- : '',
- orthographyRepairRepairs: Array.isArray(item.orthographyRepairRepairs)
- ? (item.orthographyRepairRepairs as Array<{ targetId: string; correct: string }>)
- .map((repair) => `${repair.targetId} | ${repair.correct}`)
- .join('\n')
- : '',
- orthographyRepairCorrectText: String(item.orthographyRepairCorrectText ?? ''),
- orderFragments: Array.isArray(item.orderFragments)
- ? (item.orderFragments as Array<{ id: string; text: string }>).map((f) => `${f.id} | ${f.text}`).join('\n')
- : '',
- orderCorrectOrder: Array.isArray(item.orderCorrectOrder) ? (item.orderCorrectOrder as string[]).join(', ') : '',
- punctuationTokens: Array.isArray(item.punctuationTokens) ? (item.punctuationTokens as string[]).join(' | ') : '',
- punctuationAllowedMarks: Array.isArray(item.punctuationAllowedMarks)
- ? (item.punctuationAllowedMarks as string[]).join(', ')
- : ',',
- punctuationMarks: Array.isArray(item.punctuationMarks)
- ? (item.punctuationMarks as Array<{ afterTokenIndex: number; mark: string }>)
- .map((mark) => `${mark.afterTokenIndex}:${mark.mark}`)
- .join(', ')
- : '',
- punctuationConstructorTokens: Array.isArray(item.punctuationConstructorTokens)
- ? (item.punctuationConstructorTokens as string[]).join(' | ')
- : '',
- punctuationConstructorMarkBank: Array.isArray(item.punctuationConstructorMarkBank)
- ? (item.punctuationConstructorMarkBank as string[]).join(', ')
- : 'comma, colon, dash',
- punctuationConstructorHints: Array.isArray(item.punctuationConstructorHints)
- ? (item.punctuationConstructorHints as string[]).join('\n')
- : '',
- punctuationConstructorGuidedSteps: Array.isArray(item.punctuationConstructorGuidedSteps)
- ? (item.punctuationConstructorGuidedSteps as Array<{
- id: string;
- title: string;
- slotIndex: number;
- marks?: string[];
- }>)
- .map((step) => `${step.id} | ${step.title} | ${step.slotIndex} | ${(step.marks ?? []).join(',')}`)
- .join('\n')
- : '',
- punctuationConstructorSegments: Array.isArray(item.punctuationConstructorSegments)
- ? (item.punctuationConstructorSegments as Array<{
- label: string;
- tokenStart: number;
- tokenEnd: number;
- kind: string;
- }>)
- .map((segment) => `${segment.label} | ${segment.tokenStart} | ${segment.tokenEnd} | ${segment.kind}`)
- .join('\n')
- : '',
- punctuationConstructorPlacements: Array.isArray(item.punctuationConstructorPlacements)
- ? (item.punctuationConstructorPlacements as Array<{ slotIndex: number; mark: string }>)
- .map((placement) => `${placement.slotIndex}:${placement.mark}`)
- .join(', ')
- : '',
- punctuationConstructorSlotExplanations: Array.isArray(item.punctuationConstructorSlotExplanations)
- ? (item.punctuationConstructorSlotExplanations as Array<{
- slotIndex: number;
- marks?: string[];
- text: string;
- }>)
- .map((item) => `${item.slotIndex} | ${(item.marks ?? []).join(',')} | ${item.text}`)
- .join('\n')
- : '',
- ege20TextWithSlots: String(item.ege20TextWithSlots ?? ''),
- ege20Slots: Array.isArray(item.ege20Slots) ? (item.ege20Slots as number[]).join(', ') : '',
- ege20TargetSet: Array.isArray(item.ege20TargetSet) ? (item.ege20TargetSet as number[]).join(', ') : '',
- ege21TargetPunctuation: ((item.ege21TargetPunctuation as
- | 'comma'
- | 'dash'
- | 'colon'
- | 'semicolon'
- | undefined) ?? 'comma'),
- ege21Sentences: Array.isArray(item.ege21Sentences)
- ? (item.ege21Sentences as Array<{ index: number; text: string }>)
- .map((s) => `${s.index}. ${s.text}`)
- .join('\n')
- : '',
- ege21TargetSet: Array.isArray(item.ege21TargetSet) ? (item.ege21TargetSet as number[]).join(', ') : '',
- };
-}
-
 export default function AdminForm({
  initialItems,
  initialTotalItems,
@@ -1315,31 +609,12 @@ const sortPrefsReadyRef = useRef(false);
 const sidebarRef = useRef<HTMLElement | null>(null);
  const formRef = useRef<HTMLFormElement | null>(null);
  const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
-const [activeMarks] = useState<ActiveMarks>(EMPTY_ACTIVE_MARKS);
 const lastAppliedRefreshKeyRef = useRef('');
 const inFlightRefreshKeyRef = useRef<string | null>(null);
 const refreshSeqRef = useRef(0);
 const refreshAbortControllerRef = useRef<AbortController | null>(null);
 const sessionDraftIdsRef = useRef<Set<number>>(new Set());
 const loadExerciseSeqRef = useRef(0);
-
-const markdownCommands = useMemo<ICommand[]>(() => ([
- makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, false),
- makeToggleCommand('italic', 'italic', <span style={{ fontSize: 14, fontStyle: 'italic' }}>I</span>, 'Курсив', { kind: 'markdown', prefix: '*' }, false),
- makeToggleCommand('strikethrough', 'strikethrough', <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>, 'Зачёркнутый', { kind: 'markdown', prefix: '~~' }, false),
- makeToggleCommand('underline', 'underline', <span style={{ fontSize: 14, textDecoration: 'underline' }}>U</span>, 'Подчёркнутый', { kind: 'html', openTag: '<u>', closeTag: '</u>' }, false),
- makeToggleCommand('doubleUnderline', 'doubleUnderline', <span style={{ fontSize: 14, textDecoration: 'underline double' }}>U</span>, 'Двойное подчёркивание', { kind: 'html', openTag: '<ins class="du">', closeTag: '</ins>' }, false),
- commands.hr,
- commands.divider,
- commands.link,
- commands.quote,
- commands.code,
- commands.image,
- commands.divider,
- commands.unorderedListCommand,
- commands.orderedListCommand,
- commands.checkedListCommand,
-]), []);
 
  function clearPendingDraftMarker(id: number) {
  const pendingValue = document.cookie
@@ -1478,7 +753,7 @@ useEffect(() => {
  if (!isDraftLoaded) return;
  const snapshot = JSON.stringify(form);
  if (snapshot === lastPersistedSnapshotRef.current) return;
- writeStoredDraft(form.id, form);
+ writeStoredDraft(form.id ?? null, form);
  if (form.id) {
  sessionDraftIdsRef.current.add(form.id);
  }
@@ -1523,7 +798,7 @@ useEffect(() => {
  }
 
  function storeLocalDraft(source: Form) {
- writeStoredDraft(source.id, source);
+ writeStoredDraft(source.id ?? null, source);
  if (source.id) {
  sessionDraftIdsRef.current.add(source.id);
  document.cookie = `admin_pending_draft_id=${source.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
@@ -1618,7 +893,6 @@ useEffect(() => {
  useEffect(() => {
  // eslint-disable-next-line react-hooks/set-state-in-effect
  setPreviewCheckResult(null);
- // eslint-disable-next-line react-hooks/set-state-in-effect
  setPreviewDictationText('');
  }, [form]);
 
@@ -1642,8 +916,6 @@ useEffect(() => {
  () => ['all', ...Array.from({ length: 13 }, (_, i) => String(i + 9))],
  [],
  );
-
-function updateActiveMarksFromTarget(_target: EventTarget | null) {}
 
  useEffect(() => {
  const anchor = mainSaveAnchorRef.current;
@@ -2289,7 +1561,6 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  }
  lastAppliedRefreshKeyRef.current = requestKey;
  } else {
- deletedExerciseIdsRef.current.delete(deletedId);
  setIsError(true);
  setMessage(res.error || 'Ошибка загрузки списка заданий.');
  }
@@ -2338,7 +1609,6 @@ function updateActiveMarksFromTarget(_target: EventTarget | null) {}
  setNextCursorId(cursorId);
  setNextCursorUpdatedAt(cursorUpdatedAt);
  } else {
- deletedExerciseIdsRef.current.delete(deletedId);
  setIsError(true);
  setMessage(res.error || 'Ошибка подгрузки списка.');
  }
@@ -2586,315 +1856,6 @@ async function loadExercise(id: number) {
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [isDraftLoaded, initialSelectionPending]);
 
- function parsePunctuationMarks(raw: string) {
-  const regex = /(\d+)\s*:\s*([^\s]+)/g;
-  const matches = Array.from(raw.matchAll(regex));
-
-  return matches
-    .map((m) => {
-      const idx = m[1];
-      let mark = m[2];
-      if (mark.length > 1 && mark.endsWith(',')) {
-        mark = mark.slice(0, -1);
-      }
-      return {
-        afterTokenIndex: Number(idx),
-        mark: mark as PMark,
-      };
-    })
-    .filter(
-      (v) =>
-        Number.isInteger(v.afterTokenIndex) &&
-        v.afterTokenIndex >= 0 &&
-        typeof v.mark === 'string' &&
-        v.mark.length > 0,
-    );
-}
-
-function parseOrthographyRepairTargets(raw: string) {
- return raw
- .split('\n')
- .map((line) => line.trim())
- .filter(Boolean)
- .map((line, index) => {
- const parts = line.split('|').map((part) => part.trim());
- const [idRaw, surfaceRaw, replacementRaw, typeRaw, optionsRaw, occurrenceRaw] = parts;
- return {
- id: idRaw || `target_${index + 1}`,
- surface: surfaceRaw ?? '',
- replacement: replacementRaw ?? '',
- type: typeRaw === 'span' ? 'span' as const : 'word' as const,
- options: optionsRaw
- ? optionsRaw
- .split(',')
- .map((option) => option.trim())
- .filter(Boolean)
- : undefined,
- occurrence: occurrenceRaw ? Number(occurrenceRaw) : undefined,
- };
- })
- .filter(
- (target) =>
- target.id.length > 0 &&
- target.surface.length > 0 &&
- target.replacement.length > 0,
- );
-}
-
-function parseOrthographyRepairRepairs(raw: string) {
- return raw
- .split('\n')
- .map((line) => line.trim())
- .filter(Boolean)
- .map((line) => {
- const [targetIdRaw, correctRaw] = line.split('|').map((part) => part.trim());
- return {
- targetId: targetIdRaw ?? '',
- correct: correctRaw ?? '',
- };
- })
- .filter((repair) => repair.targetId.length > 0 && repair.correct.length > 0);
-}
-
- function parsePunctuationConstructorMarkBank(raw: string): PCMark[] {
-  const allowed = new Set<PCMark>([
-    'comma',
-    'colon',
-    'semicolon',
-    'dash',
-    'quote_open',
-    'quote_close',
-    'paren_open',
-    'paren_close',
-    'period',
-    'exclamation',
-    'question',
-    'ellipsis',
-  ]);
-
-  return raw
-    .split(',')
-    .map((value) => value.trim())
-    .filter((value): value is PCMark => allowed.has(value as PCMark));
-}
-
- function parsePunctuationConstructorPlacements(raw: string) {
-  const markBank = new Set<PCMark>([
-    'comma',
-    'colon',
-    'semicolon',
-    'dash',
-    'quote_open',
-    'quote_close',
-    'paren_open',
-    'paren_close',
-    'period',
-    'exclamation',
-    'question',
-    'ellipsis',
-  ]);
-  const regex = /(\d+)\s*:\s*([a-z_]+)/g;
-  const matches = Array.from(raw.matchAll(regex));
-
-  return matches
-    .map((match) => ({
-      slotIndex: Number(match[1]),
-      mark: match[2] as PCMark,
-    }))
-    .filter(
-      (placement) =>
-        Number.isInteger(placement.slotIndex) &&
-        placement.slotIndex >= 0 &&
-      markBank.has(placement.mark),
-    );
-}
-
- function punctuationConstructorGlyph(mark: PCMark) {
-  const glyphs: Record<PCMark, string> = {
-    comma: ',',
-    colon: ':',
-    semicolon: ';',
-    dash: '—',
-    quote_open: '«',
-    quote_close: '»',
-    paren_open: '(',
-    paren_close: ')',
-    period: '.',
-    exclamation: '!',
-    question: '?',
-    ellipsis: '...',
-  };
-
-  return glyphs[mark];
-}
-
- function renderPunctuationConstructorAnswer(
-  tokensRaw: string,
-  placementsRaw: string,
-) {
-  const tokens = tokensRaw
-    .split('|')
-    .map((token) => token.trim())
-    .filter(Boolean);
-  const placements = parsePunctuationConstructorPlacements(placementsRaw);
-  const parts: string[] = [];
-
-  for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex += 1) {
-    const beforeMarks = placements
-      .filter((placement) => placement.slotIndex === tokenIndex)
-      .map((placement) => punctuationConstructorGlyph(placement.mark))
-      .join('');
-    if (beforeMarks) parts.push(beforeMarks);
-    parts.push(tokens[tokenIndex]);
-  }
-
-  const tailMarks = placements
-    .filter((placement) => placement.slotIndex === tokens.length)
-    .map((placement) => punctuationConstructorGlyph(placement.mark))
-    .join('');
-  if (tailMarks) parts.push(tailMarks);
-
-  return parts
-    .join(' ')
-    .replace(/\s+([,;:.!?»)\u2026])/g, '$1')
-    .replace(/([:;])«/g, '$1 «')
-    .replace(/\(\s+/g, '(')
-    .replace(/\s+\)/g, ')')
-    .trim();
-}
-
- function parsePunctuationConstructorSegments(raw: string) {
-  const allowed = new Set([
-    'author_words',
-    'direct_speech',
-    'main_clause',
-    'subordinate_clause',
-    'introductory',
-    'enumeration',
-    'other',
-  ]);
-
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [label, tokenStart, tokenEnd, kind] = line
-        .split('|')
-        .map((part) => part.trim());
-      return {
-        label,
-        tokenStart: Number(tokenStart),
-        tokenEnd: Number(tokenEnd),
-        kind,
-      };
-    })
-    .filter(
-      (segment) =>
-        segment.label &&
-        Number.isInteger(segment.tokenStart) &&
-        segment.tokenStart >= 0 &&
-        Number.isInteger(segment.tokenEnd) &&
-        segment.tokenEnd >= segment.tokenStart &&
-        allowed.has(segment.kind),
-    )
-    .map((segment) => ({
-      ...segment,
-      kind: segment.kind as
-        | 'author_words'
-        | 'direct_speech'
-        | 'main_clause'
-        | 'subordinate_clause'
-        | 'introductory'
-        | 'enumeration'
-        | 'other',
-    }));
-}
-
- function parsePunctuationConstructorGuidedSteps(raw: string) {
-  const markBank = new Set<PCMark>([
-    'comma',
-    'colon',
-    'semicolon',
-    'dash',
-    'quote_open',
-    'quote_close',
-    'paren_open',
-    'paren_close',
-    'period',
-    'exclamation',
-    'question',
-    'ellipsis',
-  ]);
-
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [idRaw, titleRaw, slotRaw, marksRaw] = line
-        .split('|')
-        .map((part) => part.trim());
-      const marks = (marksRaw ?? '')
-        .split(',')
-        .map((mark) => mark.trim())
-        .filter((mark): mark is PCMark => markBank.has(mark as PCMark));
-      return {
-        id: idRaw || `step_${index + 1}`,
-        title: titleRaw,
-        slotIndex: Number(slotRaw),
-        marks: marks.length > 0 ? marks : undefined,
-      };
-    })
-    .filter(
-      (step) =>
-        step.id &&
-        step.title &&
-        Number.isInteger(step.slotIndex) &&
-        step.slotIndex >= 0,
-    );
-}
-
- function parsePunctuationConstructorSlotExplanations(raw: string) {
-  const markBank = new Set<PCMark>([
-    'comma',
-    'colon',
-    'semicolon',
-    'dash',
-    'quote_open',
-    'quote_close',
-    'paren_open',
-    'paren_close',
-    'period',
-    'exclamation',
-    'question',
-    'ellipsis',
-  ]);
-
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [slotIndexRaw, marksRaw, ...textParts] = line.split('|');
-      const marks = (marksRaw ?? '')
-        .split(',')
-        .map((mark) => mark.trim())
-        .filter((mark): mark is PCMark => markBank.has(mark as PCMark));
-      return {
-        slotIndex: Number(slotIndexRaw?.trim()),
-        marks: marks.length > 0 ? marks : undefined,
-        text: textParts.join('|').trim(),
-      };
-    })
-    .filter(
-      (item) =>
-        Number.isInteger(item.slotIndex) &&
-        item.slotIndex >= 0 &&
-        item.text.length > 0,
-    );
-}
-
   function applyHistoryState(next: Form) {
  suppressHistoryRef.current = true;
  setForm(next);
@@ -2914,198 +1875,6 @@ function parseOrthographyRepairRepairs(raw: string) {
  if (!next) return;
  historyPastRef.current.push(next);
  applyHistoryState(next);
- }
-
- function buildPayloadFromForm(source: Form): ExerciseEditorInput {
- const skillTags = source.skillTags.split(',').map((v) => v.trim()).filter(Boolean);
- const steps = source.algorithmSteps.split('\n').map((v) => v.trim()).filter(Boolean);
- return {
- id: source.id,
- type: source.type,
- seedKey: source.seedKey || undefined,
- category: source.category,
- difficulty: source.difficulty,
- qualityStatus: source.qualityStatus,
- prompt: source.prompt,
- explanation: source.explanation,
- skillTags,
- sourceAlignment: source.sourceAlignment || undefined,
- typicalMistake: source.typicalMistake || undefined,
- algorithmSteps: steps,
- isActive: source.isActive,
- options:
- source.type === 'multiple_choice' || source.type === 'ege_multi_select'
- ? source.options
- : undefined,
- correctOptionIndex:
- source.type === 'multiple_choice' ? source.correctOptionIndex : undefined,
- multiCorrectOptionIndexes:
- source.type === 'ege_multi_select'
- ? source.multiCorrectOptionIndexes
- .split(',')
- .map((v) => Number(v.trim()))
- .filter((v) => Number.isInteger(v) && v > 0)
- : undefined,
- fillBefore: source.type === 'fill_blank' ? source.fillBefore : undefined,
- fillAfter: source.type === 'fill_blank' ? source.fillAfter : undefined,
- fillAccepted:
- source.type === 'fill_blank'
- ? skillTags.includes('ege.18')
- ? [normalizeNumberAnswerSignature(source.fillAccepted)].filter(Boolean)
- : source.fillAccepted.split(',').map((v) => v.trim()).filter(Boolean)
- : undefined,
- fillCaseSensitive:
- source.type === 'fill_blank' ? source.fillCaseSensitive : undefined,
- wordBankTextWithSlots:
- source.type === 'word_bank_cloze' ? source.wordBankTextWithSlots : undefined,
- wordBankWords:
- source.type === 'word_bank_cloze'
- ? source.wordBankWords.split('\n').map((v) => v.trim()).filter(Boolean)
- : undefined,
- wordBankCorrectBySlot:
- source.type === 'word_bank_cloze'
- ? source.wordBankCorrectBySlot
- .split('\n')
- .map((v) => v.trim())
- .filter(Boolean)
- : undefined,
- wordBankCaseSensitive:
- source.type === 'word_bank_cloze' ? source.wordBankCaseSensitive : undefined,
- wordSearchGridRows:
- source.type === 'word_search'
- ? source.wordSearchGridRows.split('\n').map((v) => v.trim()).filter(Boolean)
- : undefined,
- wordSearchWords:
- source.type === 'word_search'
- ? source.wordSearchWords.split('\n').map((v) => v.trim()).filter(Boolean)
- : undefined,
- wordSearchCaseSensitive:
- source.type === 'word_search' ? source.wordSearchCaseSensitive : undefined,
- dictationTitle:
- source.type === 'dictation' ? source.dictationTitle : undefined,
- dictationAudioSrc:
- source.type === 'dictation' ? source.dictationAudioSrc : undefined,
- dictationPlaybackRates:
- source.type === 'dictation'
- ? source.dictationPlaybackRates
- .split(',')
- .map((value) => Number(value.trim()))
- .filter((value) => Number.isFinite(value) && value > 0)
- : undefined,
- dictationText:
- source.type === 'dictation' ? source.dictationText : undefined,
- dictationCaseSensitive:
- source.type === 'dictation' ? source.dictationCaseSensitive : undefined,
- dictationIgnorePunctuation:
- source.type === 'dictation' ? source.dictationIgnorePunctuation : undefined,
- orthographyRepairText:
- source.type === 'orthography_repair' ? source.orthographyRepairText : undefined,
- orthographyRepairMode:
- source.type === 'orthography_repair' ? source.orthographyRepairMode : undefined,
- orthographyRepairTargets:
- source.type === 'orthography_repair'
- ? parseOrthographyRepairTargets(source.orthographyRepairTargets)
- : undefined,
- orthographyRepairHints:
- source.type === 'orthography_repair'
- ? source.orthographyRepairHints.split('\n').map((v) => v.trim()).filter(Boolean)
- : undefined,
- orthographyRepairRepairs:
- source.type === 'orthography_repair'
- ? parseOrthographyRepairRepairs(source.orthographyRepairRepairs)
- : undefined,
- orthographyRepairCorrectText:
- source.type === 'orthography_repair'
- ? source.orthographyRepairCorrectText
- : undefined,
- orderFragments:
- source.type === 'order_fragments'
- ? source.orderFragments
- .split('\n')
- .map((line) => line.trim())
- .filter(Boolean)
- .map((line, idx) => {
- const m = line.match(/^([^|]+)\|(.+)$/);
- if (m) return { id: m[1].trim(), text: m[2].trim() };
- return { id: `f${idx + 1}`, text: line };
- })
- .filter((f) => f.id.length > 0 && f.text.length > 0)
- : undefined,
- orderCorrectOrder:
- source.type === 'order_fragments'
- ? source.orderCorrectOrder
- .split(',')
- .map((v) => v.trim())
- .filter(Boolean)
- : undefined,
- punctuationTokens:
- source.type === 'punctuation_insert'
- ? source.punctuationTokens.split('|').map((v) => v.trim()).filter(Boolean)
- : undefined,
- punctuationAllowedMarks:
- source.type === 'punctuation_insert'
- ? (source.punctuationAllowedMarks
- .split(',')
- .map((v) => v.trim())
- .filter(Boolean) as PMark[])
- : undefined,
- punctuationMarks:
- source.type === 'punctuation_insert'
- ? parsePunctuationMarks(source.punctuationMarks)
- : undefined,
- punctuationConstructorTokens:
- source.type === 'punctuation_constructor'
- ? source.punctuationConstructorTokens.split('|').map((v) => v.trim()).filter(Boolean)
- : undefined,
- punctuationConstructorMarkBank:
- source.type === 'punctuation_constructor'
- ? parsePunctuationConstructorMarkBank(source.punctuationConstructorMarkBank)
- : undefined,
- punctuationConstructorHints:
- source.type === 'punctuation_constructor'
- ? source.punctuationConstructorHints.split('\n').map((v) => v.trim()).filter(Boolean)
- : undefined,
- punctuationConstructorGuidedSteps:
- source.type === 'punctuation_constructor'
- ? parsePunctuationConstructorGuidedSteps(source.punctuationConstructorGuidedSteps)
- : undefined,
- punctuationConstructorSegments:
- source.type === 'punctuation_constructor'
- ? parsePunctuationConstructorSegments(source.punctuationConstructorSegments)
- : undefined,
- punctuationConstructorPlacements:
- source.type === 'punctuation_constructor'
- ? parsePunctuationConstructorPlacements(source.punctuationConstructorPlacements)
- : undefined,
- punctuationConstructorSlotExplanations:
- source.type === 'punctuation_constructor'
- ? parsePunctuationConstructorSlotExplanations(source.punctuationConstructorSlotExplanations)
- : undefined,
- ege20TextWithSlots:
- source.type === 'ege20_complex_sentence_punctuation'
- ? source.ege20TextWithSlots
- : undefined,
- ege20Slots:
- source.type === 'ege20_complex_sentence_punctuation'
- ? parseIndexCsv(source.ege20Slots)
- : undefined,
- ege20TargetSet:
- source.type === 'ege20_complex_sentence_punctuation'
- ? parseIndexCsv(source.ege20TargetSet)
- : undefined,
- ege21TargetPunctuation:
- source.type === 'ege21_punctuation_analysis'
- ? source.ege21TargetPunctuation
- : undefined,
- ege21Sentences:
- source.type === 'ege21_punctuation_analysis'
- ? parseEge21SentencesText(source.ege21Sentences)
- : undefined,
- ege21TargetSet:
- source.type === 'ege21_punctuation_analysis'
- ? parseIndexCsv(source.ege21TargetSet)
- : undefined,
- };
  }
 
  function saveFailureMessage(error: string | undefined, switchCancelled = false) {
@@ -3835,8 +2604,6 @@ async function openExerciseWithAutosave(id: number) {
  <form
  ref={formRef}
  onSubmit={onSubmit}
- onMouseUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
- onKeyUpCapture={(e) => updateActiveMarksFromTarget(e.target)}
  >
  <div className="grid gap-3 sm:grid-cols-3">
  <Input label="Тип">
@@ -3938,34 +2705,18 @@ async function openExerciseWithAutosave(id: number) {
  </Input>
  </div>
 
- <div className="mt-3">
- <div className="mb-1 text-sm font-medium text-foreground/80">Формулировка</div>
- <MDEditor
+ <AdminMarkdownEditor
+ label="Формулировка"
  value={form.prompt}
- onChange={(val) => {
- setForm((f) => ({ ...f, prompt: val || '' }));
- }}
- data-color-mode={currentTheme === 'dark' ? 'dark' : 'light'}
- className="w-full"
- height={205}
- commands={markdownCommands}
- extraCommands={markdownExtraCommands}
+ onChange={(prompt) => setForm((f) => ({ ...f, prompt }))}
+ colorMode={currentTheme === 'dark' ? 'dark' : 'light'}
  />
- </div>
- <div className="mt-3">
- <div className="mb-1 text-sm font-medium text-foreground/80">Объяснение</div>
- <MDEditor
+ <AdminMarkdownEditor
+ label="Объяснение"
  value={form.explanation}
- onChange={(val) => {
- setForm((f) => ({ ...f, explanation: val || '' }));
- }}
- data-color-mode={currentTheme === 'dark' ? 'dark' : 'light'}
- className="w-full"
- height={205}
- commands={markdownCommands}
- extraCommands={markdownExtraCommands}
+ onChange={(explanation) => setForm((f) => ({ ...f, explanation }))}
+ colorMode={currentTheme === 'dark' ? 'dark' : 'light'}
  />
- </div>
 
  {(form.type === 'multiple_choice' || form.type === 'ege_multi_select') && (
  <div className="mt-3 space-y-2">
@@ -4864,36 +3615,3 @@ function normalizeSearchText(input: string) {
  .trim();
 }
 
-function parseEge21SentencesText(raw: string): Array<{ index: number; text: string }> {
- const text = raw.trim();
- if (!text) return [];
-
- // Supports both line-by-line format:
- // 1. ...
- // 2) ...
- // and inline format:
- // 1. ... 2) ... 3) ...
- const marker = /\(?(\d{1,2})\)?\s*[.)\-:]\s*/g;
- const points: Array<{ idx: number; start: number; markerEnd: number }> = [];
- let m: RegExpExecArray | null;
- while ((m = marker.exec(text)) !== null) {
- points.push({
- idx: Number(m[1]),
- start: m.index,
- markerEnd: marker.lastIndex,
- });
- }
-
- if (points.length === 0) return [];
-
- const out: Array<{ index: number; text: string }> = [];
- for (let i = 0; i < points.length; i += 1) {
- const current = points[i];
- const next = points[i + 1];
- const body = text.slice(current.markerEnd, next ? next.start : text.length).trim();
- if (!Number.isInteger(current.idx) || current.idx <= 0 || !body) continue;
- out.push({ index: current.idx, text: body });
- }
-
- return out.sort((a, b) => a.index - b.index);
-}
