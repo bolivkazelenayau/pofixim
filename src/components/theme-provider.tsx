@@ -50,7 +50,7 @@ function subscribeTheme(listener: () => void) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme = useSyncExternalStore(
+  const theme = useSyncExternalStore<Theme>(
     subscribeTheme,
     readThemeFromStorage,
     () => 'light',
