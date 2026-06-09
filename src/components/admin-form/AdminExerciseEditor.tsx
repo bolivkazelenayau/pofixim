@@ -81,6 +81,105 @@ type AdminExerciseEditorProps = {
   };
 };
 
+type TypeSpecificFieldsProps = {
+  form: Form;
+  setForm: React.Dispatch<React.SetStateAction<Form>>;
+};
+
+function EditorSkeletonBlock({ className = '' }: { className?: string }) {
+  return <div className={`rounded-md bg-foreground/10 ${className}`} />;
+}
+
+function AdminExerciseEditorSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <EditorSkeletonBlock className="h-7 w-56" />
+          <EditorSkeletonBlock className="mt-3 h-4 w-36" />
+        </div>
+        <div className="flex gap-3">
+          <EditorSkeletonBlock className="h-5 w-10" />
+          <EditorSkeletonBlock className="h-5 w-10" />
+          <EditorSkeletonBlock className="h-5 w-24" />
+        </div>
+      </div>
+
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div>
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+          </div>
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)]">
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+            <EditorSkeletonBlock className="h-12 rounded-lg" />
+          </div>
+
+          <EditorSkeletonBlock className="mb-2 h-4 w-28" />
+          <EditorSkeletonBlock className="mb-4 h-48 rounded-lg" />
+          <EditorSkeletonBlock className="mb-2 h-4 w-24" />
+          <EditorSkeletonBlock className="mb-4 h-44 rounded-lg" />
+
+          <EditorSkeletonBlock className="mb-3 h-4 w-36" />
+          <div className="space-y-2">
+            <EditorSkeletonBlock className="h-10 rounded-lg" />
+            <EditorSkeletonBlock className="h-10 rounded-lg" />
+            <EditorSkeletonBlock className="h-10 rounded-lg" />
+          </div>
+        </div>
+
+        <aside className="rounded-2xl border border-stroke bg-surface p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <EditorSkeletonBlock className="h-5 w-28" />
+            <EditorSkeletonBlock className="h-8 w-28 rounded-lg" />
+          </div>
+          <EditorSkeletonBlock className="mb-4 h-20 rounded-xl" />
+          <div className="space-y-3">
+            <EditorSkeletonBlock className="h-16 rounded-xl" />
+            <EditorSkeletonBlock className="h-16 rounded-xl" />
+            <EditorSkeletonBlock className="h-16 rounded-xl" />
+            <EditorSkeletonBlock className="h-16 rounded-xl" />
+          </div>
+          <EditorSkeletonBlock className="mt-4 h-12 rounded-xl" />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function TypeSpecificFields({ form, setForm }: TypeSpecificFieldsProps) {
+  switch (form.type) {
+    case 'multiple_choice':
+    case 'ege_multi_select':
+      return <AdminChoiceFields form={form} setForm={setForm} />;
+    case 'fill_blank':
+      return <AdminFillBlankFields form={form} setForm={setForm} />;
+    case 'word_bank_cloze':
+      return <AdminWordBankClozeFields form={form} setForm={setForm} />;
+    case 'word_search':
+      return <AdminWordSearchFields form={form} setForm={setForm} />;
+    case 'dictation':
+      return <AdminDictationFields form={form} setForm={setForm} />;
+    case 'orthography_repair':
+      return <AdminOrthographyRepairFields form={form} setForm={setForm} />;
+    case 'order_fragments':
+      return <AdminOrderFragmentsFields form={form} setForm={setForm} />;
+    case 'punctuation_insert':
+      return <AdminPunctuationInsertFields form={form} setForm={setForm} />;
+    case 'punctuation_constructor':
+      return <AdminPunctuationConstructorFields form={form} setForm={setForm} />;
+    case 'ege20_complex_sentence_punctuation':
+      return <AdminEge20Fields form={form} setForm={setForm} />;
+    case 'ege21_punctuation_analysis':
+      return <AdminEge21Fields form={form} setForm={setForm} />;
+    default:
+      return null;
+  }
+}
+
 export default function AdminExerciseEditor({
   status,
   formState,
@@ -90,10 +189,19 @@ export default function AdminExerciseEditor({
   actions,
 }: AdminExerciseEditorProps) {
   const { form, formRef, mainSaveAnchorRef, setForm, typeOptions } = formState;
+  const isInitialSelectionLoading =
+    recovery.initialSelectionPending && !recovery.initialSelectedExercise;
 
   return (
     <>
-      <div className={`rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm ${recovery.initialSelectionPending && !recovery.initialSelectedExercise ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity`}>
+      <div
+        className="relative rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm"
+        aria-busy={isInitialSelectionLoading}
+      >
+        {isInitialSelectionLoading ? (
+          <AdminExerciseEditorSkeleton />
+        ) : (
+          <>
         <AdminEditorHeader
           isEdit={status.isEdit}
           hasUnsavedChanges={status.hasUnsavedChanges}
@@ -115,17 +223,7 @@ export default function AdminExerciseEditor({
               onSeedManualChange={actions.onSeedManualChange}
             />
 
-            <AdminChoiceFields form={form} setForm={setForm} />
-            <AdminFillBlankFields form={form} setForm={setForm} />
-            <AdminWordBankClozeFields form={form} setForm={setForm} />
-            <AdminWordSearchFields form={form} setForm={setForm} />
-            <AdminDictationFields form={form} setForm={setForm} />
-            <AdminOrthographyRepairFields form={form} setForm={setForm} />
-            <AdminOrderFragmentsFields form={form} setForm={setForm} />
-            <AdminPunctuationInsertFields form={form} setForm={setForm} />
-            <AdminPunctuationConstructorFields form={form} setForm={setForm} />
-            <AdminEge20Fields form={form} setForm={setForm} />
-            <AdminEge21Fields form={form} setForm={setForm} />
+            <TypeSpecificFields form={form} setForm={setForm} />
 
             <AdminMetaFields
               form={form}
@@ -151,6 +249,8 @@ export default function AdminExerciseEditor({
             onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
           />
         </div>
+          </>
+        )}
       </div>
 
       <FloatingSaveButton
