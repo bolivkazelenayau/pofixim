@@ -1,50 +1,57 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import FormattedFeedbackExplanation from '@/components/FormattedFeedbackExplanation';
 import {
  fetchExerciseById,
  fetchExerciseList,
  getExerciseIdFromHash,
  getExerciseIdFromSearch,
 } from '@/components/admin-form/api';
-import { categories, inputClass, qualityStatuses } from '@/components/admin-form/constants';
+import AdminCoreFields from '@/components/admin-form/AdminCoreFields';
+import AdminDraftRecoveryModal from '@/components/admin-form/AdminDraftRecoveryModal';
+import AdminChoiceFields from '@/components/admin-form/AdminChoiceFields';
+import AdminEditorHeader from '@/components/admin-form/AdminEditorHeader';
+import AdminExerciseSidebar from '@/components/admin-form/AdminExerciseSidebar';
+import AdminDictationFields from '@/components/admin-form/AdminDictationFields';
+import AdminMetaFields from '@/components/admin-form/AdminMetaFields';
+import AdminMessageToast from '@/components/admin-form/AdminMessageToast';
+import AdminOrthographyRepairFields from '@/components/admin-form/AdminOrthographyRepairFields';
+import AdminPreviewPanel from '@/components/admin-form/AdminPreviewPanel';
+import AdminPunctuationConstructorFields from '@/components/admin-form/AdminPunctuationConstructorFields';
+import { inputClass, qualityStatuses } from '@/components/admin-form/constants';
+import type { DatabaseIndicator } from '@/components/admin-form/DatabaseSaveIndicator';
+import DeleteExerciseConfirmModal from '@/components/admin-form/DeleteExerciseConfirmModal';
 import { EMPTY } from '@/components/admin-form/defaults';
+import {
+ getDraftKey,
+ getDraftSessionId,
+ loadFormState,
+ logDraftRecoveryDebug,
+ readStoredDraft,
+ writeStoredDraft,
+} from '@/components/admin-form/draftStorage';
+import {
+ splitFeedbackSections,
+} from '@/components/admin-form/feedback';
 import {
  buildTypeChangeMessage,
  convertFormForTypeChange,
  seedPrefixForType,
 } from '@/components/admin-form/formTypeConversion';
 import { buildPayloadFromForm, formFromExerciseItem } from '@/components/admin-form/formMapping';
-import AdminMarkdownEditor from '@/components/admin-form/markdown/AdminMarkdownEditor';
-import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
-import {
- parseEge21SentencesText,
- parseOrthographyRepairRepairs,
- parseOrthographyRepairTargets,
- parsePunctuationConstructorGuidedSteps,
- parsePunctuationConstructorMarkBank,
- parsePunctuationConstructorPlacements,
- parsePunctuationConstructorSegments,
- parsePunctuationConstructorSlotExplanations,
- parsePunctuationMarks,
- renderPunctuationConstructorAnswer,
-} from '@/components/admin-form/parsers';
+import { buildPreviewExercise } from '@/components/admin-form/previewModel';
+import FloatingSaveButton from '@/components/admin-form/FloatingSaveButton';
+import SeedRegenerateConfirmModal from '@/components/admin-form/SeedRegenerateConfirmModal';
 import type {
  AdminFormProps,
  ExerciseListResponse,
- FeedbackSections,
  Form,
  ListItem,
- PCMark,
+ PreviewCheckResult,
  RawPreviewItem,
 } from '@/components/admin-form/types';
-import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, CheckSquare, Search, ArrowUp, ArrowDown, X, XSquare, History } from "lucide-react";
-import rehypeRaw from 'rehype-raw';
 import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
 import {
  batchUpdateExercisesMetaAction,
@@ -53,20 +60,10 @@ import {
  previewRawNormalizationAction,
  updateExerciseAction,
 } from '@/app/actions/admin';
-import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import { checkExerciseAnswer } from '@/features/exercises/checkers';
 import { formatAdminDateTime, formatAdminTime } from '@/lib/date-time';
-import {
- normalizeNumberAnswerSignature,
- parseIndexCsv,
- stripEge18PromptFromFillBefore,
-} from '@/lib/exercise-type-conversion';
-import {
- exerciseSchema,
- type Exercise,
- type SubmittedAnswer,
-} from '@/features/exercises/schemas';
-import { EXERCISE_TYPES, type ExerciseCategory } from '@/features/exercises/types';
+import { type Exercise, type SubmittedAnswer } from '@/features/exercises/schemas';
+import { EXERCISE_TYPES } from '@/features/exercises/types';
 
 function slugFromPrompt(prompt: string) {
  const translitMap: Record<string, string> = {
@@ -94,413 +91,6 @@ function randomShortId() {
  return Math.random().toString(36).slice(2, 10);
 }
 
-function compactCorrectAnswerLine(line: string) {
- const noNumber = line.replace(/^\s*\**\d+[).]\**\s*/u, '').trim();
- const parts = noNumber.split(/\s+[\u2014-]\s+/u);
- if (parts.length === 1) return noNumber;
- const words = [];
- for (let i = 0; i < parts.length - 1; i++) {
- const part = parts[i];
- if (i === 0) {
- words.push(part);
- } else {
- const match = part.match(/[,;]\s*([^,;]+)$/);
- if (match) words.push(match[1].trim());
- else {
- const match2 = part.match(/[.]\s*([^.]+)$/);
- if (match2) words.push(match2[1].trim());
- else words.push(part.trim());
- }
- }
- }
- return words
- .map((w) => w.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim())
- .join(', ');
-}
-
-function normalizeMorphemeMarkdownSpacing(value: string) {
- const joinPrefixSpaces = (part: string) => part
- .replace(
- /(^|[^\p{L}])(рас|раз|без|бес|нис|низ|нес|нез|вз|вс|воз|вос|из|ис|под|пред|пре|при|пра|про|транс|контр|суб|супер|сверх)\s+(?=\p{Ll}|\*\*)/giu,
- '$1$2',
- );
- const normalizeMarked = (part: string) => part
- .replace(/(?<!\p{L})рас\s+ч[её]т(?!\p{L})/giu, 'расчёт')
- .replace(/\*\*([\p{L}])\s+\*\*(?=[\p{L}])/gu, '**$1**')
- .replace(/([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1**$2**')
- .replace(/([\p{L}])\*\*([\p{L}])\*\*\s+(?=[\p{L}])/gu, '$1**$2**')
- .replace(/(^|[^\p{L}])([\p{L}])\s+\*\*([\p{L}])\*\*\s*(?=[\p{L}])/gu, '$1$2**$3**')
- .replace(/(^|[^\p{L}*])([\p{L}]+(?:\*\*[\p{L}]+\*\*)+)\s+(?=\p{Ll})/gu, '$1$2')
- .replace(/\s+(?:\*\s*)+$/u, '');
- const parts = value.split(/\s+—\s+/u).map(normalizeMarked);
- if (parts.length < 2) return joinPrefixSpaces(normalizeMarked(value));
- parts[0] = joinPrefixSpaces(parts[0]);
- return parts.join(' — ');
-}
-
-function normalizeAnswerWord(value: string) {
- return normalizeMorphemeMarkdownSpacing(value)
- .replace(/\*\*/g, '')
- .replace(/_/g, '')
- .replace(/\([^)]*\)/g, '')
- .replace(/\s+/g, '');
-}
-
-function escapeRegExpLiteral(value: string) {
- return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
-}
-
-function fillOptionBlanks(optionLine: string, correctLine: string) {
- const optionParts = optionLine.split(',').map(s => s.trim());
- const correctWords = correctLine.split(',').map(s => s.trim());
- if (optionParts.length !== correctWords.length) return correctLine;
-
- const filledParts = optionParts.map((opt, i) => {
- const word = normalizeAnswerWord(correctWords[i]);
- const cleanOpt = normalizeAnswerWord(opt);
- const parts = cleanOpt.split(/\.\.+/);
- if (parts.length !== 2) return normalizeAnswerWord(correctWords[i]); 
- const [prefix, suffix] = parts;
- const escapedPrefix = escapeRegExpLiteral(prefix);
- const escapedSuffix = escapeRegExpLiteral(suffix);
- const match = word.match(new RegExp('^' + escapedPrefix + '(.*?)' + escapedSuffix + '$', 'i'));
- if (match) {
- return opt.replace(/\.\.+/, match[1]); 
- }
- return normalizeAnswerWord(correctWords[i]); 
- });
- return filledParts.join(', ');
-}
-
-function fillOptionBlanksFromLine(optionLine: string, explanationLine: string) {
- const optionParts = optionLine.split(',').map((s) => s.trim());
- const cleanLine = normalizeAnswerWord(explanationLine);
- const filledParts = optionParts.map((opt) => {
- const cleanOpt = normalizeAnswerWord(opt);
- const parts = cleanOpt.split(/\.\.+/);
- if (parts.length !== 2) return opt;
- const [prefix, suffix] = parts;
- const escapedPrefix = escapeRegExpLiteral(prefix);
- const escapedSuffix = escapeRegExpLiteral(suffix);
- const match = cleanLine.match(new RegExp(escapedPrefix + '([\\p{L}]*?)' + escapedSuffix, 'iu'));
- return match ? opt.replace(/\.\.+/, match[1]) : opt;
- });
- return filledParts.join(', ');
-}
-
-function splitFeedbackSections(content: string, options?: string[]): FeedbackSections | null {
- if (!/\u041f\u0440\u0438\u0432\u0435\u0434[\u0435\u0451]\u043c \u0432\u0435\u0440\u043d\u043e\u0435 \u043d\u0430\u043f\u0438\u0441\u0430\u043d\u0438\u0435/u.test(content)) return null;
- const normalized = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
- const markerMatch = normalized.match(/\u041f\u0440\u0438\u0432\u0435\u0434[\u0435\u0451]\u043c \u0432\u0435\u0440\u043d\u043e\u0435 \u043d\u0430\u043f\u0438\u0441\u0430\u043d\u0438\u0435[:.]?\s*/u);
- if (!markerMatch || markerMatch.index == null) return null;
-
- const markerIndex = markerMatch.index;
- const lead = normalized.slice(0, markerIndex).trim();
- const body = normalized.slice(markerIndex).trim();
- const tail = body.replace(/^\u041f\u0440\u0438\u0432\u0435\u0434[\u0435\u0451]\u043c \u0432\u0435\u0440\u043d\u043e\u0435 \u043d\u0430\u043f\u0438\u0441\u0430\u043d\u0438\u0435[:.]?\s*/u, '').trim();
-
- const numberedChunks = [...tail.matchAll(/(?:^|[\n;]\s*)(\d+[).]\s*[\s\S]*?)(?=(?:[\n;]\s*\d+[).])|$)/gu)]
- .map((m) => m[1]?.trim())
- .filter((v): v is string => Boolean(v));
-
- const answerSource = numberedChunks.length >= 2 ? numberedChunks : tail.split('\n');
- const answerLinesRaw = answerSource
- .map((line) => line.trim())
- .filter(Boolean)
- .map(compactCorrectAnswerLine)
- .filter(Boolean);
- 
- const answerLines = answerLinesRaw.map((line, idx) => {
- if (options && options[idx]) {
- return fillOptionBlanks(options[idx], line);
- }
- return line;
- });
- 
- const markdownAnswerList = answerLines.join('\n\n');
-
- return {
- lead,
- correctAnswer: answerLines.length > 0 ? markdownAnswerList : tail,
- explanation: content,
- };
-}
-
-function extractNumberedExplanationRows(content: string) {
- const normalized = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
- const markerRegex = /\u041f\u0440\u0438\u0432\u0435\u0434[\u0435\u0451]\u043c \u0432\u0435\u0440\u043d\u043e\u0435 \u043d\u0430\u043f\u0438\u0441\u0430\u043d\u0438\u0435[:.]?\s*/u;
- const markerMatch = normalized.match(markerRegex);
- const tail = markerMatch
- ? normalized.slice((markerMatch.index ?? 0) + markerMatch[0].length)
- : normalized;
-
- const rows: string[] = [];
- let currentRow: string | null = null;
- const lines = tail.split('\n').map((line) => line.trim()).filter(Boolean);
-
- for (const line of lines) {
- const chunks = line
- .split(/(?=(?:^|[\s;])\**\d+[).]\**\s*)/u)
- .map((chunk) => chunk.replace(/^;\s*/, '').trim())
- .filter(Boolean);
-
- for (const chunk of chunks) {
- if (/^\**\d+[).]\**\s*/u.test(chunk)) {
- if (currentRow) rows.push(currentRow);
- currentRow = chunk;
- } else if (currentRow) {
- currentRow += ` ${chunk}`;
- }
- }
- }
-
- if (currentRow) rows.push(currentRow);
-
- return rows
- .map((row) => row.replace(/\s*Ответ:\s*[\d,.\s|]+.*$/iu, '').trim())
- .filter(Boolean);
-}
-
-function isDetailedEge10ExplanationRow(row: string) {
- return (
- /\u0420\u044f\u0434\s+(?:\u043d\u0435\s+)?\u043f\u043e\u0434\u0445\u043e\u0434\u0438\u0442/iu.test(row) ||
- /\**\u0421\u0442\u0440\u043e\u043a\u0430\s+\d+\**/iu.test(row)
- );
-}
-
-function normalizeDetailedEge10Row(row: string) {
- return row
- .replace(/^\**\u0421\u0442\u0440\u043e\u043a\u0430\s+(\d+)\**\s*/iu, '**$1)** ')
- .replace(/\s+(?:\*\s*)+$/u, '')
- .trim();
-}
-
-function splitEge10FeedbackRows(rows: string[], optionsLength: number) {
- const normalizedRows = rows
- .map(normalizeMorphemeMarkdownSpacing)
- .filter((row) => row !== '*');
- const inlineDetailedStart = normalizedRows.findIndex((row) =>
- /\**\u0421\u0442\u0440\u043e\u043a\u0430\s+\d+\**/iu.test(row),
- );
- if (inlineDetailedStart >= 0) {
- const markerized = normalizedRows[inlineDetailedStart]
- .replace(/\*\*\u0421\u0442\u0440\u043e\u043a\u0430\s+(\d+)\*\*/giu, '\n\u0421\u0442\u0440\u043e\u043a\u0430 $1')
- .replace(/([^\n])\u0421\u0442\u0440\u043e\u043a\u0430\s+(\d+)/giu, '$1\n\u0421\u0442\u0440\u043e\u043a\u0430 $2');
- const chunks = markerized
- .split('\n')
- .map((chunk) => chunk.trim())
- .filter(Boolean);
- const firstDetailedChunk = chunks.findIndex((chunk) =>
- /^\**\u0421\u0442\u0440\u043e\u043a\u0430\s+\d+\**/iu.test(chunk),
- );
- const answerRows = normalizedRows.slice(0, inlineDetailedStart);
- if (firstDetailedChunk > 0) answerRows.push(...chunks.slice(0, firstDetailedChunk));
- return {
- answerRows: answerRows.slice(0, optionsLength),
- explanationRows: chunks.slice(Math.max(firstDetailedChunk, 0)).map(normalizeDetailedEge10Row),
- };
- }
- const detailedStart = normalizedRows.findIndex(isDetailedEge10ExplanationRow);
- if (detailedStart > 0) {
- return {
- answerRows: normalizedRows.slice(0, Math.min(optionsLength, detailedStart)),
- explanationRows: normalizedRows.slice(detailedStart).map(normalizeDetailedEge10Row),
- };
- }
- return {
- answerRows: normalizedRows,
- explanationRows: normalizedRows,
- };
-}
-
-function buildCorrectAnswerLinesFromOptions(
- options: string[],
- targetSet: number[],
- explanationRows: string[] = [],
-) {
- const mergedExplanation = explanationRows.join(' ');
- return [...new Set(targetSet)]
- .sort((a, b) => a - b)
- .map((idx) => {
- const option = options[idx - 1]?.trim();
- if (!option) return '';
- const explanationRow = explanationRows[idx - 1] ?? mergedExplanation;
- return explanationRow
- ? fillOptionBlanksFromLine(option, explanationRow)
- : option;
- })
- .filter((value): value is string => Boolean(value));
-}
-
-function buildEgeMultiSelectFeedback(
- options: string[],
- targetSet: number[],
- explanation: string,
-) {
- const rows = splitEge10FeedbackRows(
- extractNumberedExplanationRows(explanation),
- options.length,
- );
- const correctAnswer = buildCorrectAnswerLinesFromOptions(
- options,
- targetSet,
- rows.answerRows,
- );
- if (!correctAnswer.length) return null;
- return {
- correctAnswer,
- explanation: rows.explanationRows.length
- ? rows.explanationRows
- : [normalizeMorphemeMarkdownSpacing(explanation)],
- };
-}
-
-function shouldNormalizeEge10Form(form: Pick<Form, 'type' | 'skillTags'>) {
- return (
- form.type === 'ege_multi_select' &&
- form.skillTags
- .split(',')
- .map((tag) => tag.trim())
- .includes('ege.10')
- );
-}
-
-function shouldStripEge18FillBeforePrompt(form: Pick<Form, 'type' | 'skillTags'>) {
- return (
- form.type === 'fill_blank' &&
- form.skillTags
- .split(',')
- .map((tag) => tag.trim())
- .includes('ege.18')
- );
-}
-
-function normalizeFormForEditor(form: Form): Form {
- const nextForm = shouldStripEge18FillBeforePrompt(form)
- ? {
- ...form,
- fillBefore: stripEge18PromptFromFillBefore(form.fillBefore, form.prompt),
- }
- : form;
-
- if (!shouldNormalizeEge10Form(nextForm)) return nextForm;
- const explanationRows = extractNumberedExplanationRows(nextForm.explanation).map(
- normalizeMorphemeMarkdownSpacing,
- );
- const rows = splitEge10FeedbackRows(explanationRows, nextForm.options.length);
- return {
- ...nextForm,
- explanation: rows.explanationRows.length
- ? rows.explanationRows.join('\n')
- : normalizeMorphemeMarkdownSpacing(nextForm.explanation),
- };
-}
-
-function getDraftKey(id?: number | string | null) {
- return id ? `admin_form_draft_${id}` : 'admin_form_draft_new';
-}
-
-type StoredDraftEnvelope = {
- sessionId: string | null;
- savedAt: string;
- form: Form;
-};
-
-function randomDraftSessionId() {
- if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
- return crypto.randomUUID();
- }
- return `draft_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function getDraftSessionId() {
-  if (typeof window === 'undefined') return null;
-  const key = 'admin_draft_session_id';
-  const existing = window.sessionStorage.getItem(key);
- if (existing) return existing;
- const nextValue = randomDraftSessionId();
-  window.sessionStorage.setItem(key, nextValue);
-  return nextValue;
-}
-
-function logDraftRecoveryDebug(event: string, details?: Record<string, unknown>) {
-  if (typeof window === 'undefined') return;
-  console.info(`[admin-draft] ${event}`, details ?? {});
-}
-
-function parseStoredDraft(raw: string, targetId: number | null) {
- try {
- const parsed = JSON.parse(raw) as Form | StoredDraftEnvelope;
- if (!parsed || typeof parsed !== 'object') return null;
-
- if ('form' in parsed) {
- const form = parsed.form;
- if (!form || typeof form !== 'object') return null;
- if (targetId !== null && form.id !== targetId) return null;
- return {
- form: normalizeFormForEditor(form),
- sessionId: typeof parsed.sessionId === 'string' ? parsed.sessionId : null,
- };
- }
-
- if (targetId !== null && parsed.id !== targetId) return null;
- return {
- form: normalizeFormForEditor(parsed as Form),
- sessionId: null,
- };
- } catch {
- return null;
- }
-}
-
-function writeStoredDraft(targetId: number | null, form: Form) {
-  if (typeof window === 'undefined') return;
-  const sessionId = getDraftSessionId();
-  const envelope: StoredDraftEnvelope = {
-    sessionId,
-    savedAt: new Date().toISOString(),
-    form,
-  };
-  window.localStorage.setItem(getDraftKey(targetId), JSON.stringify(envelope));
-  logDraftRecoveryDebug('writeStoredDraft', {
-    targetId,
-    formId: form.id ?? null,
-    sessionId,
-    type: form.type,
-  });
-}
-
-function loadFormState(targetId: number | null, baseForm: Form) {
- if (targetId != null) {
- return normalizeFormForEditor(baseForm);
- }
- const key = getDraftKey(targetId);
- const draft = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
- if (draft) {
-  try {
- const parsed = parseStoredDraft(draft, targetId);
- if (parsed) {
- return parsed.form;
- }
- } catch (e) {
- console.error(`Failed to parse ${key}`, e);
- }
- }
- return normalizeFormForEditor(baseForm);
-}
-
-function readStoredDraft(targetId: number | null) {
- const raw = typeof window !== 'undefined' ? localStorage.getItem(getDraftKey(targetId)) : null;
- if (!raw) return null;
- try {
- const parsed = parseStoredDraft(raw, targetId);
- return parsed;
- } catch (error) {
- console.error(`Failed to parse ${getDraftKey(targetId)}`, error);
- return null;
- }
-}
-
 function formatUpdatedAt(value: string) {
  return formatAdminDateTime(value);
 }
@@ -512,13 +102,6 @@ export default function AdminForm({
  initialSelectedExercise = null,
 }: AdminFormProps) {
  const router = useRouter();
- const { resolvedTheme, theme } = useTheme();
- const isClient = useSyncExternalStore(
-  () => () => {},
-  () => true,
-  () => false,
- );
- const currentTheme = isClient ? (resolvedTheme || theme || 'light') : 'light';
  const [form, setForm] = useState<Form>(() => {
  if (initialSelectedId && initialSelectedExercise) {
  return loadFormState(initialSelectedId, formFromExerciseItem(initialSelectedExercise));
@@ -584,12 +167,7 @@ const [rawPreviewFilter, setRawPreviewFilter] = useState('');
 const [rawPreviewLimit, setRawPreviewLimit] = useState(3);
 const [rawPreviewLoading, setRawPreviewLoading] = useState(false);
 const [rawPreviewItems, setRawPreviewItems] = useState<RawPreviewItem[]>([]);
-const [previewCheckResult, setPreviewCheckResult] = useState<{
- isCorrect: boolean;
- text: string;
- correctAnswer?: string;
- detailedExplanation?: string;
-  } | null>(null);
+const [previewCheckResult, setPreviewCheckResult] = useState<PreviewCheckResult | null>(null);
  const [previewDictationText, setPreviewDictationText] = useState('');
  const historyPastRef = useRef<Form[]>([]);
  const historyFutureRef = useRef<Form[]>([]);
@@ -901,12 +479,6 @@ useEffect(() => {
  () => form.skillTags.split(',').map((v) => v.trim()).filter(Boolean),
  [form.skillTags],
  );
- const isEge18FillBlank =
- form.type === 'fill_blank' && parsedSkillTags.includes('ege.18');
- const ege18AcceptedSignature = useMemo(
- () => normalizeNumberAnswerSignature(form.fillAccepted),
- [form.fillAccepted],
- );
  const parsedSteps = useMemo(
  () => form.algorithmSteps.split('\n').map((v) => v.trim()).filter(Boolean),
  [form.algorithmSteps],
@@ -982,399 +554,10 @@ useEffect(() => {
  const flatFilteredItems = filteredItems;
  const multiSelectedSet = useMemo(() => new Set(multiSelectedIds), [multiSelectedIds]);
 
- const preview = useMemo(() => {
- const base = {
- id: form.id,
- seedKey: form.seedKey || null,
- category: form.category,
- difficulty: form.difficulty,
- prompt: form.prompt || 'Предпросмотр задания',
- explanation: form.explanation || 'Пояснение пока не заполнено.',
- skillTags: parsedSkillTags,
- sourceAlignment: form.sourceAlignment
- ? { reference: form.sourceAlignment }
- : undefined,
- typicalMistake: form.typicalMistake || undefined,
- algorithmSteps: parsedSteps.length
- ? parsedSteps.map((title, index) => ({
- id: `preview_${index + 1}`,
- title,
- required: true,
- }))
- : undefined,
- qualityStatus: form.qualityStatus,
- isActive: true,
- type: form.type,
- } as const;
-
- let candidate: unknown;
- if (form.type === 'multiple_choice') {
- const previewOptions = form.options.map((v) => v.trim()).filter(Boolean);
- const safeOptions = previewOptions.length > 0 ? previewOptions : ['Вариант 1'];
- const safeCorrectIndex = Math.min(
- Math.max(form.correctOptionIndex, 0),
- safeOptions.length - 1,
+ const preview = useMemo(
+  () => buildPreviewExercise({ form, parsedSkillTags, parsedSteps }),
+  [form, parsedSkillTags, parsedSteps],
  );
-
- candidate = {
- ...base,
- payload: { options: safeOptions },
- answer: { correctOptionIndex: safeCorrectIndex },
- };
- } else if (form.type === 'ege_multi_select') {
- const previewOptions = form.options.map((v) => v.trim()).filter(Boolean);
- const safeOptions = previewOptions.length > 0 ? previewOptions : ['Вариант 1', 'Вариант 2'];
- const targetSet = form.multiCorrectOptionIndexes
- .split(',')
- .map((v) => Number(v.trim()))
- .filter((v) => Number.isInteger(v) && v > 0 && v <= safeOptions.length);
- const signature = [...new Set(targetSet)].sort((a, b) => a - b).join('');
- const safeTargetSet = targetSet.length ? targetSet : [1];
- const isEge10 = parsedSkillTags.includes('ege.10');
- const feedback = isEge10
- ? buildEgeMultiSelectFeedback(
- safeOptions,
- safeTargetSet,
- base.explanation,
- )
- : null;
- candidate = {
- ...base,
- explanation: isEge10
- ? normalizeMorphemeMarkdownSpacing(base.explanation)
- : base.explanation,
- payload: {
- options: safeOptions,
- ...(feedback ? { feedback } : {}),
- },
- answer: {
- rawAnswerText: signature || '1',
- acceptedAnswers: [signature || '1'],
- targetSet: safeTargetSet,
- },
- };
- } else if (form.type === 'fill_blank') {
- const accepted = isEge18FillBlank
- ? [ege18AcceptedSignature].filter(Boolean)
- : form.fillAccepted
- .split(',')
- .map((v) => v.trim())
- .filter(Boolean);
-
- candidate = {
- ...base,
- payload: {
- before:
- isEge18FillBlank
- ? stripEge18PromptFromFillBefore(form.fillBefore, form.prompt) || 'Текст до пропуска'
- : form.fillBefore || 'Текст до пропуска',
- after: form.fillAfter || 'текст после пропуска',
- },
- answer: {
- accepted: accepted.length > 0 ? accepted : ['пример'],
- caseSensitive: form.fillCaseSensitive,
- },
- };
- } else if (form.type === 'word_bank_cloze') {
- const wordBank = form.wordBankWords
- .split('\n')
- .map((v) => v.trim())
- .filter(Boolean);
- const correctBySlot = form.wordBankCorrectBySlot
- .split('\n')
- .map((v) => v.trim())
- .filter(Boolean);
- const slotCount = correctBySlot.length > 0 ? correctBySlot.length : 1;
-
- candidate = {
- ...base,
- payload: {
- textWithSlots: form.wordBankTextWithSlots || 'Текст [[1]] с пропуском.',
- slotCount,
- wordBank: wordBank.length > 0 ? wordBank : ['пример'],
- },
- answer: {
- correctBySlot: correctBySlot.length > 0 ? correctBySlot : ['пример'],
- caseSensitive: form.wordBankCaseSensitive,
- },
- };
- } else if (form.type === 'word_search') {
- const rows = form.wordSearchGridRows
- .split('\n')
- .map((v) => v.trim())
- .filter(Boolean);
- const words = form.wordSearchWords
- .split('\n')
- .map((v) => v.trim())
- .filter(Boolean);
-
- candidate = {
- ...base,
- payload: {
- grid:
- rows.length >= 2
- ? rows.map((line) => line.split('').filter(Boolean))
- : [
- ['Д', 'О', 'М'],
- ['О', 'К', 'Н'],
- ],
- words: words.length > 0 ? words : ['ДОМ'],
- allowDiagonal: true,
- allowReverse: true,
- },
- answer: {
- words: words.length > 0 ? words : ['ДОМ'],
- caseSensitive: form.wordSearchCaseSensitive,
- },
- };
- } else if (form.type === 'dictation') {
- const playbackRates = form.dictationPlaybackRates
- .split(',')
- .map((value) => Number(value.trim()))
- .filter((value) => Number.isFinite(value) && value > 0);
-
- candidate = {
- ...base,
- payload: {
- title: form.dictationTitle.trim() || form.prompt.trim() || 'Диктант',
- audioSrc:
- form.dictationAudioSrc.trim() ||
- '/voice_memos/audio_2026-06-08_00-53-43.ogg',
- ...(playbackRates.length > 0 ? { playbackRates } : {}),
- },
- answer: {
- text: form.dictationText.trim() || 'Текст диктанта.',
- caseSensitive: form.dictationCaseSensitive,
- ignorePunctuation: form.dictationIgnorePunctuation,
- },
- };
- } else if (form.type === 'orthography_repair') {
- const targets = parseOrthographyRepairTargets(form.orthographyRepairTargets);
- const safeTargets =
- targets.length > 0
- ? targets
- : [
- {
- id: 'target_1',
- surface: 'ошыбка',
- replacement: 'ошибка',
- type: 'word' as const,
- options: ['ошыбка', 'ошибка'],
- },
- ];
- const targetIds = new Set(safeTargets.map((target) => target.id));
- const repairs = parseOrthographyRepairRepairs(form.orthographyRepairRepairs)
- .filter((repair) => targetIds.has(repair.targetId));
- const safeRepairs =
- repairs.length > 0
- ? repairs
- : safeTargets.map((target) => ({
- targetId: target.id,
- correct: target.replacement,
- }));
-
- candidate = {
- ...base,
- payload: {
- text:
- form.orthographyRepairText.trim() ||
- `Найдите слово: ${safeTargets[0]?.surface ?? 'ошыбка'}.`,
- mode: form.orthographyRepairMode,
- targets: safeTargets,
- ...(form.orthographyRepairHints.trim()
- ? {
- hints: form.orthographyRepairHints
- .split('\n')
- .map((value) => value.trim())
- .filter(Boolean),
- }
- : {}),
- },
- answer: {
- repairs: safeRepairs,
- ...(form.orthographyRepairCorrectText.trim()
- ? { correctText: form.orthographyRepairCorrectText.trim() }
- : {}),
- },
- };
- } else if (form.type === 'order_fragments') {
- const fragments = form.orderFragments
- .split('\n')
- .map((line) => line.trim())
- .filter(Boolean)
- .map((line, idx) => {
- const m = line.match(/^([^|]+)\|(.+)$/);
- if (m) {
- return { id: m[1].trim(), text: m[2].trim() };
- }
- return { id: `f${idx + 1}`, text: line };
- })
- .filter((f) => f.id.length > 0 && f.text.length > 0);
- const safeFragments =
- fragments.length >= 2
- ? fragments
- : [
- { id: 'f1', text: 'Первый фрагмент' },
- { id: 'f2', text: 'Второй фрагмент' },
- ];
- const idSet = new Set(safeFragments.map((f) => f.id));
- const order = form.orderCorrectOrder
- .split(',')
- .map((v) => v.trim())
- .filter((id) => idSet.has(id));
- const correctOrder =
- order.length === safeFragments.length
- ? order
- : safeFragments.map((f) => f.id);
-
- candidate = {
- ...base,
- payload: { fragments: safeFragments },
- answer: { correctOrder },
- };
- } else if (form.type === 'punctuation_constructor') {
- const tokens = form.punctuationConstructorTokens
- .split('|')
- .map((value) => value.trim())
- .filter(Boolean);
- const markBank = parsePunctuationConstructorMarkBank(
- form.punctuationConstructorMarkBank,
- );
-
- candidate = {
- ...base,
- payload: {
- tokens:
- tokens.length >= 2
- ? tokens
- : ['Мне', 'сказали', 'Ждите', 'придет'],
- markBank:
- markBank.length > 0
- ? markBank
- : (['comma', 'colon', 'dash'] satisfies PCMark[]),
- ...(form.punctuationConstructorHints.trim()
- ? {
- hints: form.punctuationConstructorHints
- .split('\n')
- .map((value) => value.trim())
- .filter(Boolean),
- }
- : {}),
- ...(form.punctuationConstructorGuidedSteps.trim()
- ? {
- guidedSteps: parsePunctuationConstructorGuidedSteps(
- form.punctuationConstructorGuidedSteps,
- ),
- }
- : {}),
- ...(form.punctuationConstructorSegments.trim()
- ? { segments: parsePunctuationConstructorSegments(form.punctuationConstructorSegments) }
- : {}),
- },
- answer: {
- placements: parsePunctuationConstructorPlacements(
- form.punctuationConstructorPlacements,
- ),
- ...(form.punctuationConstructorSlotExplanations.trim()
- ? {
- slotExplanations: parsePunctuationConstructorSlotExplanations(
- form.punctuationConstructorSlotExplanations,
- ),
- }
- : {}),
- },
- };
- } else if (form.type === 'ege20_complex_sentence_punctuation') {
- const slots = form.ege20Slots
- .split(',')
- .map((v) => Number(v.trim()))
- .filter((v) => Number.isInteger(v) && v > 0);
- const slotsSet = new Set(slots);
- const targetSetRaw = parseIndexCsv(form.ege20TargetSet);
- const targetSet = [...new Set(targetSetRaw.filter((v) => slotsSet.has(v)))].sort(
- (a, b) => a - b,
- );
- const signature = targetSet.join('');
-
- candidate = {
- ...base,
- payload: {
- textWithSlots: form.ege20TextWithSlots || 'Текст (1) с (2) разметкой.',
- slots: slots.length > 0 ? [...new Set(slots)].sort((a, b) => a - b) : [1, 2],
- },
- answer: {
- rawAnswerText: signature || '1',
- acceptedAnswers: [signature || '1'],
- targetSet:
- targetSet.length > 0
- ? targetSet
- : slots.length > 0
- ? [slots[0]]
- : [1],
- },
- };
- } else if (form.type === 'ege21_punctuation_analysis') {
- const sentences = parseEge21SentencesText(form.ege21Sentences);
- const sentenceSet = new Set(sentences.map((s) => s.index));
- const targetSetRaw = parseIndexCsv(form.ege21TargetSet);
- const targetSet = [...new Set(targetSetRaw.filter((v) => sentenceSet.has(v)))].sort(
- (a, b) => a - b,
- );
- const signature = targetSet.join('');
-
- candidate = {
- ...base,
- payload: {
- targetPunctuation: form.ege21TargetPunctuation,
- sentences:
- sentences.length > 0
- ? sentences
- : [
- { index: 1, text: 'Пример первого предложения.' },
- { index: 2, text: 'Пример второго предложения.' },
- ],
- },
- answer: {
- rawAnswerText: signature || '1',
- acceptedAnswers: [signature || '1'],
- targetSet:
- targetSet.length > 0
- ? targetSet
- : sentences.length > 0
- ? [sentences[0].index]
- : [1],
- },
- };
- } else {
- const tokens = form.punctuationTokens
- .split('|')
- .map((v) => v.trim())
- .filter(Boolean);
- const allowedMarks = form.punctuationAllowedMarks
- .split(',')
- .map((v) => v.trim())
- .filter(Boolean);
-
- candidate = {
- ...base,
- payload: {
- tokens: tokens.length > 0 ? tokens : ['Пример', 'предложения'],
- allowedMarks: allowedMarks.length > 0 ? allowedMarks : [','],
- },
- answer: {
- marks: parsePunctuationMarks(form.punctuationMarks),
- },
- };
- }
-
- const parsed = exerciseSchema.safeParse(candidate);
- return parsed.success
- ? { exercise: parsed.data as Exercise, error: '' }
- : {
- exercise: null,
- error: parsed.error.issues[0]?.message ?? 'Ошибка валидации превью',
- };
- }, [form, parsedSkillTags, parsedSteps]);
  const previewFeedbackSections = useMemo(() => {
  if (!previewCheckResult) return null;
  if (previewCheckResult.correctAnswer && previewCheckResult.detailedExplanation) {
@@ -1389,10 +572,6 @@ useEffect(() => {
  }, [
  previewCheckResult,
  form.options,
- form.type,
- form.multiCorrectOptionIndexes,
- form.explanation,
- parsedSkillTags,
  ]);
 
  function answerFeedbackPrefix(isCorrect: boolean) {
@@ -1877,6 +1056,29 @@ async function loadExercise(id: number) {
  applyHistoryState(next);
  }
 
+ function startNewDraft() {
+ setForm(loadFormState(null, EMPTY));
+ setSelectedId(null);
+ setDatabaseSaveState('draft');
+ setDatabaseSavedAt(null);
+ clearExerciseUrlSelection();
+ setMessage('');
+ setIsSeedRegenerateArmed(false);
+ setShowSeedRegenerateModal(false);
+ }
+
+ function handleTypeChange(nextType: Form['type']) {
+ setForm((current) => {
+ const nextForm = convertFormForTypeChange(current, nextType);
+ const transferMessage = buildTypeChangeMessage(current, nextForm);
+ if (transferMessage) {
+ setIsError(false);
+ setMessage(transferMessage);
+ }
+ return nextForm;
+ });
+ }
+
  function saveFailureMessage(error: string | undefined, switchCancelled = false) {
  if (error === 'Unauthorized') {
  return 'Сессия истекла. Изменения сохранены локально. Войдите снова, чтобы записать их в базу.';
@@ -2102,7 +1304,7 @@ async function openExerciseWithAutosave(id: number) {
  setDeleting(false);
  }
 
- const databaseIndicator = databaseSaveState === 'saved'
+ const databaseIndicator: DatabaseIndicator = databaseSaveState === 'saved'
   ? {
    label: 'В БД',
    detail: databaseSavedAt
@@ -2134,660 +1336,89 @@ async function openExerciseWithAutosave(id: number) {
 
  return (
  <div className="mx-auto grid w-full max-w-[1400px] gap-5 items-start xl:grid-cols-[300px_minmax(0,1fr)]">
- <aside ref={sidebarRef} className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
- <div className="mb-4 flex items-center justify-between">
- <div>
-  <div className="flex items-center gap-2">
-   <h3 className="text-xl font-bold tracking-tight">Задания</h3>
-   <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-semibold text-primary">
-    {hasActiveListFilter && matchingItems !== null ? `${matchingItems} / ` : ''}
-    {totalItems ?? '...'}
-   </span>
-  </div>
-  <p className="mt-0.5 text-[11px] font-medium text-foreground/50">
-   {initialListPending ? 'Загрузка списка...' : `Показано: ${flatFilteredItems.length}`}
-  </p>
- </div>
- <div className="flex items-center gap-1.5">
- <button
- className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
-                  onClick={() => void refreshList({ includeTotal: true, force: true })}
- >
- <RefreshCw className="h-4 w-4" />
- <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
- Обновить список
- </span>
- </button>
- {!selectionMode ? (
- <button
- className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
- onClick={() => setSelectionMode(true)}
- >
- <CheckSquare className="h-4 w-4" />
- <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
- Выбрать задания
- </span>
- </button>
- ) : (
- <button
- className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
- onClick={clearMultiSelection}
- >
- <XSquare className="h-4 w-4" />
- <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
- Отмена выбора
- </span>
- </button>
- )}
- </div>
- </div>
- <div
-  aria-live="polite"
-   className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${databaseIndicator.box}`}
- >
-  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${databaseIndicator.dot}`} />
-  <span>{databaseIndicator.label}</span>
-  {databaseIndicator.detail && (
-    <span className="opacity-70">· {databaseIndicator.detail}</span>
-  )}
- </div>
- {selectionMode && (
- <button
- type="button"
- onClick={selectAllShownItems}
- disabled={flatFilteredItems.length === 0}
- className="mb-3 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-stroke disabled:cursor-not-allowed disabled:opacity-60"
- >
- Выбрать все показанные ({flatFilteredItems.length})
- </button>
- )}
- {selectionMode && multiSelectedIds.length > 0 && (
- <div className="mb-3 space-y-2 rounded-lg border border-stroke bg-surface p-2">
- <div className="flex items-center gap-1 text-xs font-semibold text-foreground/80">
- <span>Выбрано: {multiSelectedIds.length}</span>
- <span className="relative inline-flex">
- <button
- type="button"
- className="group inline-flex h-4 w-4 items-center justify-center rounded-full border border-stroke bg-surface-strong text-[10px] font-bold text-foreground/70 hover:bg-stroke focus:outline-none"
- aria-label="Подсказка по массовым действиям"
- >
- i
- <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-52 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block group-focus-visible:block">
- Действия применяются к выделенным заданиям.
- </span>
- </button>
- </span>
- </div>
- <div className="grid grid-cols-2 gap-2">
- <span className="group relative block w-full h-full">
- <button
- type="button"
- onClick={() => void applyBatchStatus()}
- disabled={batchSaving}
- className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
- >
- Применить статус
- </button>
- <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal text-center group-hover:block">
- Изменить статус у выделенных.
- </span>
- </span>
- <span className="group relative block w-full h-full">
- <button
- type="button"
- onClick={() => void applyBatchActivity()}
- disabled={batchSaving}
- className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
- >
- Применить активность
- </button>
- <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal text-center group-hover:block">
- Вкл/выкл выделенные задания.
- </span>
- </span>
- </div>
- <div className="grid grid-cols-2 gap-2">
- <span className="group relative block w-full h-full">
- <button
- type="button"
- onClick={() => setShowMoreBatchActions((v) => !v)}
- className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
- >
- Параметры
- </button>
- <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal text-center group-hover:block">
- Показать/скрыть расширенные параметры.
- </span>
- </span>
- <span className="group relative block w-full h-full">
- <button
- type="button"
- onClick={clearMultiSelection}
- className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke"
- >
- Снять выделение
- </button>
- <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal text-center group-hover:block">
- Снять текущее выделение.
- </span>
- </span>
- </div>
- {showMoreBatchActions ? (
- <div className="grid grid-cols-1 gap-2">
- <Select
-              value={batchStatus}
-              onValueChange={(value) => setBatchStatus(value as typeof batchStatus)}
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {qualityStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
- <Select
-              value={batchIsActive}
-              onValueChange={(value) => setBatchIsActive(value as typeof batchIsActive)}
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Активно</SelectItem>
-                <SelectItem value="inactive">Неактивно</SelectItem>
-              </SelectContent>
-            </Select>
- </div>
- ) : null}
- </div>
- )}
- <div className="mb-4 space-y-3">
- <div className="relative">
- <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
- <input
- className={`${inputClass} pl-9`}
- placeholder="Поиск: id / seed_key / текст"
- value={listQuery}
- onChange={(e) => setListQuery(e.target.value)}
+ <AdminExerciseSidebar
+  sidebarRef={sidebarRef}
+  hasActiveListFilter={hasActiveListFilter}
+  matchingItems={matchingItems}
+  totalItems={totalItems}
+  initialListPending={initialListPending}
+  shownCount={flatFilteredItems.length}
+  databaseIndicator={databaseIndicator}
+  selectionMode={selectionMode}
+  shownItemsCount={flatFilteredItems.length}
+  selectedCount={multiSelectedIds.length}
+  batchSaving={batchSaving}
+  showMoreBatchActions={showMoreBatchActions}
+  batchStatus={batchStatus}
+  batchIsActive={batchIsActive}
+  listQuery={listQuery}
+  listTypeFilter={listTypeFilter}
+  listExamTypeFilter={listExamTypeFilter}
+  listStatusFilter={listStatusFilter}
+  listSortBy={listSortBy}
+  listSortDir={listSortDir}
+  sortPrefsReady={sortPrefsReady}
+  listTypes={listTypes}
+  listExamTypes={listExamTypes}
+  rawPreviewFilter={rawPreviewFilter}
+  rawPreviewLimit={rawPreviewLimit}
+  rawPreviewLoading={rawPreviewLoading}
+  rawPreviewItems={rawPreviewItems}
+  groupedItems={groupedItems}
+  selectedId={selectedId}
+  multiSelectedSet={multiSelectedSet}
+  hasMore={hasMore}
+  loadingMore={loadingMore}
+  onRefreshList={() => void refreshList({ includeTotal: true, force: true })}
+  onEnableSelectionMode={() => setSelectionMode(true)}
+  onClearSelection={clearMultiSelection}
+  onSelectAllShownItems={selectAllShownItems}
+  onApplyBatchStatus={() => void applyBatchStatus()}
+  onApplyBatchActivity={() => void applyBatchActivity()}
+  onToggleBatchMore={() => setShowMoreBatchActions((value) => !value)}
+  onBatchStatusChange={setBatchStatus}
+  onBatchIsActiveChange={setBatchIsActive}
+  onListQueryChange={setListQuery}
+  onListTypeFilterChange={setListTypeFilter}
+  onListExamTypeFilterChange={setListExamTypeFilter}
+  onListStatusFilterChange={setListStatusFilter}
+  onListSortByChange={setListSortBy}
+  onListSortDirChange={setListSortDir}
+  onRawPreviewFilterChange={setRawPreviewFilter}
+  onRawPreviewLimitChange={setRawPreviewLimit}
+  onRunRawPreviewAudit={() => void runRawPreviewAudit()}
+  onToggleSelection={toggleMultiSelectionByClick}
+  onOpenExercise={(id) => void openExerciseWithAutosave(id)}
+  onLoadMore={() => void loadMore()}
+  formatUpdatedAt={formatUpdatedAt}
  />
- </div>
- <div className="grid grid-cols-2 gap-2">
- <Select
-            value={listTypeFilter}
-            onValueChange={(value) => setListTypeFilter(value)}
-          >
-            <SelectTrigger className={inputClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {listTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type === 'all' ? 'Все типы' : type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
- <Select
-            value={listExamTypeFilter}
-            onValueChange={(value) => setListExamTypeFilter(value)}
-          >
-            <SelectTrigger className={inputClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {listExamTypes.map((n) => (
-                <SelectItem key={n} value={n}>
-                  {n === 'all' ? 'ЕГЭ: все' : `ЕГЭ: ${n}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
- </div>
- <div className="grid grid-cols-1 gap-2">
- <Select
-            value={listStatusFilter}
-            onValueChange={(value) => setListStatusFilter(value)}
-          >
-            <SelectTrigger className={inputClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все статусы</SelectItem>
-              {qualityStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
- </div>
-          <div>
-            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-foreground/50">
-              <span className="uppercase tracking-wider">Сортировка</span>
-              {sortPrefsReady && (listSortBy !== 'id' || listSortDir !== 'asc') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setListSortBy('id');
-                    setListSortDir('asc');
-                  }}
-                  className="group relative flex items-center gap-1 hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                  Сбросить
-                  <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                    Сбросить сортировку
-                  </span>
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              {sortPrefsReady ? (
-                <>
-                  <Select
-                    value={listSortBy}
-                    onValueChange={(value) => setListSortBy(value as typeof listSortBy)}
-                  >
-                    <SelectTrigger className={inputClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="id">По номеру</SelectItem>
-                      <SelectItem value="updatedAt">По дате изменения</SelectItem>
-                      <SelectItem value="type">По типу</SelectItem>
-                      <SelectItem value="status">По статусу</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <button
-                    type="button"
-                    onClick={() => setListSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                    className="group relative flex w-10 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition hover:bg-stroke hover:text-foreground"
-                  >
-                    {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                    <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                      {listSortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}
-                    </span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="h-10 w-full rounded-lg border border-stroke bg-surface animate-pulse" />
-                  <div className="h-10 w-10 rounded-lg border border-stroke bg-surface animate-pulse" />
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-dashed border-stroke/70 bg-surface/30 p-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground/50">Raw HTML Preview</div>
-            <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
-              <input
-                className={`${inputClass} bg-surface-strong`}
-                placeholder="Файл (напр. 56151015)"
-                value={rawPreviewFilter}
-                onChange={(e) => setRawPreviewFilter(e.target.value)}
-              />
-              <input
-                className={`${inputClass} bg-surface-strong`}
-                type="number"
-                min={1}
-                max={20}
-                value={rawPreviewLimit}
-                onChange={(e) => setRawPreviewLimit(Math.max(1, Math.min(20, Number(e.target.value) || 3)))}
-              />
-            </div>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-lg bg-foreground/5 px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => void runRawPreviewAudit()}
-              disabled={rawPreviewLoading}
-            >
-              {rawPreviewLoading ? 'Сканирование...' : 'Сканировать raw HTML'}
-            </button>
-            {rawPreviewItems.length > 0 ? (
-              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
-                {rawPreviewItems.map((item) => (
-                  <div key={item.file} className="rounded-md border border-stroke bg-surface-strong p-2 text-xs">
-                    <div className="font-semibold text-foreground/80">{item.file}</div>
-                    <div className="mt-1 text-foreground/70">
-                      пробелы-перед-пунктуацией: {item.beforeIssues.spacesBeforePunct} → {item.afterIssues.spacesBeforePunct}
-                    </div>
-                    <div className="mt-1 grid gap-1">
-                      <div className="rounded border border-stroke bg-surface p-1 text-foreground/70">
-                        <span className="font-medium">До:</span> {item.beforeSnippet}
-                      </div>
-                      <div className="rounded border border-stroke bg-surface p-1 text-foreground/70">
-                        <span className="font-medium">После:</span> {item.afterSnippet}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
- {groupedItems.map(([type, typeItems]) => (
- <div key={type} className="space-y-2">
- <div className="sticky top-0 z-10 rounded-md border border-stroke bg-surface px-2 py-1 text-xs font-semibold text-foreground/80">
- {type} · {typeItems.length}
- </div>
- {typeItems.map((item) => (
- <button
- key={item.id}
- onClick={(e) => toggleMultiSelectionByClick(item.id, e)}
- onDoubleClick={() => {
- if (selectionMode) void openExerciseWithAutosave(item.id);
- }}
- onKeyDown={(e) => {
- if (selectionMode && e.key === 'Enter') {
- e.preventDefault();
- void openExerciseWithAutosave(item.id);
- }
- }}
- className={`w-full rounded-xl border p-3 text-left transition focus:outline-none ${
- multiSelectedSet.has(item.id)
- ? 'border-primary/50 bg-primary/10'
- : selectedId === item.id
- ? 'border-foreground/30 bg-foreground/5'
- : 'border-stroke hover:border-stroke hover:bg-foreground/5'
- }`}
- >
- {selectionMode ? (
- <div className="mb-1 flex items-center justify-between">
- <span className="text-[10px] text-foreground/60">Shift/Ctrl</span>
- {multiSelectedSet.has(item.id) ? (
- <span className="text-[10px] font-semibold text-primary">выбрано</span>
- ) : null}
- </div>
- ) : null}
- <div className="text-xs text-foreground/70">
- #{item.id} • {item.qualityStatus}
- </div>
- <div className="mt-0.5 text-[11px] text-foreground/60">
- обновлено: {formatUpdatedAt(item.updatedAt)}
- </div>
- <div className="line-clamp-2 text-sm text-foreground">{item.prompt}</div>
- </button>
- ))}
- </div>
- ))}
- {initialListPending ? (
- <div className="space-y-2">
- <div className="h-6 rounded-md border border-stroke bg-surface animate-pulse" />
- <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
- <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
- <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
- <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
- <div className="h-20 rounded-xl border border-stroke bg-surface animate-pulse" />
- </div>
- ) : groupedItems.length === 0 && (
- <div className="rounded-lg border border-dashed border-stroke px-3 py-4 text-sm text-foreground/60">
- Ничего не найдено по текущим фильтрам.
- </div>
- )}
- {hasMore && (
- <div className="mt-2 text-center">
- <div className="mb-2 text-[11px] font-medium text-foreground/50">
-  Можно загрузить ещё
- </div>
- <button
- type="button"
- onClick={() => void loadMore()}
- disabled={loadingMore}
- className="w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
- >
- {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
- </button>
- </div>
- )}
- </div>
- </aside>
 
  <div className={`rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm ${initialSelectionPending && !initialSelectedExercise ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity`}>
- <div className="mb-4 flex items-center justify-between">
- <h2 className="text-xl font-semibold text-foreground ">
- {isEdit ? 'Редактирование задания' : 'Создание задания'}
- </h2>
- {hasUnsavedChanges ? <span className="text-xs font-medium text-amber-600">Есть несохранённые изменения</span> : null}
- <div className="flex items-center gap-2">
- <button
- type="button"
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/70 hover:bg-stroke"
- onClick={undoForm}
- title="Undo"
- >
- Undo
- </button>
- <button
- type="button"
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/70 hover:bg-stroke"
- onClick={redoForm}
- title="Redo"
- >
- Redo
- </button>
- <button
- type="button"
- className="rounded-md px-2 py-1 text-xs font-medium text-foreground/70 hover:bg-stroke"
- onClick={() => {
- setForm(loadFormState(null, EMPTY));
- setSelectedId(null);
- setDatabaseSaveState('draft');
- setDatabaseSavedAt(null);
- clearExerciseUrlSelection();
- setMessage('');
- setIsSeedRegenerateArmed(false);
- setShowSeedRegenerateModal(false);
- }}
- >
- Новый черновик
- </button>
- </div>
- </div>
+ <AdminEditorHeader
+ isEdit={isEdit}
+ hasUnsavedChanges={hasUnsavedChanges}
+ onUndo={undoForm}
+ onRedo={redoForm}
+ onNewDraft={startNewDraft}
+ />
 
- {message && (
- <div
- className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-5 ${
- isError
- ? 'border-red-200 bg-red-50 text-red-700'
- : 'border-emerald-200 bg-emerald-50 text-emerald-700'
- }`}
- >
- {message}
- </div>
- )}
+ <AdminMessageToast message={message} isError={isError} />
 
  <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
  <form
  ref={formRef}
  onSubmit={onSubmit}
  >
- <div className="grid gap-3 sm:grid-cols-3">
- <Input label="Тип">
- <Select
-                      value={form.type}
-                      onValueChange={(value) => {
-                        const nextType = value as Form['type'];
-                        setForm((f) => {
-                          const nextForm = convertFormForTypeChange(f, nextType);
-                          const transferMessage = buildTypeChangeMessage(f, nextForm);
-                          if (transferMessage) {
-                            setIsError(false);
-                            setMessage(transferMessage);
-                          }
-                          return nextForm;
-                        });
-                      }}
-                    >
-                      <SelectTrigger className={inputClass}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {typeOptions.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
- </Input>
- <Input label="Категория">
- <Select
-              value={form.category}
-              onValueChange={(value) =>
-                setForm((f) => ({
-                  ...f,
-                  category: value as ExerciseCategory,
-                }))
-              }
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
- </Input>
- <Input label="Сложность">
- <Select
-              value={String(form.difficulty)}
-              onValueChange={(value) =>
-                setForm((f) => ({ ...f, difficulty: Number(value) as 1 | 2 }))
-              }
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1</SelectItem>
-                <SelectItem value="2">2</SelectItem>
-              </SelectContent>
-            </Select>
- </Input>
- </div>
-
- <div className="mt-3 grid gap-3 sm:grid-cols-2">
- <Input label="Seed key">
- <div className="flex gap-2">
- <input
- className={inputClass}
- value={form.seedKey}
- onChange={(e) => {
- setIsSeedRegenerateArmed(false);
- setForm((f) => ({ ...f, seedKey: e.target.value }));
- }}
- placeholder="e.g. ege21-task-abc123ef"
- />
- <button
- type="button"
- onClick={handleGenerateSeedClick}
- className="shrink-0 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-xs font-semibold text-foreground/80 transition hover:bg-surface"
- title="Сгенерировать seed key"
- >
- Сгенерировать
- </button>
- </div>
- </Input>
- <Input label="Skill tags">
- <input
- className={inputClass}
- value={form.skillTags}
- onChange={(e) => setForm((f) => ({ ...f, skillTags: e.target.value }))}
- />
- </Input>
- </div>
-
- <AdminMarkdownEditor
- label="Формулировка"
- value={form.prompt}
- onChange={(prompt) => setForm((f) => ({ ...f, prompt }))}
- colorMode={currentTheme === 'dark' ? 'dark' : 'light'}
- />
- <AdminMarkdownEditor
- label="Объяснение"
- value={form.explanation}
- onChange={(explanation) => setForm((f) => ({ ...f, explanation }))}
- colorMode={currentTheme === 'dark' ? 'dark' : 'light'}
+ <AdminCoreFields
+ form={form}
+ typeOptions={typeOptions}
+ setForm={setForm}
+ onTypeChange={handleTypeChange}
+ onGenerateSeedClick={handleGenerateSeedClick}
+ onSeedManualChange={() => setIsSeedRegenerateArmed(false)}
  />
 
- {(form.type === 'multiple_choice' || form.type === 'ege_multi_select') && (
- <div className="mt-3 space-y-2">
- <div className="text-sm font-medium text-foreground/80">Варианты ответа</div>
- {form.options.map((option, index) => (
- <div key={index} className="flex items-center gap-2">
- {form.type === 'multiple_choice' ? (
- <input
- type="radio"
- checked={form.correctOptionIndex === index}
- onChange={() => setForm((f) => ({ ...f, correctOptionIndex: index }))}
- />
- ) : (
- <span className="inline-flex w-5 justify-center text-xs font-semibold text-foreground/60">
- {index + 1}
- </span>
- )}
- <input
- className={inputClass}
- value={option}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- options: f.options.map((value, idx) =>
- idx === index ? e.target.value : value,
- ),
- }))
- }
- />
- {form.options.length > 2 && (
- <button
- type="button"
- onClick={() =>
- setForm((f) => {
- const newOptions = f.options.filter((_, idx) => idx !== index);
- let newCorrect = f.correctOptionIndex;
- if (newCorrect === index) newCorrect = 0;
- else if (newCorrect > index) newCorrect--;
- return { ...f, options: newOptions, correctOptionIndex: newCorrect };
- })
- }
- className="p-1 text-slate-400 transition hover:text-red-500"
- title="Удалить вариант"
- >
- <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
- </svg>
- </button>
- )}
- </div>
- ))}
- <button
- type="button"
- className="rounded-md border border-stroke px-2 py-1 text-xs text-foreground/80 hover:bg-surface"
- onClick={() => setForm((f) => ({ ...f, options: [...f.options, ''] }))}
- >
- Добавить вариант
- </button>
- {form.type === 'ege_multi_select' && (
- <Input label="Правильные номера (через запятую)" className="mt-2">
- <input
- className={inputClass}
- value={form.multiCorrectOptionIndexes}
- onChange={(e) =>
- setForm((f) => ({ ...f, multiCorrectOptionIndexes: e.target.value }))
- }
- />
- </Input>
- )}
- </div>
- )}
+ <AdminChoiceFields form={form} setForm={setForm} />
 
  {form.type === 'fill_blank' && (
  <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2880,153 +1511,9 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  )}
 
- {form.type === 'dictation' && (
- <div className="mt-3 space-y-3">
- <Input label="Название диктанта">
- <input
- className={inputClass}
- value={form.dictationTitle}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationTitle: e.target.value }))
- }
- placeholder="Цифровой след"
- />
- </Input>
- <Input label="Путь к аудио">
- <input
- className={inputClass}
- value={form.dictationAudioSrc}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationAudioSrc: e.target.value }))
- }
- placeholder="/voice_memos/audio_2026-06-08_00-53-43.ogg"
- />
- </Input>
- <Input label="Скорости воспроизведения">
- <input
- className={inputClass}
- value={form.dictationPlaybackRates}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationPlaybackRates: e.target.value }))
- }
- placeholder="0.75, 1, 1.25, 1.5"
- />
- </Input>
- <Input label="Эталонная расшифровка">
- <textarea
- className={inputClass}
- rows={6}
- value={form.dictationText}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationText: e.target.value }))
- }
- placeholder="Текст, который должен повторить ученик."
- />
- </Input>
- <div className="grid gap-3 sm:grid-cols-2">
- <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
- <input
- type="checkbox"
- checked={form.dictationCaseSensitive}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationCaseSensitive: e.target.checked }))
- }
- />
- Учитывать регистр
- </label>
- <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
- <input
- type="checkbox"
- checked={form.dictationIgnorePunctuation}
- onChange={(e) =>
- setForm((f) => ({ ...f, dictationIgnorePunctuation: e.target.checked }))
- }
- />
- Игнорировать пунктуацию
- </label>
- </div>
- </div>
- )}
+ <AdminDictationFields form={form} setForm={setForm} />
 
- {form.type === 'orthography_repair' && (
- <div className="mt-3 space-y-3">
- <Input label="Текст с ошибкой">
- <textarea
- className={inputClass}
- rows={4}
- value={form.orthographyRepairText}
- onChange={(e) =>
- setForm((f) => ({ ...f, orthographyRepairText: e.target.value }))
- }
- placeholder="Имейте ввиду, что она займет у Вас целый день."
- />
- </Input>
- <Input label="Режим">
- <Select
- value={form.orthographyRepairMode}
- onValueChange={(value) =>
- setForm((f) => ({
- ...f,
- orthographyRepairMode:
- value === 'click_then_type' ? 'click_then_type' : 'click_then_choose',
- }))
- }
- >
- <SelectTrigger className={inputClass}>
- <SelectValue />
- </SelectTrigger>
- <SelectContent>
- <SelectItem value="click_then_choose">click_then_choose</SelectItem>
- <SelectItem value="click_then_type">click_then_type</SelectItem>
- </SelectContent>
- </Select>
- </Input>
- <Input label="Targets (id | surface | replacement | type | options | occurrence)">
- <textarea
- className={inputClass}
- rows={5}
- value={form.orthographyRepairTargets}
- onChange={(e) =>
- setForm((f) => ({ ...f, orthographyRepairTargets: e.target.value }))
- }
- placeholder="target_1 | ввиду | в виду | span | ввиду, в виду, в-виду"
- />
- </Input>
- <Input label="Repairs (targetId | correct)">
- <textarea
- className={inputClass}
- rows={3}
- value={form.orthographyRepairRepairs}
- onChange={(e) =>
- setForm((f) => ({ ...f, orthographyRepairRepairs: e.target.value }))
- }
- placeholder="target_1 | в виду"
- />
- </Input>
- <Input label="Подсказки (по одной на строку)">
- <textarea
- className={inputClass}
- rows={3}
- value={form.orthographyRepairHints}
- onChange={(e) =>
- setForm((f) => ({ ...f, orthographyRepairHints: e.target.value }))
- }
- placeholder={'Ошибка в устойчивом сочетании.\nПравильно: иметь в виду.'}
- />
- </Input>
- <Input label="Правильный текст целиком (optional)">
- <textarea
- className={inputClass}
- rows={3}
- value={form.orthographyRepairCorrectText}
- onChange={(e) =>
- setForm((f) => ({ ...f, orthographyRepairCorrectText: e.target.value }))
- }
- placeholder="Полный текст после исправления, только для показа."
- />
- </Input>
- </div>
- )}
+ <AdminOrthographyRepairFields form={form} setForm={setForm} />
 
  {form.type === 'order_fragments' && (
  <div className="mt-3 space-y-3">
@@ -3087,104 +1574,7 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  )}
 
- {form.type === 'punctuation_constructor' && (
- <div className="mt-3 space-y-3">
- <Input label="Токены предложения (через |)">
- <textarea
- className={inputClass}
- rows={2}
- value={form.punctuationConstructorTokens}
- onChange={(e) =>
- setForm((f) => ({ ...f, punctuationConstructorTokens: e.target.value }))
- }
- placeholder="Мне | сказали | Ждите | приедет | другой | замерщик"
- />
- </Input>
- <Input label="Банк знаков: period, comma, semicolon, colon, question, exclamation, quote_open, quote_close, paren_open, paren_close, dash, ellipsis">
- <input
- className={inputClass}
- value={form.punctuationConstructorMarkBank}
- onChange={(e) =>
- setForm((f) => ({ ...f, punctuationConstructorMarkBank: e.target.value }))
- }
- />
- </Input>
- <Input label="Подсказки (по одной на строку)">
- <textarea
- className={inputClass}
- rows={3}
- value={form.punctuationConstructorHints}
- onChange={(e) =>
- setForm((f) => ({ ...f, punctuationConstructorHints: e.target.value }))
- }
- placeholder={'В предложении есть прямая речь.\nПосле слов автора нужен знак.'}
- />
- </Input>
- <Input label="Пошаговый режим (id | title | slot | marks)">
- <textarea
- className={inputClass}
- rows={4}
- value={form.punctuationConstructorGuidedSteps}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- punctuationConstructorGuidedSteps: e.target.value,
- }))
- }
- placeholder={'author_end | Где заканчиваются слова автора? | 2 | colon\nopen_quote | Где начинается прямая речь? | 2 | quote_open'}
- />
- </Input>
- <Input label="Правильные слоты (slot:mark)">
- <input
- className={inputClass}
- value={form.punctuationConstructorPlacements}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- punctuationConstructorPlacements: e.target.value,
- }))
- }
- placeholder="2:colon, 2:quote_open, 3:comma, 6:quote_close, 6:period"
- />
- </Input>
- <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
- <div className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-emerald-700">
- Правильный ответ
- </div>
- <div className="text-base font-semibold leading-7 text-emerald-950">
- {renderPunctuationConstructorAnswer(
- form.punctuationConstructorTokens,
- form.punctuationConstructorPlacements,
- ) || 'Заполните токены и правильные слоты'}
- </div>
- </div>
- <Input label="Разбор слотов (slot | marks | text)">
- <textarea
- className={inputClass}
- rows={3}
- value={form.punctuationConstructorSlotExplanations}
- onChange={(e) =>
- setForm((f) => ({
- ...f,
- punctuationConstructorSlotExplanations: e.target.value,
- }))
- }
- placeholder={'2 | colon, quote_open | После слов автора ставится двоеточие и открываются кавычки.\n6 | quote_close, period | Реплика закрывается кавычкой, затем ставится точка.'}
- />
- </Input>
- <Input label="Структура (label | tokenStart | tokenEnd | kind)">
- <textarea
- className={inputClass}
- rows={2}
- value={form.punctuationConstructorSegments}
- onChange={(e) =>
- setForm((f) => ({ ...f, punctuationConstructorSegments: e.target.value }))
- }
- placeholder={'Слова автора | 0 | 1 | author_words\nПрямая речь | 2 | 5 | direct_speech'}
- />
- </Input>
- </div>
- )}
+ <AdminPunctuationConstructorFields form={form} setForm={setForm} />
 
  {form.type === 'ege20_complex_sentence_punctuation' && (
  <div className="mt-3 space-y-3">
@@ -3266,323 +1656,68 @@ async function openExerciseWithAutosave(id: number) {
  </div>
  )}
 
- <div className="mt-3 grid gap-3 sm:grid-cols-2">
- <Input label="Source alignment">
- <input
- className={inputClass}
- value={form.sourceAlignment}
- onChange={(e) => setForm((f) => ({ ...f, sourceAlignment: e.target.value }))}
+ <AdminMetaFields
+ form={form}
+ setForm={setForm}
+ mainSaveAnchorRef={mainSaveAnchorRef}
+ saving={saving}
+ deleting={deleting}
+ isEdit={isEdit}
+ onDeleteClick={() => setShowDeleteConfirmModal(true)}
  />
- </Input>
- <Input label="Типичная ошибка">
- <input
- className={inputClass}
- value={form.typicalMistake}
- onChange={(e) => setForm((f) => ({ ...f, typicalMistake: e.target.value }))}
- />
- </Input>
- </div>
-
- <Input label="Algorithm steps (по строкам)" className="mt-3">
- <textarea
- className={inputClass}
- rows={3}
- value={form.algorithmSteps}
- onChange={(e) => setForm((f) => ({ ...f, algorithmSteps: e.target.value }))}
- />
- </Input>
-
- <div className="mt-3 grid gap-3 sm:grid-cols-2">
- <Input label="Статус качества">
- <Select
-              value={form.qualityStatus}
-              onValueChange={(value) =>
-                setForm((f) => ({
-                  ...f,
-                  qualityStatus: value as Form['qualityStatus'],
-                }))
-              }
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {qualityStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
- </Input>
- <Input label="Активность">
- <Select
-              value={form.isActive ? 'active' : 'inactive'}
-              onValueChange={(value) =>
-                setForm((f) => ({ ...f, isActive: value === 'active' }))
-              }
-            >
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Активно</SelectItem>
-                <SelectItem value="inactive">Неактивно</SelectItem>
-              </SelectContent>
-            </Select>
- </Input>
- </div>
-
- <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
- <button
- disabled={saving || deleting}
- className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700"
- >
- {saving
- ? 'Сохранение...'
- : isEdit
- ? 'Сохранить изменения'
- : 'Создать задание'}
- </button>
- {isEdit ? (
- <button
- type="button"
- disabled={saving || deleting}
- onClick={() => setShowDeleteConfirmModal(true)}
- className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
- >
- {deleting ? 'Удаление...' : 'Удалить'}
- </button>
- ) : null}
- </div>
  </form>
 
- <div className="h-fit rounded-2xl border border-stroke bg-surface-strong p-4 2xl:sticky 2xl:top-4">
- <div className="mb-2 flex items-center justify-between gap-2">
- <h3 className="text-sm font-semibold text-foreground ">Превью в чате</h3>
- <div className="inline-flex rounded-md border border-stroke bg-surface p-0.5 text-xs ">
- <button
- type="button"
- onClick={() => setPreviewMode('desktop')}
- className={`rounded px-2 py-1 ${
- previewMode === 'desktop'
- ? 'bg-primary text-white'
- : 'text-foreground/80 hover:bg-stroke'
- }`}
- >
- Desktop
- </button>
- <button
- type="button"
- onClick={() => setPreviewMode('mobile')}
- className={`rounded px-2 py-1 ${
- previewMode === 'mobile'
- ? 'bg-primary text-white'
- : 'text-foreground/80 hover:bg-stroke'
- }`}
- >
- Mobile
- </button>
- </div>
- </div>
- {preview.error ? (
- <p className="text-sm text-amber-700">Превью недоступно: {preview.error}</p>
- ) : preview.exercise ? (
- <div className={previewMode === 'mobile' ? 'mx-auto w-[320px] max-w-full' : 'w-full'}>
- <div className="mb-2 rounded-xl bg-surface px-4 py-3 text-sm text-foreground shadow-sm [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0">
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(preview.exercise.prompt)}</ReactMarkdown>
- </div>
-        <ExerciseRenderer
-          exercise={preview.exercise}
-          onSubmit={handlePreviewSubmit}
-          previewMode={true}
-        />
-        {preview.exercise.type === 'dictation' ? (
-          <form onSubmit={handlePreviewDictationSubmit} className="mt-3 space-y-2">
-            <textarea
-              rows={3}
-              value={previewDictationText}
-              onChange={(event) => {
-                setPreviewDictationText(event.target.value);
-                setPreviewCheckResult(null);
-              }}
-              placeholder="Введите услышанный текст для проверки..."
-              className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
-            />
-            <button
-              type="submit"
-              disabled={!previewDictationText.trim()}
-              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)]"
-            >
-              Проверить диктант
-            </button>
-          </form>
-        ) : null}
-  {previewCheckResult && (
-  <div
-  className={`relative mt-3 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
-  preview.exercise.type === 'dictation'
-  ? 'border-cyan-200 bg-cyan-50 text-cyan-950 before:bg-cyan-400 dark:border-cyan-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-cyan-300/65'
-  :
-  previewCheckResult.isCorrect
-  ? 'border-emerald-200 bg-emerald-50 text-emerald-900 before:bg-emerald-400 dark:border-emerald-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-emerald-300/65 [&>p:first-child]:dark:text-emerald-200'
-  : 'border-amber-200 bg-amber-50 text-amber-900 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/70 [&>p:first-child]:dark:text-amber-200'
-  }`}
-  >
- {previewFeedbackSections ? (
- <div className="space-y-3">
- {previewFeedbackSections.lead ? (
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.lead)}</ReactMarkdown>
- ) : null}
- <div className="rounded-xl border border-emerald-200 bg-emerald-100/60 px-3 py-2 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/30 dark:text-emerald-200">
- <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
- Правильный ответ
- </div>
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.correctAnswer)}</ReactMarkdown>
- </div>
- <div className="rounded-xl border border-stroke bg-surface-strong/70 px-3 py-2 text-foreground">
- <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/80 ">
- Объяснение
- </div>
- <FormattedFeedbackExplanation text={previewFeedbackSections.explanation} />
- </div>
- </div>
- ) : (
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewCheckResult.text)}</ReactMarkdown>
- )}
- </div>
- )}
- </div>
- ) : (
- <p className="text-sm text-foreground/60">Заполните поля задания для превью.</p>
- )}
- </div>
+ <AdminPreviewPanel
+ preview={preview}
+ previewMode={previewMode}
+ previewCheckResult={previewCheckResult}
+ previewFeedbackSections={previewFeedbackSections}
+ previewDictationText={previewDictationText}
+ onPreviewModeChange={setPreviewMode}
+ onPreviewSubmit={handlePreviewSubmit}
+ onPreviewDictationSubmit={handlePreviewDictationSubmit}
+ onPreviewDictationTextChange={(text) => {
+ setPreviewDictationText(text);
+ setPreviewCheckResult(null);
+ }}
+ />
  </div>
  </div>
 
- <div
- className={`fixed right-6 bottom-6 z-40 hidden xl:block transition-all duration-200 ${
- showFloatingSave ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
- }`}
- >
- <button
- type="button"
+ <FloatingSaveButton
+ visible={showFloatingSave}
+ saving={saving}
+ deleting={deleting}
+ isEdit={isEdit}
  onClick={() => formRef.current?.requestSubmit()}
- disabled={!showFloatingSave || saving || deleting}
- className={`rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700 ${
- showFloatingSave ? 'pointer-events-auto' : 'pointer-events-none'
- }`}
- >
- {saving
- ? 'Сохранение...'
- : isEdit
- ? 'Сохранить изменения'
- : 'Создать задание'}
- </button>
- </div>
+ />
 
- {draftRecovery && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-all">
- <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-stroke/50 bg-surface-strong shadow-2xl">
- <div className="border-b border-stroke/50 bg-surface/30 p-6">
- <div className="flex items-center gap-4">
- <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 shadow-sm">
- <History className="h-6 w-6" />
- </div>
- <div>
- <p className="text-[11px] font-bold uppercase tracking-wider text-amber-500">
- Локальная страховочная копия
- </p>
- <h4 className="mt-1 text-lg font-bold tracking-tight text-foreground">
- Восстановление задания #{draftRecovery.id}
- </h4>
- </div>
- </div>
- </div>
- <div className="p-6">
- <p className="text-sm leading-relaxed text-foreground/75">
- В браузере осталась версия, которая отличается от данных в базе. Можно восстановить её и продолжить редактирование
- или отказаться от неё и открыть текущую версию из базы.
- </p>
- <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
- <button
- type="button"
- className="rounded-xl border border-stroke/60 bg-surface px-4 py-3 text-sm font-semibold text-foreground/70 transition-all hover:bg-stroke/40 hover:text-foreground"
- onClick={useDatabaseVersion}
- >
- Использовать версию из БД
- </button>
- <button
- type="button"
- className="rounded-xl bg-gradient-to-r from-primary to-primary-strong px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 active:translate-y-0"
- onClick={useRecoveredDraft}
- >
- Восстановить изменения
- </button>
- </div>
- </div>
- </div>
- </div>
- )}
+ {draftRecovery ? (
+ <AdminDraftRecoveryModal
+ exerciseId={draftRecovery.id}
+ onUseDatabaseVersion={useDatabaseVersion}
+ onUseRecoveredDraft={useRecoveredDraft}
+ />
+ ) : null}
 
- {showSeedRegenerateModal && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
- <div className="w-full max-w-md rounded-2xl border border-stroke bg-surface-strong p-5 shadow-xl ">
- <h4 className="text-base font-semibold text-foreground ">Подтверждение</h4>
- <p className="mt-2 text-sm text-foreground/80 ">
- Вы уверены, что хотите перегенерировать сид?
- </p>
- <div className="mt-4 flex justify-end gap-2">
- <button
- type="button"
- className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 hover:bg-surface "
- onClick={() => setShowSeedRegenerateModal(false)}
- >
- Отмена
- </button>
- <button
- type="button"
- className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-strong"
- onClick={() => {
+ {showSeedRegenerateModal ? (
+ <SeedRegenerateConfirmModal
+ onCancel={() => setShowSeedRegenerateModal(false)}
+ onConfirm={() => {
  generateSeedKey();
  setShowSeedRegenerateModal(false);
  }}
- >
- Перегенерировать
- </button>
- </div>
- </div>
- </div>
- )}
+ />
+ ) : null}
 
- {showDeleteConfirmModal && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
- <div className="w-full max-w-md rounded-2xl border border-stroke bg-surface-strong p-5 shadow-xl ">
- <h4 className="text-base font-semibold text-foreground ">Подтверждение удаления</h4>
- <p className="mt-2 text-sm text-foreground/80 ">
- Удалить упражнение {form.seedKey.trim() || `#${form.id}`}? Это действие также удалит связанные попытки и не может быть отменено.
- </p>
- <div className="mt-4 flex justify-end gap-2">
- <button
- type="button"
- className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 hover:bg-surface "
- onClick={() => setShowDeleteConfirmModal(false)}
- disabled={deleting}
- >
- Отмена
- </button>
- <button
- type="button"
- className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
- onClick={() => void handleDeleteExercise()}
- disabled={deleting}
- >
- {deleting ? 'Удаление...' : 'Удалить'}
- </button>
- </div>
- </div>
- </div>
- )}
+ {showDeleteConfirmModal ? (
+ <DeleteExerciseConfirmModal
+ exerciseLabel={form.seedKey.trim() || `#${form.id}`}
+ deleting={deleting}
+ onCancel={() => setShowDeleteConfirmModal(false)}
+ onConfirm={() => void handleDeleteExercise()}
+ />
+ ) : null}
  </div>
  );
 }

@@ -1,0 +1,135 @@
+import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
+import { inputClass, qualityStatuses } from '@/components/admin-form/constants';
+import type { Form } from '@/components/admin-form/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type AdminMetaFieldsProps = {
+ form: Form;
+ setForm: Dispatch<SetStateAction<Form>>;
+ mainSaveAnchorRef: RefObject<HTMLDivElement | null>;
+ saving: boolean;
+ deleting: boolean;
+ isEdit: boolean;
+ onDeleteClick: () => void;
+};
+
+export default function AdminMetaFields({
+ form,
+ setForm,
+ mainSaveAnchorRef,
+ saving,
+ deleting,
+ isEdit,
+ onDeleteClick,
+}: AdminMetaFieldsProps) {
+ return (
+  <>
+   <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <Field label="Source alignment">
+     <input
+      className={inputClass}
+      value={form.sourceAlignment}
+      onChange={(event) => setForm((current) => ({ ...current, sourceAlignment: event.target.value }))}
+     />
+    </Field>
+    <Field label="Типичная ошибка">
+     <input
+      className={inputClass}
+      value={form.typicalMistake}
+      onChange={(event) => setForm((current) => ({ ...current, typicalMistake: event.target.value }))}
+     />
+    </Field>
+   </div>
+
+   <Field label="Algorithm steps (по строкам)" className="mt-3">
+    <textarea
+     className={inputClass}
+     rows={3}
+     value={form.algorithmSteps}
+     onChange={(event) => setForm((current) => ({ ...current, algorithmSteps: event.target.value }))}
+    />
+   </Field>
+
+   <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <Field label="Статус качества">
+     <Select
+      value={form.qualityStatus}
+      onValueChange={(value) =>
+       setForm((current) => ({
+        ...current,
+        qualityStatus: value as Form['qualityStatus'],
+       }))
+      }
+     >
+      <SelectTrigger className={inputClass}>
+       <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+       {qualityStatuses.map((status) => (
+        <SelectItem key={status} value={status}>
+         {status}
+        </SelectItem>
+       ))}
+      </SelectContent>
+     </Select>
+    </Field>
+    <Field label="Активность">
+     <Select
+      value={form.isActive ? 'active' : 'inactive'}
+      onValueChange={(value) =>
+       setForm((current) => ({ ...current, isActive: value === 'active' }))
+      }
+     >
+      <SelectTrigger className={inputClass}>
+       <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+       <SelectItem value="active">Активно</SelectItem>
+       <SelectItem value="inactive">Неактивно</SelectItem>
+      </SelectContent>
+     </Select>
+    </Field>
+   </div>
+
+   <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <button
+     disabled={saving || deleting}
+     className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700"
+    >
+     {saving
+      ? 'Сохранение...'
+      : isEdit
+       ? 'Сохранить изменения'
+       : 'Создать задание'}
+    </button>
+    {isEdit ? (
+     <button
+      type="button"
+      disabled={saving || deleting}
+      onClick={onDeleteClick}
+      className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+     >
+      {deleting ? 'Удаление...' : 'Удалить'}
+     </button>
+    ) : null}
+   </div>
+  </>
+ );
+}
+
+function Field({
+ label,
+ children,
+ className = '',
+}: {
+ label: string;
+ children: ReactNode;
+ className?: string;
+}) {
+ return (
+  <label className={`block ${className}`}>
+   <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
+   {children}
+  </label>
+ );
+}

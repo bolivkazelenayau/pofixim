@@ -24,6 +24,13 @@ export type FeedbackSections = {
   explanation: string;
 };
 
+export type PreviewCheckResult = {
+  isCorrect: boolean;
+  text: string;
+  correctAnswer?: string;
+  detailedExplanation?: string;
+};
+
 export type ListItem = {
   id: number;
   type: string;
