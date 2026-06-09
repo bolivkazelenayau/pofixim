@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, BookOpenCheck, Trophy, X } from 'lucide-react';
 import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
+import { refreshEge13QuickCardAction } from '@/app/actions/exercises';
 
 type Ege13QuickGameProps = {
   cards: Ege13QuickCard[];
@@ -36,11 +37,12 @@ export default function Ege13QuickGame({
   const [scoreDelta, setScoreDelta] = useState(0);
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [isAnswerLocked, setIsAnswerLocked] = useState(false);
+  const [localCards, setLocalCards] = useState<Ege13QuickCard[]>(cards);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const finishedRef = useRef(false);
   const answerLockedRef = useRef(false);
-  const feedbackTimeoutRef = useRef<number | null>(null);
 
-  const currentCard = cards[index % Math.max(cards.length, 1)];
+  const currentCard = localCards[index % Math.max(localCards.length, 1)];
 
   const tokenFontClass = currentCard && currentCard.token.length > 14
     ? 'text-[clamp(1.5rem,7vw,2.4rem)] sm:text-[2.25rem]'
@@ -59,11 +61,7 @@ export default function Ege13QuickGame({
   }, [bestCombo, correctCount, onFinish, scoreDelta, wrongCount]);
 
   function start() {
-    if (cards.length === 0) return;
-    if (feedbackTimeoutRef.current !== null) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = null;
-    }
+    if (localCards.length === 0) return;
     finishedRef.current = false;
     answerLockedRef.current = false;
     setIsAnswerLocked(false);
@@ -98,35 +96,61 @@ export default function Ege13QuickGame({
     }
 
     setLastAnswerCorrect(isCorrect);
-    feedbackTimeoutRef.current = window.setTimeout(() => {
-      setIndex((value) => value + 1);
-      setLastAnswerCorrect(null);
-      answerLockedRef.current = false;
-      setIsAnswerLocked(false);
-      feedbackTimeoutRef.current = null;
-    }, 260);
   }, [currentCard, status]);
 
-  useEffect(() => {
-    return () => {
-      if (feedbackTimeoutRef.current !== null) {
-        window.clearTimeout(feedbackTimeoutRef.current);
-      }
-    };
+  const nextCard = useCallback(() => {
+    setIndex((value) => value + 1);
+    setLastAnswerCorrect(null);
+    answerLockedRef.current = false;
+    setIsAnswerLocked(false);
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (!currentCard?.sourceExerciseId || isRefreshing) return;
+    setIsRefreshing(true);
+    const res = await refreshEge13QuickCardAction({
+      exerciseId: currentCard.sourceExerciseId,
+      cardId: currentCard.id,
+      rowIndex: currentCard.rowIndex,
+    });
+    if (res.success && res.card) {
+      setLocalCards((prev) =>
+        prev.map((c) => (c.id === currentCard.id ? res.card! : c)),
+      );
+    }
+    setIsRefreshing(false);
+  }, [currentCard, isRefreshing]);
+
+  useEffect(() => {
+    if (!isAnswerLocked) return;
+
+    const onFocus = () => {
+      void handleRefresh();
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isAnswerLocked, handleRefresh]);
 
   useEffect(() => {
     if (status !== 'running') return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft') answer(0);
-      if (event.key === 'ArrowRight') answer(1);
+      if (answerLockedRef.current) {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          nextCard();
+        }
+      } else {
+        if (event.key === 'ArrowLeft') answer(0);
+        if (event.key === 'ArrowRight') answer(1);
+      }
       if (event.key === 'Escape') finish();
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [answer, finish, status]);
+  }, [answer, finish, nextCard, status]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-md sm:items-center sm:px-3 sm:py-4">
@@ -165,7 +189,7 @@ export default function Ege13QuickGame({
             <button
               type="button"
               onClick={start}
-              disabled={cards.length === 0}
+              disabled={localCards.length === 0}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-45"
             >
               <BookOpenCheck className="h-5 w-5" />
@@ -219,27 +243,42 @@ export default function Ege13QuickGame({
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4">
-              <ChoiceButton
-                label={currentCard.choices[0]}
-                icon="left"
-                disabled={isAnswerLocked}
-                onClick={() => answer(0)}
-              />
-              <ChoiceButton
-                label={currentCard.choices[1]}
-                icon="right"
-                disabled={isAnswerLocked}
-                onClick={() => answer(1)}
-              />
-            </div>
+            {isAnswerLocked ? (
+              <div className="mt-3 sm:mt-4">
+                <button
+                  type="button"
+                  onClick={nextCard}
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong active:scale-[0.98] sm:text-lg"
+                >
+                  Далее
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4">
+                <ChoiceButton
+                  label={currentCard.choices[0]}
+                  icon="left"
+                  disabled={false}
+                  onClick={() => answer(0)}
+                />
+                <ChoiceButton
+                  label={currentCard.choices[1]}
+                  icon="right"
+                  disabled={false}
+                  onClick={() => answer(1)}
+                />
+              </div>
+            )}
 
-            <p className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
-              seed:{' '}
-              <span className="font-mono select-all">
-                {currentCard.seedKey ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
-              </span>
-            </p>
+            <div className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
+              <p>
+                seed:{' '}
+                <span className="font-mono select-all">
+                  {currentCard.seedKey ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
+                </span>
+              </p>
+            </div>
           </div>
         )}
 

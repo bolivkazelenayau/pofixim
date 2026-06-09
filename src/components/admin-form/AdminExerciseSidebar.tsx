@@ -10,116 +10,82 @@ import type { ListItem, RawPreviewItem } from './types';
 
 type AdminExerciseSidebarProps = {
   sidebarRef: RefObject<HTMLElement | null>;
-  hasActiveListFilter: boolean;
-  matchingItems: number | null;
-  totalItems: number | null;
-  initialListPending: boolean;
-  shownCount: number;
   databaseIndicator: DatabaseIndicator;
-  selectionMode: boolean;
-  shownItemsCount: number;
-  selectedCount: number;
-  batchSaving: boolean;
-  showMoreBatchActions: boolean;
-  batchStatus: (typeof qualityStatuses)[number];
-  batchIsActive: 'active' | 'inactive';
-  listQuery: string;
-  listTypeFilter: string;
-  listExamTypeFilter: string;
-  listStatusFilter: string;
-  listSortBy: 'id' | 'updatedAt' | 'type' | 'status';
-  listSortDir: 'asc' | 'desc';
-  sortPrefsReady: boolean;
-  listTypes: string[];
-  listExamTypes: string[];
-  rawPreviewFilter: string;
-  rawPreviewLimit: number;
-  rawPreviewLoading: boolean;
-  rawPreviewItems: RawPreviewItem[];
-  groupedItems: Array<[string, ListItem[]]>;
-  selectedId: number | null;
-  multiSelectedSet: Set<number>;
-  hasMore: boolean;
-  loadingMore: boolean;
-  onRefreshList: () => void;
-  onEnableSelectionMode: () => void;
-  onClearSelection: () => void;
-  onSelectAllShownItems: () => void;
-  onApplyBatchStatus: () => void;
-  onApplyBatchActivity: () => void;
-  onToggleBatchMore: () => void;
-  onBatchStatusChange: (value: (typeof qualityStatuses)[number]) => void;
-  onBatchIsActiveChange: (value: 'active' | 'inactive') => void;
-  onListQueryChange: (value: string) => void;
-  onListTypeFilterChange: (value: string) => void;
-  onListExamTypeFilterChange: (value: string) => void;
-  onListStatusFilterChange: (value: string) => void;
-  onListSortByChange: (value: 'id' | 'updatedAt' | 'type' | 'status') => void;
-  onListSortDirChange: (value: 'asc' | 'desc') => void;
-  onRawPreviewFilterChange: (value: string) => void;
-  onRawPreviewLimitChange: (value: number) => void;
-  onRunRawPreviewAudit: () => void;
-  onToggleSelection: (id: number, event: MouseEvent<HTMLButtonElement>) => void;
-  onOpenExercise: (id: number) => void;
-  onLoadMore: () => void;
-  formatUpdatedAt: (value: string) => string;
+  stats: {
+    hasActiveListFilter: boolean;
+    matchingItems: number | null;
+    totalItems: number | null;
+    initialListPending: boolean;
+    shownCount: number;
+  };
+  selection: {
+    enabled: boolean;
+    shownItemsCount: number;
+    selectedCount: number;
+    selectedIds: Set<number>;
+    onEnable: () => void;
+    onClear: () => void;
+    onSelectAllShown: () => void;
+    onToggle: (id: number, event: MouseEvent<HTMLButtonElement>) => void;
+  };
+  batch: {
+    saving: boolean;
+    showMoreActions: boolean;
+    status: (typeof qualityStatuses)[number];
+    isActive: 'active' | 'inactive';
+    onApplyStatus: () => void;
+    onApplyActivity: () => void;
+    onToggleMore: () => void;
+    onStatusChange: (value: (typeof qualityStatuses)[number]) => void;
+    onIsActiveChange: (value: 'active' | 'inactive') => void;
+  };
+  filters: {
+    query: string;
+    type: string;
+    examType: string;
+    status: string;
+    sortBy: 'id' | 'updatedAt' | 'type' | 'status';
+    sortDir: 'asc' | 'desc';
+    sortPrefsReady: boolean;
+    types: string[];
+    examTypes: string[];
+    onQueryChange: (value: string) => void;
+    onTypeChange: (value: string) => void;
+    onExamTypeChange: (value: string) => void;
+    onStatusChange: (value: string) => void;
+    onSortByChange: (value: 'id' | 'updatedAt' | 'type' | 'status') => void;
+    onSortDirChange: (value: 'asc' | 'desc') => void;
+  };
+  rawPreview: {
+    filter: string;
+    limit: number;
+    loading: boolean;
+    items: RawPreviewItem[];
+    onFilterChange: (value: string) => void;
+    onLimitChange: (value: number) => void;
+    onRun: () => void;
+  };
+  list: {
+    groupedItems: Array<[string, ListItem[]]>;
+    selectedId: number | null;
+    hasMore: boolean;
+    loadingMore: boolean;
+    onRefresh: () => void;
+    onOpenExercise: (id: number) => void;
+    onLoadMore: () => void;
+    formatUpdatedAt: (value: string) => string;
+  };
 };
 
 export default function AdminExerciseSidebar({
   sidebarRef,
-  hasActiveListFilter,
-  matchingItems,
-  totalItems,
-  initialListPending,
-  shownCount,
   databaseIndicator,
-  selectionMode,
-  shownItemsCount,
-  selectedCount,
-  batchSaving,
-  showMoreBatchActions,
-  batchStatus,
-  batchIsActive,
-  listQuery,
-  listTypeFilter,
-  listExamTypeFilter,
-  listStatusFilter,
-  listSortBy,
-  listSortDir,
-  sortPrefsReady,
-  listTypes,
-  listExamTypes,
-  rawPreviewFilter,
-  rawPreviewLimit,
-  rawPreviewLoading,
-  rawPreviewItems,
-  groupedItems,
-  selectedId,
-  multiSelectedSet,
-  hasMore,
-  loadingMore,
-  onRefreshList,
-  onEnableSelectionMode,
-  onClearSelection,
-  onSelectAllShownItems,
-  onApplyBatchStatus,
-  onApplyBatchActivity,
-  onToggleBatchMore,
-  onBatchStatusChange,
-  onBatchIsActiveChange,
-  onListQueryChange,
-  onListTypeFilterChange,
-  onListExamTypeFilterChange,
-  onListStatusFilterChange,
-  onListSortByChange,
-  onListSortDirChange,
-  onRawPreviewFilterChange,
-  onRawPreviewLimitChange,
-  onRunRawPreviewAudit,
-  onToggleSelection,
-  onOpenExercise,
-  onLoadMore,
-  formatUpdatedAt,
+  stats,
+  selection,
+  batch,
+  filters,
+  rawPreview,
+  list,
 }: AdminExerciseSidebarProps) {
   return (
     <aside
@@ -131,28 +97,30 @@ export default function AdminExerciseSidebar({
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-bold tracking-tight">Задания</h3>
             <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-semibold text-primary">
-              {hasActiveListFilter && matchingItems !== null ? `${matchingItems} / ` : ''}
-              {totalItems ?? '...'}
+              {stats.hasActiveListFilter && stats.matchingItems !== null
+                ? `${stats.matchingItems} / `
+                : ''}
+              {stats.totalItems ?? '...'}
             </span>
           </div>
           <p className="mt-0.5 text-[11px] font-medium text-foreground/50">
-            {initialListPending ? 'Загрузка списка...' : `Показано: ${shownCount}`}
+            {stats.initialListPending ? 'Загрузка списка...' : `Показано: ${stats.shownCount}`}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
-            onClick={onRefreshList}
+            onClick={list.onRefresh}
           >
             <RefreshCw className="h-4 w-4" />
             <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
               Обновить список
             </span>
           </button>
-          {!selectionMode ? (
+          {!selection.enabled ? (
             <button
               className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
-              onClick={onEnableSelectionMode}
+              onClick={selection.onEnable}
             >
               <CheckSquare className="h-4 w-4" />
               <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
@@ -162,7 +130,7 @@ export default function AdminExerciseSidebar({
           ) : (
             <button
               className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
-              onClick={onClearSelection}
+              onClick={selection.onClear}
             >
               <XSquare className="h-4 w-4" />
               <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
@@ -173,69 +141,69 @@ export default function AdminExerciseSidebar({
         </div>
       </div>
       <DatabaseSaveIndicator indicator={databaseIndicator} className="mb-4" />
-      {selectionMode && (
+      {selection.enabled && (
         <button
           type="button"
-          onClick={onSelectAllShownItems}
-          disabled={shownItemsCount === 0}
+          onClick={selection.onSelectAllShown}
+          disabled={selection.shownItemsCount === 0}
           className="mb-3 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-stroke disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Выбрать все показанные ({shownItemsCount})
+          Выбрать все показанные ({selection.shownItemsCount})
         </button>
       )}
-      {selectionMode && (
+      {selection.enabled && (
         <AdminBatchActions
-          selectedCount={selectedCount}
-          batchSaving={batchSaving}
-          showMoreBatchActions={showMoreBatchActions}
-          batchStatus={batchStatus}
-          batchIsActive={batchIsActive}
-          onApplyStatus={onApplyBatchStatus}
-          onApplyActivity={onApplyBatchActivity}
-          onToggleMore={onToggleBatchMore}
-          onClearSelection={onClearSelection}
-          onBatchStatusChange={onBatchStatusChange}
-          onBatchIsActiveChange={onBatchIsActiveChange}
+          selectedCount={selection.selectedCount}
+          batchSaving={batch.saving}
+          showMoreBatchActions={batch.showMoreActions}
+          batchStatus={batch.status}
+          batchIsActive={batch.isActive}
+          onApplyStatus={batch.onApplyStatus}
+          onApplyActivity={batch.onApplyActivity}
+          onToggleMore={batch.onToggleMore}
+          onClearSelection={selection.onClear}
+          onBatchStatusChange={batch.onStatusChange}
+          onBatchIsActiveChange={batch.onIsActiveChange}
         />
       )}
       <AdminSidebarFilters
-        listQuery={listQuery}
-        listTypeFilter={listTypeFilter}
-        listExamTypeFilter={listExamTypeFilter}
-        listStatusFilter={listStatusFilter}
-        listSortBy={listSortBy}
-        listSortDir={listSortDir}
-        sortPrefsReady={sortPrefsReady}
-        listTypes={listTypes}
-        listExamTypes={listExamTypes}
-        onListQueryChange={onListQueryChange}
-        onListTypeFilterChange={onListTypeFilterChange}
-        onListExamTypeFilterChange={onListExamTypeFilterChange}
-        onListStatusFilterChange={onListStatusFilterChange}
-        onListSortByChange={onListSortByChange}
-        onListSortDirChange={onListSortDirChange}
+        listQuery={filters.query}
+        listTypeFilter={filters.type}
+        listExamTypeFilter={filters.examType}
+        listStatusFilter={filters.status}
+        listSortBy={filters.sortBy}
+        listSortDir={filters.sortDir}
+        sortPrefsReady={filters.sortPrefsReady}
+        listTypes={filters.types}
+        listExamTypes={filters.examTypes}
+        onListQueryChange={filters.onQueryChange}
+        onListTypeFilterChange={filters.onTypeChange}
+        onListExamTypeFilterChange={filters.onExamTypeChange}
+        onListStatusFilterChange={filters.onStatusChange}
+        onListSortByChange={filters.onSortByChange}
+        onListSortDirChange={filters.onSortDirChange}
       />
       <RawPreviewAuditPanel
-        filter={rawPreviewFilter}
-        limit={rawPreviewLimit}
-        loading={rawPreviewLoading}
-        items={rawPreviewItems}
-        onFilterChange={onRawPreviewFilterChange}
-        onLimitChange={onRawPreviewLimitChange}
-        onRun={onRunRawPreviewAudit}
+        filter={rawPreview.filter}
+        limit={rawPreview.limit}
+        loading={rawPreview.loading}
+        items={rawPreview.items}
+        onFilterChange={rawPreview.onFilterChange}
+        onLimitChange={rawPreview.onLimitChange}
+        onRun={rawPreview.onRun}
       />
       <AdminExerciseList
-        groupedItems={groupedItems}
-        initialListPending={initialListPending}
-        selectionMode={selectionMode}
-        selectedId={selectedId}
-        multiSelectedSet={multiSelectedSet}
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-        onToggleSelection={onToggleSelection}
-        onOpenExercise={onOpenExercise}
-        onLoadMore={onLoadMore}
-        formatUpdatedAt={formatUpdatedAt}
+        groupedItems={list.groupedItems}
+        initialListPending={stats.initialListPending}
+        selectionMode={selection.enabled}
+        selectedId={list.selectedId}
+        multiSelectedSet={selection.selectedIds}
+        hasMore={list.hasMore}
+        loadingMore={list.loadingMore}
+        onToggleSelection={selection.onToggle}
+        onOpenExercise={list.onOpenExercise}
+        onLoadMore={list.onLoadMore}
+        formatUpdatedAt={list.formatUpdatedAt}
       />
     </aside>
   );

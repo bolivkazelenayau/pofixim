@@ -49,7 +49,7 @@ test_sources/parsed_live/
 /exports/
 /public/voice_memos/
 *.sql
-
+AUDIT_RECOMMENDATIONS.md
 # editors
 .vscode/
 .idea/

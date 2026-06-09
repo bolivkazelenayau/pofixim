@@ -1,4 +1,4 @@
-import type { ExerciseEditorInput } from '@/app/actions/admin';
+import type { ExerciseEditorInput } from '@/app/actions/admin-types';
 import type { ExerciseCategory } from '@/features/exercises/types';
 import type { qualityStatuses } from './constants';
 
@@ -102,6 +102,12 @@ export type AdminFormProps = {
   initialSelectedId?: number | null;
   initialSelectedExercise?: Record<string, unknown> | null;
 };
+
+export type DraftRecoveryState = {
+  id: number;
+  serverForm: Form;
+  draftForm: Form;
+} | null;
 
 export type Form = {
   id?: number;

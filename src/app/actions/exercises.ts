@@ -61,6 +61,54 @@ type GetEge15QuickPoolInput = {
   seenExerciseIds?: number[];
 };
 
+type RefreshEge13QuickCardInput = {
+  exerciseId: number;
+  cardId: string;
+  rowIndex: number;
+};
+
+type RefreshEge15QuickCardInput = {
+  exerciseId: number;
+  cardId: string;
+  positionIndex?: number;
+};
+
+export async function refreshEge13QuickCardAction(input: RefreshEge13QuickCardInput) {
+  try {
+    const exercise = await getExerciseById(input.exerciseId);
+    if (!exercise || exercise.type !== 'ege_multi_select') {
+      return { success: false, error: 'Exercise not found or wrong type' };
+    }
+    const cards = buildEge13QuickCards(exercise);
+    const card = cards.find((c) => c.id === input.cardId) ?? cards.find((c) => c.rowIndex === input.rowIndex);
+    if (!card) {
+      return { success: false, error: 'Card not found in reassembled exercise' };
+    }
+    return { success: true, card };
+  } catch (error) {
+    console.error('Failed to refresh EGE-13 quick card:', error);
+    return { success: false, error: 'Failed to refresh card' };
+  }
+}
+
+export async function refreshEge15QuickCardAction(input: RefreshEge15QuickCardInput) {
+  try {
+    const exercise = await getExerciseById(input.exerciseId);
+    if (!exercise || exercise.type !== 'fill_blank') {
+      return { success: false, error: 'Exercise not found or wrong type' };
+    }
+    const cards = buildEge15QuickCards(exercise);
+    const card = cards.find((c) => c.id === input.cardId) ?? cards.find((c) => c.positionIndex === input.positionIndex);
+    if (!card) {
+      return { success: false, error: 'Card not found in reassembled exercise' };
+    }
+    return { success: true, card };
+  } catch (error) {
+    console.error('Failed to refresh EGE-15 quick card:', error);
+    return { success: false, error: 'Failed to refresh card' };
+  }
+}
+
 export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
   const startedAt = Date.now();
   try {
@@ -141,6 +189,10 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
         dbRow: dbRows[0] ?? null,
       });
       return { success: false, error: 'Exercise not found' };
+    }
+
+    if (!exercise.isActive) {
+      return { success: false, error: 'Exercise is inactive' };
     }
 
     const result = checkExerciseAnswer(exercise, submittedAnswer, {

@@ -62,6 +62,12 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
             </div>
           ) : null}
 
+          {error === 'rate-limit' ? (
+            <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 text-sm text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300">
+              <span className="font-semibold">Слишком много попыток.</span> Попробуйте войти снова через 10 минут.
+            </div>
+          ) : null}
+
           <button
             type="submit"
             className="w-full rounded-xl bg-gradient-to-r from-primary to-primary-strong px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 active:translate-y-0"

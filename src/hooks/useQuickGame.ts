@@ -1,0 +1,100 @@
+'use client';
+
+import { useCallback, useRef, useState } from 'react';
+import { useChatStore } from '@/store/chatStore';
+import { createMessageId } from '@/lib/message-id';
+
+interface QuickGameResult {
+  duration?: number;
+  correctCount: number;
+  wrongCount: number;
+  bestCombo: number;
+  scoreDelta: number;
+}
+
+interface PoolResponse<Card> {
+  success: boolean;
+  cards: Card[];
+  error?: string;
+}
+
+interface QuickGameConfig<Card> {
+  poolAction: (params: { limit: number; seenExerciseIds: number[] }) => Promise<PoolResponse<Card>>;
+  shuffleCards: (cards: Card[], seed?: string) => Card[];
+  skillTag: string;
+  limit: number;
+  emptyMessage: string;
+}
+
+interface UseQuickGameReturn<Card, Result> {
+  cards: Card[];
+  isOpen: boolean;
+  isLoading: boolean;
+  open: () => Promise<void>;
+  close: () => void;
+  onFinish: (result: Result) => void;
+}
+
+export function useQuickGame<Card, Result extends QuickGameResult>(
+  config: QuickGameConfig<Card>
+): UseQuickGameReturn<Card, Result> {
+  const { seenExerciseIds, addMessage, recordBlitzScore } = useChatStore();
+  const [cards, setCards] = useState<Card[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
+
+  const open = useCallback(
+    async () => {
+      if (isLoadingRef.current) return;
+      isLoadingRef.current = true;
+      setIsLoading(true);
+
+      try {
+        const res = await config.poolAction({
+          limit: config.limit,
+          seenExerciseIds,
+        });
+
+        if (res.success && res.cards.length > 0) {
+          const shuffled = config.shuffleCards(res.cards, String(Date.now()));
+          setCards(shuffled);
+          setIsOpen(true);
+          return;
+        }
+
+        addMessage({
+          id: createMessageId(`${config.skillTag}-empty`),
+          isBot: true,
+          content: config.emptyMessage,
+          type: 'text',
+        });
+      } finally {
+        isLoadingRef.current = false;
+        setIsLoading(false);
+      }
+    },
+    [config, seenExerciseIds, addMessage]
+  );
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setCards([]);
+  }, []);
+
+  const onFinish = useCallback(
+    (result: Result) => {
+      recordBlitzScore(result.scoreDelta);
+      addMessage({
+        id: createMessageId(`${config.skillTag}-result`),
+        isBot: true,
+        content: `${config.skillTag === 'ege.9' ? 'Блиц' : config.skillTag === 'ege.13' ? 'Тип 13' : 'Тип 15'}: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
+        type: 'text',
+      });
+      close();
+    },
+    [config.skillTag, recordBlitzScore, addMessage, close]
+  );
+
+  return { cards, isOpen, isLoading, open, close, onFinish };
+}

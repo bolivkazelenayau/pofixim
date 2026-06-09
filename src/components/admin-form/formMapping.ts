@@ -1,4 +1,4 @@
-import type { ExerciseEditorInput } from '@/app/actions/admin';
+import type { ExerciseEditorInput } from '@/app/actions/admin-types';
 import type { ExerciseCategory } from '@/features/exercises/types';
 import { normalizeNumberAnswerSignature, parseIndexCsv } from '@/lib/exercise-type-conversion';
 import {

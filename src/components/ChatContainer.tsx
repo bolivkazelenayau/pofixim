@@ -5,22 +5,20 @@ import { AnimatePresence, motion } from 'motion/react';
 import { BarChart3, RotateCcw, Zap, PenTool } from 'lucide-react';
 import type { ExerciseType } from '@/features/exercises/types';
 import {
-  getBlitzPoolAction,
-  getEge13QuickPoolAction,
-  getEge15QuickPoolAction,
   getNextExerciseAction,
   submitExerciseAnswerAction,
 } from '@/app/actions/exercises';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
-import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
-import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
-import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
 import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
 import { useChatStore, type Message } from '@/store/chatStore';
-import BlitzGame, { type BlitzResult } from './BlitzGame';
-import Ege13QuickGame, { type Ege13QuickResult } from './Ege13QuickGame';
-import Ege15QuickGame, { type Ege15QuickResult } from './Ege15QuickGame';
+import { useBlitzGame } from '@/hooks/useBlitzGame';
+import { useEge13QuickGame } from '@/hooks/useEge13QuickGame';
+import { useEge15QuickGame } from '@/hooks/useEge15QuickGame';
+import { createMessageId } from '@/lib/message-id';
+import BlitzGame from './BlitzGame';
+import Ege13QuickGame from './Ege13QuickGame';
+import Ege15QuickGame from './Ege15QuickGame';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 
@@ -73,23 +71,6 @@ const SLASH_COMMANDS = [
 ] as const;
 
 type SlashCommand = (typeof SLASH_COMMANDS)[number]['command'];
-
-function createMessageId(suffix?: string) {
-  const c = globalThis.crypto as Crypto | undefined;
-  let baseId: string;
-
-  if (c && typeof c.randomUUID === 'function') {
-    baseId = c.randomUUID();
-  } else if (c && typeof c.getRandomValues === 'function') {
-    const bytes = new Uint8Array(16);
-    c.getRandomValues(bytes);
-    baseId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  } else {
-    baseId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  }
-
-  return suffix ? `${baseId}-${suffix}` : baseId;
-}
 
 function isExerciseMessage(message: Message): message is ExerciseMessage {
   return (
@@ -168,7 +149,6 @@ export default function ChatContainer() {
     setTyping,
     setSessionId,
     recordExerciseResult,
-    recordBlitzScore,
     score,
     streak,
     seenExerciseIds,
@@ -186,16 +166,9 @@ export default function ChatContainer() {
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
   const globalInputRef = useRef<HTMLTextAreaElement>(null);
-  const [blitzCards, setBlitzCards] = useState<Ege9BlitzCard[]>([]);
-  const [isBlitzOpen, setIsBlitzOpen] = useState(false);
-  const isLoadingBlitz = useRef(false);
-  const lastBlitzPromptStreak = useRef(0);
-  const [ege13QuickCards, setEge13QuickCards] = useState<Ege13QuickCard[]>([]);
-  const [isEge13QuickOpen, setIsEge13QuickOpen] = useState(false);
-  const isLoadingEge13Quick = useRef(false);
-  const [ege15QuickCards, setEge15QuickCards] = useState<Ege15QuickCard[]>([]);
-  const [isEge15QuickOpen, setIsEge15QuickOpen] = useState(false);
-  const isLoadingEge15Quick = useRef(false);
+  const blitz = useBlitzGame();
+  const ege13Quick = useEge13QuickGame();
+  const ege15Quick = useEge15QuickGame();
 
   useEffect(() => {
     let isMounted = true;
@@ -258,16 +231,9 @@ export default function ChatContainer() {
 
     initialized.current = false;
     setTyping(false);
-    setIsBlitzOpen(false);
-    setBlitzCards([]);
-    setIsEge13QuickOpen(false);
-    setEge13QuickCards([]);
-    setIsEge15QuickOpen(false);
-    setEge15QuickCards([]);
-    lastBlitzPromptStreak.current = 0;
-    isLoadingBlitz.current = false;
-    isLoadingEge13Quick.current = false;
-    isLoadingEge15Quick.current = false;
+    blitz.close();
+    ege13Quick.close();
+    ege15Quick.close();
     resetProgress();
   };
 
@@ -416,141 +382,6 @@ export default function ChatContainer() {
     }, 800);
   };
 
-  const handleBlitzFinish = useCallback(
-    (result: BlitzResult) => {
-      recordBlitzScore(result.scoreDelta);
-      addMessage({
-        id: createMessageId('blitz-result'),
-        isBot: true,
-        content: `Блиц: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
-        type: 'text',
-      });
-    },
-    [addMessage, recordBlitzScore],
-  );
-
-  const handleEge13QuickFinish = useCallback(
-    (result: Ege13QuickResult) => {
-      recordBlitzScore(result.scoreDelta);
-      addMessage({
-        id: createMessageId('ege13-quick-result'),
-        isBot: true,
-        content: `Тип 13: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
-        type: 'text',
-      });
-    },
-    [addMessage, recordBlitzScore],
-  );
-
-  const handleEge15QuickFinish = useCallback(
-    (result: Ege15QuickResult) => {
-      recordBlitzScore(result.scoreDelta);
-      addMessage({
-        id: createMessageId('ege15-quick-result'),
-        isBot: true,
-        content: `Тип 15: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
-        type: 'text',
-      });
-    },
-    [addMessage, recordBlitzScore],
-  );
-
-  const openBlitz = useCallback(
-    async (promptStreak?: number) => {
-      if (isLoadingBlitz.current) return;
-
-      isLoadingBlitz.current = true;
-      if (typeof promptStreak === 'number') {
-        lastBlitzPromptStreak.current = promptStreak;
-      }
-
-      try {
-        const res = await getBlitzPoolAction({
-          limit: 80,
-          seenExerciseIds,
-        });
-
-        if (res.success && res.cards.length > 0) {
-          setBlitzCards(res.cards);
-          setIsBlitzOpen(true);
-          return;
-        }
-
-        addMessage({
-          id: createMessageId('blitz-empty'),
-          isBot: true,
-          content: 'Блиц пока не нашёл слова из задания 9.',
-          type: 'text',
-        });
-      } finally {
-        isLoadingBlitz.current = false;
-      }
-    },
-    [addMessage, seenExerciseIds],
-  );
-
-  const openEge13Quick = useCallback(
-    async () => {
-      if (isLoadingEge13Quick.current) return;
-
-      isLoadingEge13Quick.current = true;
-
-      try {
-        const res = await getEge13QuickPoolAction({
-          limit: 80,
-          seenExerciseIds,
-        });
-
-        if (res.success && res.cards.length > 0) {
-          setEge13QuickCards(res.cards);
-          setIsEge13QuickOpen(true);
-          return;
-        }
-
-        addMessage({
-          id: createMessageId('ege13-quick-empty'),
-          isBot: true,
-          content: 'Быстрый тип 13 пока не нашёл строки со слитным или раздельным написанием.',
-          type: 'text',
-        });
-      } finally {
-        isLoadingEge13Quick.current = false;
-      }
-    },
-    [addMessage, seenExerciseIds],
-  );
-
-  const openEge15Quick = useCallback(
-    async () => {
-      if (isLoadingEge15Quick.current) return;
-
-      isLoadingEge15Quick.current = true;
-
-      try {
-        const res = await getEge15QuickPoolAction({
-          limit: 100,
-          seenExerciseIds,
-        });
-
-        if (res.success && res.cards.length > 0) {
-          setEge15QuickCards(res.cards);
-          setIsEge15QuickOpen(true);
-          return;
-        }
-
-        addMessage({
-          id: createMessageId('ege15-quick-empty'),
-          isBot: true,
-          content: 'Быстрый тип 15 пока не нашёл позиции с Н/НН.',
-          type: 'text',
-        });
-      } finally {
-        isLoadingEge15Quick.current = false;
-      }
-    },
-    [addMessage, seenExerciseIds],
-  );
-
   function showStats() {
     const FAKE_NAMES = [
       'Алиса М.', '23 года, дизайнер из Петербурга', 'подписаться', 'nasralbek.', '67|8|9',
@@ -622,17 +453,17 @@ export default function ChatContainer() {
     }
 
     if (command === '/blitz') {
-      void openBlitz();
+      void blitz.open();
       return;
     }
 
     if (command === '/ege13_quick') {
-      void openEge13Quick();
+      void ege13Quick.open();
       return;
     }
 
     if (command === '/ege15_quick') {
-      void openEge15Quick();
+      void ege15Quick.open();
       return;
     }
 
@@ -720,54 +551,46 @@ export default function ChatContainer() {
     setTyping,
   ]);
 
+  const lastBlitzStreak = useRef(0);
+
   useEffect(() => {
     if (
       !hasHydrated ||
-      isBlitzOpen ||
-      isEge13QuickOpen ||
-      isEge15QuickOpen ||
-      isLoadingBlitz.current
+      blitz.isOpen ||
+      ege13Quick.isOpen ||
+      ege15Quick.isOpen ||
+      blitz.isLoading
     ) {
       return;
     }
 
-    if (streak < 5 || streak < lastBlitzPromptStreak.current + 5) {
+    if (streak < 5 || streak < lastBlitzStreak.current + 5) {
       return;
     }
 
-    void openBlitz(streak);
+    lastBlitzStreak.current = streak;
+    void blitz.open();
   }, [
     hasHydrated,
-    isBlitzOpen,
-    isEge13QuickOpen,
-    isEge15QuickOpen,
-    openBlitz,
+    blitz.isOpen,
+    blitz.isLoading,
+    ege13Quick.isOpen,
+    ege15Quick.isOpen,
+    blitz,
     streak,
   ]);
 
   return (
     <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-lg sm:h-[calc(100vh-2rem)]">
       <AnimatePresence>
-        {isBlitzOpen && (
-          <BlitzGame
-            cards={blitzCards}
-            onClose={() => setIsBlitzOpen(false)}
-            onFinish={handleBlitzFinish}
-          />
+        {blitz.isOpen && (
+          <BlitzGame cards={blitz.cards} onClose={blitz.close} onFinish={blitz.onFinish} />
         )}
-        {isEge13QuickOpen && (
-          <Ege13QuickGame
-            cards={ege13QuickCards}
-            onClose={() => setIsEge13QuickOpen(false)}
-            onFinish={handleEge13QuickFinish}
-          />
+        {ege13Quick.isOpen && (
+          <Ege13QuickGame cards={ege13Quick.cards} onClose={ege13Quick.close} onFinish={ege13Quick.onFinish} />
         )}
-        {isEge15QuickOpen && (
-          <Ege15QuickGame
-            cards={ege15QuickCards}
-            onClose={() => setIsEge15QuickOpen(false)}
-            onFinish={handleEge15QuickFinish}
-          />
+        {ege15Quick.isOpen && (
+          <Ege15QuickGame cards={ege15Quick.cards} onClose={ege15Quick.close} onFinish={ege15Quick.onFinish} />
         )}
       </AnimatePresence>
 
