@@ -10,6 +10,7 @@ type AdminMetaFieldsProps = {
  saving: boolean;
  deleting: boolean;
  isEdit: boolean;
+ onSaveIntent: () => void;
  onDeleteClick: () => void;
 };
 
@@ -20,6 +21,7 @@ export default function AdminMetaFields({
  saving,
  deleting,
  isEdit,
+ onSaveIntent,
  onDeleteClick,
 }: AdminMetaFieldsProps) {
  return (
@@ -91,10 +93,12 @@ export default function AdminMetaFields({
     </Field>
    </div>
 
-   <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-    <button
-     disabled={saving || deleting}
-     className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700"
+    <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+     <button
+      type="submit"
+      disabled={saving || deleting}
+      onPointerDown={onSaveIntent}
+      className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700"
     >
      {saving
       ? 'Сохранение...'

@@ -77,7 +77,7 @@ export default function AdminForm({
   });
 
   return (
-    <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+    <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
       <AdminSidebarContainer
         sidebarRef={editor.sidebarRef}
         databaseIndicator={editor.databaseIndicator}

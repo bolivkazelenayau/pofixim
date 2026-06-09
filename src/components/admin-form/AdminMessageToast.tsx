@@ -1,20 +1,55 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 type AdminMessageToastProps = {
  message: string;
  isError: boolean;
 };
 
 export default function AdminMessageToast({ message, isError }: AdminMessageToastProps) {
- if (!message) return null;
+ const [visibleMessage, setVisibleMessage] = useState(message);
+ const [isVisible, setIsVisible] = useState(false);
+
+ useEffect(() => {
+  if (!message) {
+   const hideTimer = window.setTimeout(() => setIsVisible(false), 0);
+   const clearTimer = window.setTimeout(() => setVisibleMessage(''), 220);
+   return () => {
+    window.clearTimeout(hideTimer);
+    window.clearTimeout(clearTimer);
+   };
+  }
+
+  const mountTimer = window.setTimeout(() => {
+   setVisibleMessage(message);
+   setIsVisible(false);
+  }, 0);
+  const enterTimer = window.setTimeout(() => setIsVisible(true), 20);
+  const exitTimer = window.setTimeout(() => setIsVisible(false), 2600);
+  const clearTimer = window.setTimeout(() => setVisibleMessage(''), 2840);
+
+  return () => {
+   window.clearTimeout(mountTimer);
+   window.clearTimeout(enterTimer);
+   window.clearTimeout(exitTimer);
+   window.clearTimeout(clearTimer);
+  };
+ }, [message]);
+
+ if (!visibleMessage) return null;
 
  return (
   <div
-   className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-5 ${
+   className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-2xl transition-all duration-200 ease-out ${
+    isVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+   } ${
     isError
      ? 'border-red-200 bg-red-50 text-red-700'
      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
    }`}
   >
-   {message}
+   {visibleMessage}
   </div>
  );
 }

@@ -32,7 +32,12 @@
     "db:seed:ege-live:batch": "node scripts/seed-ege-live-batch.mjs",
     "db:normalize:ege9": "node scripts/normalize-ege9-content.mjs",
     "db:normalize:ege10": "node scripts/normalize-ege10-content.mjs",
-    "db:fix:ege14:fillblank": "node scripts/fix-live-ege14-fillblank.mjs"
+    "db:fix:ege14:fillblank": "node scripts/fix-live-ege14-fillblank.mjs",
+    "db:apply:ege-quick-pool-indexes": "node scripts/apply-ege-quick-pool-indexes.mjs",
+    "db:apply:admin-search-blob-columns": "node scripts/apply-admin-search-blob-columns.mjs",
+    "admin:p95": "node scripts/admin-perf-p95.mjs",
+    "admin:p95:http": "node scripts/admin-http-p95.mjs",
+    "admin:proxy-cookie-check": "node scripts/check-local-proxy-admin-cookie.mjs"
   },
   "dependencies": {
     "@uiw/react-md-editor": "^4.1.1",

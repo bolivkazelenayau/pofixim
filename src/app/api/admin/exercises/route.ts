@@ -1,5 +1,4 @@
 import { listExercisesAction } from '@/app/actions/admin';
-import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +10,6 @@ function optionalInteger(params: URLSearchParams, name: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAdminAuthenticated())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
   const params = new URL(request.url).searchParams;
   const result = await listExercisesAction({
     limit: optionalInteger(params, 'limit'),
@@ -30,5 +25,7 @@ export async function GET(request: Request) {
     includeTotal: params.get('includeTotal') === 'true',
   });
 
-  return Response.json(result, { status: result.success ? 200 : 500 });
+  const error = 'error' in result ? result.error : undefined;
+  const status = result.success ? 200 : error === 'Unauthorized' ? 401 : 500;
+  return Response.json(result, { status });
 }

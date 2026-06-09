@@ -90,7 +90,7 @@ export default function AdminExerciseSidebar({
   return (
     <aside
       ref={sidebarRef}
-      className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]"
+      className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
     >
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -183,7 +183,7 @@ export default function AdminExerciseSidebar({
         onListSortByChange={filters.onSortByChange}
         onListSortDirChange={filters.onSortDirChange}
       />
-      <RawPreviewAuditPanel
+      {/* <RawPreviewAuditPanel
         filter={rawPreview.filter}
         limit={rawPreview.limit}
         loading={rawPreview.loading}
@@ -191,7 +191,7 @@ export default function AdminExerciseSidebar({
         onFilterChange={rawPreview.onFilterChange}
         onLimitChange={rawPreview.onLimitChange}
         onRun={rawPreview.onRun}
-      />
+      /> */}
       <AdminExerciseList
         groupedItems={list.groupedItems}
         initialListPending={stats.initialListPending}

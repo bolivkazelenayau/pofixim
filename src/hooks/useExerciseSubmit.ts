@@ -16,12 +16,13 @@ import {
   updateExerciseAction,
 } from '@/app/actions/admin';
 import { slugFromPrompt, randomShortId } from '@/components/admin-form/utils';
+import { logAdminDebug } from '@/components/admin-form/debug';
 
 interface UseExerciseSubmitOptions {
   form: Form;
   isEdit: boolean;
+  selectedId: number | null;
   deleting: boolean;
-  router: ReturnType<typeof import('next/navigation').useRouter>;
   setForm: React.Dispatch<React.SetStateAction<Form>>;
   setSaving: React.Dispatch<React.SetStateAction<boolean>>;
   setDeleting: React.Dispatch<React.SetStateAction<boolean>>;
@@ -36,6 +37,7 @@ interface UseExerciseSubmitOptions {
   setMatchingItems: React.Dispatch<React.SetStateAction<number | null>>;
   hasActiveListFilter: boolean;
   refreshList: (opts?: { force?: boolean; includeTotal?: boolean }) => Promise<void>;
+  cancelPendingExerciseLoad: (reason: string) => void;
   // from useFormPersistence
   setDatabaseSaveState: (state: 'draft' | 'local' | 'saving' | 'saved') => void;
   setDatabaseSavedAt: React.Dispatch<React.SetStateAction<Date | null>>;
@@ -45,11 +47,46 @@ interface UseExerciseSubmitOptions {
   markDatabaseSaveSucceeded: (f: Form, snapshot: string) => void;
 }
 
+function updateSavedListItem(item: ListItem, form: Form): ListItem {
+  return {
+    ...item,
+    type: form.type,
+    seedKey: form.seedKey || null,
+    prompt: form.prompt,
+    qualityStatus: form.qualityStatus,
+    isActive: form.isActive,
+    skillTags: form.skillTags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  };
+}
+
+function setExerciseUrlSelection(id: number, reason: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('exercise', String(id));
+  url.searchParams.delete('id');
+  url.searchParams.delete('exerciseId');
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+  hashParams.delete('exercise');
+  url.hash = hashParams.toString();
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl === currentUrl) return;
+  logAdminDebug('url-sync:setExerciseSelection', {
+    reason,
+    id,
+    from: currentUrl,
+    to: nextUrl,
+  });
+  window.history.replaceState(null, '', nextUrl);
+}
+
 export function useExerciseSubmit({
   form,
   isEdit,
+  selectedId,
   deleting,
-  router,
   setForm,
   setSaving,
   setDeleting,
@@ -63,6 +100,7 @@ export function useExerciseSubmit({
   setMatchingItems,
   hasActiveListFilter,
   refreshList,
+  cancelPendingExerciseLoad,
   setDatabaseSaveState,
   setDatabaseSavedAt,
   lastPersistedSnapshotRef,
@@ -82,11 +120,17 @@ export function useExerciseSubmit({
     url.searchParams.delete('id');
     url.searchParams.delete('exerciseId');
     url.hash = hashParams.toString();
-    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+    logAdminDebug('url-sync:clearExerciseSelection', {
+      formId: form.id ?? null,
+      selectedId,
+      to: `${url.pathname}${url.search}${url.hash}`,
+    });
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    cancelPendingExerciseLoad('manual-submit');
     setSaving(true);
     setDatabaseSaveState('saving');
     setMessage('');
@@ -94,11 +138,41 @@ export function useExerciseSubmit({
     const payload = buildPayloadFromForm(form);
 
     const wasEdit = isEdit;
+    logAdminDebug('submit:start', {
+      wasEdit,
+      formId: form.id ?? null,
+      selectedId,
+      url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      payloadId: payload.id ?? null,
+      seedKey: payload.seedKey ?? null,
+    });
+    if (wasEdit && form.id !== selectedId) {
+      logAdminDebug('submit:blocked-id-mismatch', {
+        formId: form.id ?? null,
+        selectedId,
+      });
+      setSaving(false);
+      setDatabaseSaveState('local');
+      setIsError(true);
+      setMessage(
+        `Сохранение остановлено: открыта форма #${form.id ?? 'n/a'}, а выбранное задание #${selectedId ?? 'n/a'}. Обновите задание из списка и повторите сохранение.`,
+      );
+      storeLocalDraft(form);
+      return;
+    }
+
     const res = wasEdit
       ? await updateExerciseAction({ ...payload, id: form.id! })
       : await createExerciseAction(payload);
 
     if (res.success) {
+      logAdminDebug('submit:success', {
+        wasEdit,
+        formId: form.id ?? null,
+        selectedId,
+        resultId: 'id' in res ? res.id ?? null : null,
+        url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      });
       setMessage(wasEdit ? 'Изменения сохранены.' : 'Задание создано.');
       localStorage.removeItem(getDraftKey(form.id));
       if (form.id) clearPendingDraftMarker(form.id);
@@ -114,8 +188,34 @@ export function useExerciseSubmit({
       if (!wasEdit) {
         setTotalItems((current) => (current === null ? current : current + 1));
       }
-      await refreshList({ force: true });
+      if (wasEdit && form.id) {
+        setExerciseUrlSelection(form.id, 'submit-success-edit');
+        window.setTimeout(() => setExerciseUrlSelection(form.id!, 'submit-success-edit-posttick'), 0);
+        window.setTimeout(() => setExerciseUrlSelection(form.id!, 'submit-success-edit-settle'), 250);
+        setItems((current) =>
+          current.map((item) => (item.id === form.id ? updateSavedListItem(item, form) : item)),
+        );
+        logAdminDebug('submit:preserve-list-order', {
+          formId: form.id,
+          selectedId,
+          url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        });
+      } else {
+        await refreshList({ force: true });
+        logAdminDebug('submit:after-refresh', {
+          wasEdit,
+          formId: form.id ?? null,
+          selectedId,
+          url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        });
+      }
     } else {
+      logAdminDebug('submit:error', {
+        wasEdit,
+        formId: form.id ?? null,
+        selectedId,
+        error: res.error ?? null,
+      });
       storeLocalDraft(form);
       setDatabaseSaveState('local');
       setIsError(true);
@@ -236,5 +336,6 @@ export function useExerciseSubmit({
     handleGenerateSeedClick,
     generateSeedKey,
     startNewDraft,
+    cancelPendingExerciseLoad,
   };
 }

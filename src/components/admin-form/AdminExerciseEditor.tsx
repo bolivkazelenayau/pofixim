@@ -77,6 +77,7 @@ type AdminExerciseEditorProps = {
     onPreviewDictationSubmit: (event: FormEvent<HTMLFormElement>) => void;
     onPreviewDictationTextChange: (text: string) => void;
     onFloatingSaveClick: () => void;
+    onSaveIntent: () => void;
   };
 };
 
@@ -133,6 +134,7 @@ export default function AdminExerciseEditor({
               saving={status.saving}
               deleting={status.deleting}
               isEdit={status.isEdit}
+              onSaveIntent={actions.onSaveIntent}
               onDeleteClick={actions.onDeleteClick}
             />
           </form>
@@ -157,6 +159,7 @@ export default function AdminExerciseEditor({
         deleting={status.deleting}
         isEdit={status.isEdit}
         onClick={actions.onFloatingSaveClick}
+        onSaveIntent={actions.onSaveIntent}
       />
 
       {recovery.draft ? (

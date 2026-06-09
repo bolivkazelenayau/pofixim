@@ -1,4 +1,5 @@
 import type { MouseEvent, KeyboardEvent } from 'react';
+import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
 
 type AdminExerciseListProps = {
@@ -38,12 +39,22 @@ export default function AdminExerciseList({
           {typeItems.map((item) => (
             <button
               key={item.id}
-              onClick={(event) => onToggleSelection(item.id, event)}
+              onClick={(event) => {
+                logAdminDebug('exercise-list:item-click', {
+                  itemId: item.id,
+                  selectedId,
+                  selectionMode,
+                  shiftKey: event.shiftKey,
+                  ctrlKey: event.ctrlKey,
+                  metaKey: event.metaKey,
+                });
+                onToggleSelection(item.id, event);
+              }}
               onDoubleClick={() => {
-                if (selectionMode) onOpenExercise(item.id);
+                onOpenExercise(item.id);
               }}
               onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
-                if (selectionMode && event.key === 'Enter') {
+                if (event.key === 'Enter') {
                   event.preventDefault();
                   onOpenExercise(item.id);
                 }

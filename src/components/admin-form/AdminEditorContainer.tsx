@@ -46,6 +46,7 @@ type AdminEditorContainerProps = {
     onSeedManualChange: () => void;
     onDeleteClick: () => void;
     onFloatingSaveClick: () => void;
+    onSaveIntent: () => void;
   };
 };
 

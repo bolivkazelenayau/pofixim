@@ -38,7 +38,6 @@ export type ListItem = {
   seedKey: string | null;
   prompt: string;
   explanation: string;
-  searchText?: string;
   qualityStatus: string;
   updatedAt: string;
   updatedAtCursor: string;

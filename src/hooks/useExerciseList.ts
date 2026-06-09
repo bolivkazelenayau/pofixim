@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchExerciseList } from '@/components/admin-form/api';
 import type { ExerciseListResponse, ListItem } from '@/components/admin-form/types';
 
+const EXERCISE_LIST_PAGE_SIZE = 100;
+
 type UseExerciseListConfig = {
   initialItems: ListItem[];
   initialTotalItems: number | null | undefined;
@@ -32,7 +34,7 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
   const [items, setItems] = useState<ListItem[]>(initialItems);
   const [totalItems, setTotalItems] = useState<number | null>(initialTotalItems ?? null);
   const [nextOffset, setNextOffset] = useState<number>(initialItems.length);
-  const [hasMore, setHasMore] = useState<boolean>(initialItems.length >= 150);
+  const [hasMore, setHasMore] = useState<boolean>(initialItems.length >= EXERCISE_LIST_PAGE_SIZE);
   const [nextCursorId, setNextCursorId] = useState<number | null>(
     initialItems.length > 0 ? initialItems[initialItems.length - 1].id : null,
   );
@@ -134,7 +136,7 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     let res: ExerciseListResponse;
     try {
       res = await fetchExerciseList({
-        limit: 150,
+        limit: EXERCISE_LIST_PAGE_SIZE,
         offset: 0,
         sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
         sortDir: listSortDir,
@@ -195,7 +197,7 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     setLoadingMore(true);
     try {
       const res = await fetchExerciseList({
-        limit: 150,
+        limit: EXERCISE_LIST_PAGE_SIZE,
         offset: nextOffset,
         cursorId: nextCursorId,
         cursorUpdatedAt: nextCursorUpdatedAt,
@@ -234,21 +236,21 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
 
   const filteredItems = useMemo(() => {
     const q = normalizeSearchText(listQuery);
+    const serverQ = normalizeSearchText(serverListQuery);
+    const shouldApplyClientTextFilter = Boolean(q && q !== serverQ);
     const filtered = items.filter((item) => {
       if (listTypeFilter !== 'all' && item.type !== listTypeFilter) return false;
       if (listStatusFilter !== 'all' && item.qualityStatus !== listStatusFilter) return false;
       if (listExamTypeFilter !== 'all' && examTypeOf(item) !== listExamTypeFilter) return false;
-      if (!q) return true;
+      if (!shouldApplyClientTextFilter) return true;
       const seedNorm = normalizeSearchText(item.seedKey ?? '');
       const promptNorm = normalizeSearchText(item.prompt);
       const explanationNorm = normalizeSearchText(item.explanation ?? '');
-      const searchTextNorm = normalizeSearchText(item.searchText ?? '');
       return (
         String(item.id).includes(q) ||
         seedNorm.includes(q) ||
         promptNorm.includes(q) ||
-        explanationNorm.includes(q) ||
-        searchTextNorm.includes(q)
+        explanationNorm.includes(q)
       );
     });
     return [...filtered].sort((a, b) => {
@@ -259,7 +261,7 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
       else cmp = a.qualityStatus.localeCompare(b.qualityStatus);
       return listSortDir === 'asc' ? cmp : -cmp;
     });
-  }, [items, listQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
+  }, [items, listQuery, serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
 
   const groupedItems = useMemo(() => {
     const groups = new Map<string, ListItem[]>();

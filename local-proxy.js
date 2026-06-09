@@ -25,11 +25,28 @@ function logProxyError(context, error) {
   console.warn(`[proxy:${context}] ${code}: ${message}`);
 }
 
-function buildHeaders(headers) {
+function appendForwardedFor(existing, remoteAddress) {
+  const address = remoteAddress || '';
+  if (!address) return existing;
+  return existing ? `${existing}, ${address}` : address;
+}
+
+function buildHeaders(req) {
+  const headers = req.headers;
+  const incomingHost = headers.host || `localhost:${LISTEN_PORT}`;
+  const forwardedProto = headers['x-forwarded-proto'] || 'http';
+
   return {
     ...headers,
-    host: `localhost:${TARGET_PORT}`,
-    origin: TARGET_ORIGIN,
+    host: incomingHost,
+    'x-forwarded-for': appendForwardedFor(
+      headers['x-forwarded-for'],
+      req.socket.remoteAddress,
+    ),
+    'x-forwarded-host': headers['x-forwarded-host'] || incomingHost,
+    'x-forwarded-port':
+      headers['x-forwarded-port'] || String(incomingHost).split(':')[1] || String(LISTEN_PORT),
+    'x-forwarded-proto': forwardedProto,
   };
 }
 
@@ -55,7 +72,7 @@ const server = http.createServer((req, res) => {
       port: TARGET_PORT,
       path: req.url,
       method: req.method,
-      headers: buildHeaders(req.headers),
+      headers: buildHeaders(req),
     },
     (targetRes) => {
       targetRes.on("error", (error) => {
@@ -92,7 +109,7 @@ server.on("upgrade", (req, socket, head) => {
     port: TARGET_PORT,
     path: req.url,
     method: req.method,
-    headers: buildHeaders(req.headers),
+    headers: buildHeaders(req),
   });
 
   let upgraded = false;

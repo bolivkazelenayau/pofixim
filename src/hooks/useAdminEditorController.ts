@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { useDraftRecovery } from '@/hooks/useDraftRecovery';
 import { useExerciseLoader } from '@/hooks/useExerciseLoader';
 import { useExerciseSubmit } from '@/hooks/useExerciseSubmit';
 import { useFormEffects } from '@/hooks/useFormEffects';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
+import { logAdminDebug } from '@/components/admin-form/debug';
 import { buildDatabaseIndicator, clearPendingDraftMarker } from '@/components/admin-form/utils';
 import type { Form, ListItem } from '@/components/admin-form/types';
 
@@ -43,7 +43,6 @@ export function useAdminEditorController({
   message,
   isError,
 }: UseAdminEditorControllerConfig) {
-  const router = useRouter();
   const [selectedId, setSelectedId] = useState<number | null>(
     initialSelectedExercise ? (initialSelectedId ?? null) : null,
   );
@@ -64,6 +63,14 @@ export function useAdminEditorController({
   const formRef = useRef<HTMLFormElement | null>(null);
   const mainSaveAnchorRef = useRef<HTMLDivElement | null>(null);
   const sessionDraftIdsRef = useRef<Set<number>>(new Set());
+  const cancelPendingExerciseLoadRef = useRef<(reason: string) => void>(() => {});
+  const savingRef = useRef(saving);
+  const deletingRef = useRef(deleting);
+
+  useEffect(() => {
+    savingRef.current = saving;
+    deletingRef.current = deleting;
+  }, [saving, deleting]);
 
   const isEdit = typeof form.id === 'number';
 
@@ -86,7 +93,6 @@ export function useAdminEditorController({
     switchingExerciseRef,
     deletedExerciseIdsRef,
     sessionDraftIdsRef,
-    onRefreshList: refreshList,
     setIsError,
     setMessage,
   });
@@ -106,8 +112,8 @@ export function useAdminEditorController({
   } = useExerciseSubmit({
     form,
     isEdit,
+    selectedId,
     deleting,
-    router,
     setForm,
     setSaving,
     setDeleting,
@@ -121,6 +127,7 @@ export function useAdminEditorController({
     setMatchingItems,
     hasActiveListFilter,
     refreshList,
+    cancelPendingExerciseLoad: (reason) => cancelPendingExerciseLoadRef.current(reason),
     setDatabaseSaveState,
     setDatabaseSavedAt,
     lastPersistedSnapshotRef,
@@ -146,7 +153,7 @@ export function useAdminEditorController({
     clearPendingDraftMarker,
   });
 
-  const { loadExercise, openExerciseWithAutosave } = useExerciseLoader({
+  const { loadExercise, openExerciseWithAutosave, cancelPendingExerciseLoad } = useExerciseLoader({
     form,
     selectedId,
     switchingExerciseRef,
@@ -162,6 +169,33 @@ export function useAdminEditorController({
     offerExistingDraftRecovery,
     autosaveCurrentToDbIfNeeded,
   });
+  useEffect(() => {
+    cancelPendingExerciseLoadRef.current = cancelPendingExerciseLoad;
+  }, [cancelPendingExerciseLoad]);
+
+  function cancelExerciseOpening(reason: string) {
+    cancelPendingExerciseLoad(reason);
+    logAdminDebug('openExercise:cancel-pending', {
+      reason,
+      selectedId,
+      formId: form.id ?? null,
+    });
+  }
+
+  async function guardedOpenExerciseWithAutosave(id: number) {
+    if (savingRef.current || deletingRef.current) {
+      logAdminDebug('openExercise:blocked', {
+        nextId: id,
+        selectedId,
+        formId: form.id ?? null,
+        saving: savingRef.current,
+        deleting: deletingRef.current,
+      });
+      return;
+    }
+
+    await openExerciseWithAutosave(id);
+  }
 
   useFormEffects({
     form,
@@ -176,7 +210,6 @@ export function useAdminEditorController({
     lastPersistedSnapshotRef,
     sidebarRef,
     mainSaveAnchorRef,
-    router,
     setForm,
     setInitialSelectionPending,
     setHasUnsavedChanges,
@@ -191,7 +224,7 @@ export function useAdminEditorController({
     formRef,
     mainSaveAnchorRef,
     databaseIndicator: buildDatabaseIndicator(databaseSaveState, databaseSavedAt),
-    openExerciseWithAutosave,
+    openExerciseWithAutosave: guardedOpenExerciseWithAutosave,
     status: {
       isEdit,
       hasUnsavedChanges,
@@ -227,6 +260,7 @@ export function useAdminEditorController({
       onSeedManualChange: () => setIsSeedRegenerateArmed(false),
       onDeleteClick: () => setShowDeleteConfirmModal(true),
       onFloatingSaveClick: () => formRef.current?.requestSubmit(),
+      onSaveIntent: () => cancelExerciseOpening('save-button-pointerdown'),
     },
   };
 }

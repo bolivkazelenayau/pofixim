@@ -6,11 +6,19 @@ const nextConfig: NextConfig = {
     "192.168.0.27:3000",
     "192.168.0.27",
     "100.75.225.52:3000",
+    "100.75.225.52:3001",
     "100.75.225.52",
+    "localhost:3001",
   ],
   experimental: {
     serverActions: {
-      allowedOrigins: ["100.75.225.52:3000", "localhost:3000", "192.168.0.27:3000"],
+      allowedOrigins: [
+        "100.75.225.52:3000",
+        "100.75.225.52:3001",
+        "localhost:3000",
+        "localhost:3001",
+        "192.168.0.27:3000",
+      ],
     },
   },
   turbopack: {

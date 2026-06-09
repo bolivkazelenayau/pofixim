@@ -6,6 +6,7 @@ import { fetchExerciseById } from '@/components/admin-form/api';
 import { formFromExerciseItem } from '@/components/admin-form/formMapping';
 import { loadFormState } from '@/components/admin-form/draftStorage';
 import { logDraftRecoveryDebug } from '@/components/admin-form/draftStorage';
+import { logAdminDebug } from '@/components/admin-form/debug';
 
 type UseExerciseLoaderConfig = {
   form: Form;
@@ -42,6 +43,16 @@ export function useExerciseLoader({
 }: UseExerciseLoaderConfig) {
   const loadExerciseSeqRef = useRef(0);
 
+  function cancelPendingExerciseLoad(reason: string) {
+    loadExerciseSeqRef.current += 1;
+    logAdminDebug('loadExercise:cancelPending', {
+      reason,
+      nextRequestSeq: loadExerciseSeqRef.current,
+      currentSelectedId: selectedId,
+      currentFormId: form.id ?? null,
+    });
+  }
+
   async function loadExercise(id: number) {
     const requestSeq = ++loadExerciseSeqRef.current;
     logDraftRecoveryDebug('loadExercise:start', {
@@ -51,9 +62,17 @@ export function useExerciseLoader({
       currentFormId: form.id ?? null,
       currentFormType: form.type,
     });
+    logAdminDebug('loadExercise:start', {
+      id,
+      requestSeq,
+      currentSelectedId: selectedId,
+      currentFormId: form.id ?? null,
+      url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    });
     const res = await fetchExerciseById(id);
     if (requestSeq !== loadExerciseSeqRef.current) {
       logDraftRecoveryDebug('loadExercise:staleResultIgnored', { id, requestSeq });
+      logAdminDebug('loadExercise:staleResultIgnored', { id, requestSeq });
       return;
     }
     if (!res.success || !res.item) {
@@ -63,6 +82,7 @@ export function useExerciseLoader({
       });
       setIsError(true);
       setMessage(res.error || 'Не удалось открыть задание.');
+      logAdminDebug('loadExercise:error', { id, requestSeq, error: res.error ?? null });
       return;
     }
     const item = res.item as Record<string, unknown>;
@@ -71,6 +91,12 @@ export function useExerciseLoader({
     setForm(loaded);
     lastPersistedSnapshotRef.current = JSON.stringify(loaded);
     setSelectedId(id);
+    logAdminDebug('loadExercise:applied', {
+      id,
+      requestSeq,
+      loadedFormId: loaded.id ?? null,
+      url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    });
     setDatabaseSaveState('saved');
     setDatabaseSavedAt(null);
     logDraftRecoveryDebug('loadExercise:loaded', {
@@ -85,12 +111,24 @@ export function useExerciseLoader({
   }
 
   async function openExerciseWithAutosave(id: number) {
-    if (switchingExerciseRef.current) return;
+    if (switchingExerciseRef.current) {
+      logAdminDebug('openExerciseWithAutosave:skipped-switching', {
+        nextId: id,
+        currentSelectedId: selectedId,
+        currentFormId: form.id ?? null,
+      });
+      return;
+    }
     logDraftRecoveryDebug('openExerciseWithAutosave:start', {
       nextId: id,
       currentSelectedId: selectedId,
       currentFormId: form.id ?? null,
       currentFormType: form.type,
+    });
+    logAdminDebug('openExerciseWithAutosave:start', {
+      nextId: id,
+      currentSelectedId: selectedId,
+      currentFormId: form.id ?? null,
     });
     switchingExerciseRef.current = true;
     try {
@@ -102,12 +140,22 @@ export function useExerciseLoader({
         currentFormId: form.id ?? null,
         currentFormType: form.type,
       });
+      logAdminDebug('openExerciseWithAutosave:autosaveResult', {
+        nextId: id,
+        saved,
+        currentSelectedId: selectedId,
+        currentFormId: form.id ?? null,
+      });
       if (!saved) return;
       await loadExercise(id);
     } finally {
       logDraftRecoveryDebug('openExerciseWithAutosave:done', {
         nextId: id,
-        finalSelectedId: selectedId,
+        selectedIdSnapshot: selectedId,
+      });
+      logAdminDebug('openExerciseWithAutosave:done', {
+        nextId: id,
+        selectedIdSnapshot: selectedId,
       });
       switchingExerciseRef.current = false;
     }
@@ -117,5 +165,6 @@ export function useExerciseLoader({
     loadExercise,
     openExerciseWithAutosave,
     loadExerciseSeqRef,
+    cancelPendingExerciseLoad,
   };
 }

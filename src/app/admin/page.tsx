@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import AdminForm from '@/components/AdminForm';
+import AdminFormClient from '@/components/admin-form/AdminFormClient';
 import ThemeToggle from '@/components/ThemeToggle';
-import { getExerciseByIdAction } from '@/app/actions/admin';
 import { logoutAdminAction } from '@/app/admin/login/actions';
 import { requireAdminPageSession } from '@/lib/admin-auth';
 
@@ -18,17 +17,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     ?? (Array.isArray(resolved.exerciseId) ? resolved.exerciseId[0] : resolved.exerciseId);
   const selectedId = Number(rawId ?? NaN);
   const initialSelectedId = Number.isInteger(selectedId) && selectedId > 0 ? selectedId : null;
-
-  let initialSelectedExercise: Record<string, unknown> | null = null;
-
-  if (initialSelectedId) {
-    try {
-      const selectedResult = await getExerciseByIdAction(initialSelectedId);
-      initialSelectedExercise = selectedResult.item ?? null;
-    } catch (error) {
-      console.error('AdminPage selected exercise load failed:', error);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -58,11 +46,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </div>
 
-      <AdminForm
+      <AdminFormClient
         initialItems={[]}
         initialTotalItems={null}
         initialSelectedId={initialSelectedId}
-        initialSelectedExercise={initialSelectedExercise}
+        initialSelectedExercise={null}
       />
     </div>
   );

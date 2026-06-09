@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { getExerciseIdFromHash, getExerciseIdFromSearch } from '@/components/admin-form/api';
 import { loadFormState } from '@/components/admin-form/draftStorage';
 import { formFromExerciseItem } from '@/components/admin-form/formMapping';
 import { EMPTY } from '@/components/admin-form/defaults';
 import { slugFromPrompt } from '@/components/admin-form/utils';
+import { logAdminDebug } from '@/components/admin-form/debug';
 import type { Form } from '@/components/admin-form/types';
 
 interface UseFormEffectsOptions {
@@ -21,7 +22,6 @@ interface UseFormEffectsOptions {
   lastPersistedSnapshotRef: React.MutableRefObject<string>;
   sidebarRef: React.MutableRefObject<HTMLElement | null>;
   mainSaveAnchorRef: React.MutableRefObject<HTMLDivElement | null>;
-  router: ReturnType<typeof import('next/navigation').useRouter>;
   setForm: React.Dispatch<React.SetStateAction<Form>>;
   setInitialSelectionPending: React.Dispatch<React.SetStateAction<boolean>>;
   setHasUnsavedChanges: React.Dispatch<React.SetStateAction<boolean>>;
@@ -43,7 +43,6 @@ export function useFormEffects({
   lastPersistedSnapshotRef,
   sidebarRef,
   mainSaveAnchorRef,
-  router,
   setForm,
   setInitialSelectionPending,
   setHasUnsavedChanges,
@@ -87,9 +86,9 @@ export function useFormEffects({
   }, [initialSelectedId, initialSelectedExercise]);
 
   useEffect(() => {
-    if (!form.id) return;
+    if (!selectedId) return;
     const url = new URL(window.location.href);
-    url.searchParams.set('exercise', String(form.id));
+    url.searchParams.set('exercise', String(selectedId));
     url.searchParams.delete('id');
     url.searchParams.delete('exerciseId');
     const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
@@ -98,9 +97,15 @@ export function useFormEffects({
     const nextUrl = `${url.pathname}${url.search}${url.hash}`;
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
-      router.replace(nextUrl, { scroll: false });
+      logAdminDebug('url-sync:replaceState', {
+        source: 'selectedId',
+        selectedId,
+        from: currentUrl,
+        to: nextUrl,
+      });
+      window.history.replaceState(null, '', nextUrl);
     }
-  }, [form.id, router]);
+  }, [selectedId]);
 
   useEffect(() => {
     const baseTitle = 'Админка ЕГЭ';
@@ -131,10 +136,17 @@ export function useFormEffects({
 
   useEffect(() => {
     if (selectedId) {
+      logAdminDebug('selection:persist', {
+        selectedId,
+        currentUrl: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      });
       localStorage.setItem('admin_last_selected_id', String(selectedId));
       document.cookie = `admin_selected_exercise_id=${selectedId}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
       return;
     }
+    logAdminDebug('selection:clear', {
+      currentUrl: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    });
     localStorage.removeItem('admin_last_selected_id');
     document.cookie = 'admin_selected_exercise_id=; Path=/admin; Max-Age=0; SameSite=Lax';
   }, [selectedId]);

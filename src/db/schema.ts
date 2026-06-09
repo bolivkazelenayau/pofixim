@@ -51,6 +51,8 @@ export const exercises = pgTable(
     payload: jsonb('payload').notNull(),
     answer: jsonb('answer').notNull(),
     explanation: text('explanation').notNull(),
+    searchBlob: text('search_blob'),
+    searchBlobNormalized: text('search_blob_normalized'),
     sourceAlignment: jsonb('source_alignment'),
     typicalMistake: text('typical_mistake'),
     mistakeModel: jsonb('mistake_model'),

@@ -4,6 +4,7 @@ type FloatingSaveButtonProps = {
  deleting: boolean;
  isEdit: boolean;
  onClick: () => void;
+ onSaveIntent: () => void;
 };
 
 export default function FloatingSaveButton({
@@ -12,6 +13,7 @@ export default function FloatingSaveButton({
  deleting,
  isEdit,
  onClick,
+ onSaveIntent,
 }: FloatingSaveButtonProps) {
  return (
   <div
@@ -20,8 +22,9 @@ export default function FloatingSaveButton({
    }`}
   >
    <button
-    type="button"
-    onClick={onClick}
+   type="button"
+   onPointerDown={onSaveIntent}
+   onClick={onClick}
     disabled={!visible || saving || deleting}
     className={`rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-xl transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700 ${
      visible ? 'pointer-events-auto' : 'pointer-events-none'

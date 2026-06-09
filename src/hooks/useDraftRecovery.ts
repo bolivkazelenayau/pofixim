@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import type { Form } from '@/components/admin-form/types';
 import { getDraftKey, getDraftSessionId, logDraftRecoveryDebug, readStoredDraft } from '@/components/admin-form/draftStorage';
+import { logAdminDebug } from '@/components/admin-form/debug';
 import type { DraftRecoveryState } from '@/components/admin-form/types';
 
 type UseDraftRecoveryConfig = {
@@ -51,6 +52,11 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
       sessionDraftIdsRef.current.add(id);
       setForm(localDraft);
       setSelectedId(id);
+      logAdminDebug('draftRecovery:autoRestoreSameSession', {
+        id,
+        localDraftId: localDraft.id ?? null,
+        serverFormId: serverForm.id ?? null,
+      });
       setDatabaseSaveState('local');
       setDraftRecovery(null);
       logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSameSession', {
@@ -65,6 +71,11 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
     if (sessionDraftIdsRef.current.has(id)) {
       setForm(localDraft);
       setSelectedId(id);
+      logAdminDebug('draftRecovery:autoRestoreSessionRef', {
+        id,
+        localDraftId: localDraft.id ?? null,
+        serverFormId: serverForm.id ?? null,
+      });
       setDatabaseSaveState('local');
       setDraftRecovery(null);
       logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSessionRef', {
@@ -96,6 +107,11 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
     lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
     setForm(draftRecovery.draftForm);
     setSelectedId(draftRecovery.id);
+    logAdminDebug('draftRecovery:useRecoveredDraft', {
+      id: draftRecovery.id,
+      draftFormId: draftRecovery.draftForm.id ?? null,
+      serverFormId: draftRecovery.serverForm.id ?? null,
+    });
     setDatabaseSaveState('local');
     setDraftRecovery(null);
     setIsError(false);
@@ -115,6 +131,11 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
     setForm(draftRecovery.serverForm);
     lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
     setSelectedId(draftRecovery.id);
+    logAdminDebug('draftRecovery:useDatabaseVersion', {
+      id: draftRecovery.id,
+      draftFormId: draftRecovery.draftForm.id ?? null,
+      serverFormId: draftRecovery.serverForm.id ?? null,
+    });
     setDatabaseSaveState('saved');
     setDatabaseSavedAt(null);
     setDraftRecovery(null);

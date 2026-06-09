@@ -15,7 +15,6 @@ type FormPersistenceConfig = {
   switchingExerciseRef: React.MutableRefObject<boolean>;
   deletedExerciseIdsRef: React.MutableRefObject<Set<number>>;
   sessionDraftIdsRef: React.MutableRefObject<Set<number>>;
-  onRefreshList: (opts?: { force?: boolean }) => Promise<void>;
   setIsError: (value: boolean) => void;
   setMessage: (value: string) => void;
 };
@@ -39,7 +38,6 @@ export function useFormPersistence({
   switchingExerciseRef,
   deletedExerciseIdsRef,
   sessionDraftIdsRef,
-  onRefreshList,
   setIsError,
   setMessage,
 }: FormPersistenceConfig) {
@@ -54,7 +52,9 @@ export function useFormPersistence({
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveRetryTimerRef = useRef<number | null>(null);
 
-  latestFormRef.current = form;
+  useEffect(() => {
+    latestFormRef.current = form;
+  }, [form]);
 
   useEffect(() => {
     if (!isDraftLoaded) return;
@@ -122,7 +122,6 @@ export function useFormPersistence({
       }
       if (res.success) {
         markSaveSucceeded(targetForm, snapshot);
-        await onRefreshList({ force: true });
         return true;
       }
       setDatabaseSaveState('local');
