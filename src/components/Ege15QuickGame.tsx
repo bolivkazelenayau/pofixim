@@ -43,9 +43,12 @@ export default function Ege15QuickGame({
   const answerLockedRef = useRef(false);
 
   const currentCard = localCards[index % Math.max(localCards.length, 1)];
-  const tokenFontClass = currentCard && currentCard.token.length > 16
-    ? 'text-[clamp(1.35rem,6.5vw,2.2rem)] sm:text-[2.15rem]'
-    : 'text-[clamp(1.85rem,9vw,3rem)] sm:text-[2.85rem]';
+  const wordLength = currentCard ? currentCard.before.length + 1 + currentCard.after.length : 0;
+  const tokenFontClass = wordLength > 18
+    ? 'text-[clamp(1.25rem,5.7vw,2rem)] sm:text-[2rem]'
+    : wordLength > 12
+      ? 'text-[clamp(1.55rem,6.8vw,2.45rem)] sm:text-[2.35rem]'
+      : 'text-[clamp(2rem,9.5vw,3.05rem)] sm:text-[2.85rem]';
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
@@ -229,10 +232,14 @@ export default function Ege15QuickGame({
                   {currentCard.positionIndex ? `Позиция ${currentCard.positionIndex}` : 'Позиция'}
                 </div>
                 <div className={`${tokenFontClass} font-black leading-none text-foreground`}>
-                  {currentCard.token}
+                  <span>{currentCard.before}</span>
+                  <span className="mx-1 inline-flex h-[1.08em] min-w-[1.08em] translate-y-[0.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_rgba(51,144,236,0.22)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]">
+                    ?
+                  </span>
+                  <span>{currentCard.after}</span>
                 </div>
                 <p className="mx-auto mt-5 max-w-[440px] text-sm font-semibold leading-6 text-foreground/72 sm:text-base sm:leading-7">
-                  {currentCard.context}
+                  {renderContext(currentCard.context)}
                 </p>
                 {currentCard.explanationSnippet && lastAnswerCorrect !== null && (
                   <p className="mx-auto mt-5 max-w-[440px] rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-3 py-2 text-left text-xs font-semibold leading-5 text-foreground/65">
@@ -311,6 +318,23 @@ export default function Ege15QuickGame({
         )}
       </motion.div>
     </div>
+  );
+}
+
+function renderContext(value: string) {
+  const parts = value.split(/(\(\?\))/u);
+
+  return parts.map((part, index) =>
+    part === '(?)' ? (
+      <span
+        key={`${part}-${index}`}
+        className="mx-0.5 inline-flex h-[1.2em] min-w-[1.2em] translate-y-[0.14em] items-center justify-center rounded-md border border-primary/45 bg-primary/10 px-1 text-[0.78em] font-black leading-none text-primary"
+      >
+        ?
+      </span>
+    ) : (
+      <span key={`${part}-${index}`}>{part}</span>
+    ),
   );
 }
 

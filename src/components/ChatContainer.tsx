@@ -636,16 +636,34 @@ export default function ChatContainer() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[var(--surface)] p-5">
+      <div className="flex-1 overflow-y-auto chat-pattern-bg p-5">
         {hasHydrated ? (
           <AnimatePresence initial={false}>
-            {messages.map((msg, index) => (
+            {messages.map((msg, index) => {
+              const prevMsg = messages[index - 1];
+              const nextMsg = messages[index + 1];
+              
+              let isFirstInGroup = true;
+              let isLastInGroup = true;
+              
+              if (prevMsg && prevMsg.isBot === msg.isBot) {
+                const timeDiff = msg.createdAt && prevMsg.createdAt ? msg.createdAt - prevMsg.createdAt : 0;
+                if (timeDiff < 5 * 60 * 1000) isFirstInGroup = false;
+              }
+              if (nextMsg && nextMsg.isBot === msg.isBot) {
+                const timeDiff = nextMsg.createdAt && msg.createdAt ? nextMsg.createdAt - msg.createdAt : 0;
+                if (timeDiff < 5 * 60 * 1000) isLastInGroup = false;
+              }
+
+              return (
               <div key={`${msg.id}-${index}`} className="w-full">
                 <MessageBubble
                   content={msg.content}
                   isBot={msg.isBot}
                   isQuestion={msg.type === 'exercise'}
                   createdAt={msg.createdAt}
+                  isFirstInGroup={isFirstInGroup}
+                  isLastInGroup={isLastInGroup}
                 />
                 {isExerciseMessage(msg) && (
                   <ExerciseRenderer
@@ -657,7 +675,7 @@ export default function ChatContainer() {
                   />
                 )}
               </div>
-            ))}
+            )})}
             {isTyping && <TypingIndicator key="typing" />}
           </AnimatePresence>
         ) : (
@@ -719,6 +737,17 @@ export default function ChatContainer() {
             </AnimatePresence>
 
             <form onSubmit={handleGlobalSubmit} className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setGlobalInputValue(prev => prev.startsWith('/') ? '' : '/');
+                  globalInputRef.current?.focus();
+                }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition hover:bg-[var(--stroke)] hover:text-foreground"
+                title="Меню команд"
+              >
+                <span className="font-mono text-xl font-bold leading-none opacity-80">/</span>
+              </button>
               <textarea
                 ref={globalInputRef}
                 rows={1}
@@ -735,7 +764,7 @@ export default function ChatContainer() {
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder={supportsGlobalInput ? 'Введите ваш ответ...' : 'Команды: /dictation, /blitz, /ege13_quick, /ege15_quick, /start, ...'}
+                placeholder={supportsGlobalInput ? 'Ваш ответ...' : 'Написать сообщение...'}
                 className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm leading-5 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
                 autoFocus
               />

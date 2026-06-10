@@ -12,21 +12,25 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
 
   return (
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
-      <Field label="Текст до пропуска">
+      <Field id="admin-field-fill-before" label="Текст до пропуска">
         <input
           className={inputClass}
           value={form.fillBefore}
           onChange={(e) => setForm((f) => ({ ...f, fillBefore: e.target.value }))}
         />
       </Field>
-      <Field label="Текст после пропуска">
+      <Field id="admin-field-fill-after" label="Текст после пропуска">
         <input
           className={inputClass}
           value={form.fillAfter}
           onChange={(e) => setForm((f) => ({ ...f, fillAfter: e.target.value }))}
         />
       </Field>
-      <Field label="Допустимые ответы (через запятую)" className="sm:col-span-2">
+      <Field
+        id="admin-field-fill-accepted"
+        label="Допустимые ответы (через запятую)"
+        className="sm:col-span-2"
+      >
         <input
           className={inputClass}
           value={form.fillAccepted}

@@ -31,7 +31,7 @@ export default function AdminPreviewPanel({
  onPreviewDictationTextChange,
 }: AdminPreviewPanelProps) {
  return (
-  <div className="h-fit rounded-2xl border border-stroke bg-surface-strong p-4 2xl:sticky 2xl:top-4">
+  <div className="h-fit rounded-xl border border-stroke bg-surface-strong p-4">
    <div className="mb-2 flex items-center justify-between gap-2">
     <h3 className="text-sm font-semibold text-foreground ">Превью в чате</h3>
     <div className="inline-flex rounded-md border border-stroke bg-surface p-0.5 text-xs ">

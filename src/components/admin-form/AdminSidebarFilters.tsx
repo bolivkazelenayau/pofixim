@@ -37,11 +37,55 @@ export default function AdminSidebarFilters({
   onListSortByChange,
   onListSortDirChange,
 }: AdminSidebarFiltersProps) {
+  const savedViews = [
+    {
+      label: 'Review',
+      active: listStatusFilter === 'review' && listExamTypeFilter === 'all',
+      onClick: () => {
+        onListStatusFilterChange(listStatusFilter === 'review' ? 'all' : 'review');
+        onListExamTypeFilterChange('all');
+      },
+    },
+    {
+      label: 'Draft',
+      active: listStatusFilter === 'draft' && listExamTypeFilter === 'all',
+      onClick: () => {
+        onListStatusFilterChange(listStatusFilter === 'draft' ? 'all' : 'draft');
+        onListExamTypeFilterChange('all');
+      },
+    },
+    {
+      label: 'Approved',
+      active: listStatusFilter === 'approved',
+      onClick: () => {
+        onListStatusFilterChange(listStatusFilter === 'approved' ? 'all' : 'approved');
+        onListExamTypeFilterChange('all');
+      },
+    },
+  ];
+
   return (
     <div className="mb-4 space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {savedViews.map((view) => (
+          <button
+            key={view.label}
+            type="button"
+            onClick={view.onClick}
+            className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+              view.active
+                ? 'border-foreground/20 bg-foreground text-background'
+                : 'border-stroke bg-surface-strong text-foreground/65 hover:bg-stroke hover:text-foreground'
+            }`}
+          >
+            {view.label}
+          </button>
+        ))}
+      </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
         <input
+          id="admin-list-search"
           className={`${inputClass} pl-9`}
           placeholder="Поиск: id / seed_key / текст"
           value={listQuery}

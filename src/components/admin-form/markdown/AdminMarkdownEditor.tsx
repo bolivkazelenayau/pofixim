@@ -204,6 +204,7 @@ type AdminMarkdownEditorProps = {
   onChange: (value: string) => void;
   colorMode: 'dark' | 'light';
   height?: number;
+  id?: string;
 };
 
 export default function AdminMarkdownEditor({
@@ -212,6 +213,7 @@ export default function AdminMarkdownEditor({
   onChange,
   colorMode,
   height = 205,
+  id,
 }: AdminMarkdownEditorProps) {
   const markdownCommands = useMemo<ICommand[]>(
     () => [
@@ -235,7 +237,7 @@ export default function AdminMarkdownEditor({
   );
 
   return (
-    <div className="mt-3">
+    <div id={id} className="mt-3">
       <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
       <MDEditor
         value={value}

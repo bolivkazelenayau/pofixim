@@ -27,14 +27,14 @@ export default function AdminMetaFields({
  return (
   <>
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-    <Field label="Source alignment">
+    <Field id="admin-field-source-alignment" label="Source alignment">
      <input
       className={inputClass}
       value={form.sourceAlignment}
       onChange={(event) => setForm((current) => ({ ...current, sourceAlignment: event.target.value }))}
      />
     </Field>
-    <Field label="Типичная ошибка">
+    <Field id="admin-field-typical-mistake" label="Типичная ошибка">
      <input
       className={inputClass}
       value={form.typicalMistake}
@@ -43,7 +43,7 @@ export default function AdminMetaFields({
     </Field>
    </div>
 
-   <Field label="Algorithm steps (по строкам)" className="mt-3">
+   <Field id="admin-field-algorithm-steps" label="Algorithm steps (по строкам)" className="mt-3">
     <textarea
      className={inputClass}
      rows={3}
@@ -122,16 +122,18 @@ export default function AdminMetaFields({
 }
 
 function Field({
+ id,
  label,
  children,
  className = '',
 }: {
+ id?: string;
  label: string;
  children: ReactNode;
  className?: string;
 }) {
  return (
-  <label className={`block ${className}`}>
+  <label id={id} className={`block ${className}`}>
    <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
    {children}
   </label>

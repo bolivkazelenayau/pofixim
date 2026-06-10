@@ -13,6 +13,7 @@ import AdminOrthographyRepairFields from '@/components/admin-form/AdminOrthograp
 import AdminPreviewPanel from '@/components/admin-form/AdminPreviewPanel';
 import AdminPunctuationConstructorFields from '@/components/admin-form/AdminPunctuationConstructorFields';
 import AdminPunctuationInsertFields from '@/components/admin-form/AdminPunctuationInsertFields';
+import AdminQualityInspector from '@/components/admin-form/AdminQualityInspector';
 import AdminWordBankClozeFields from '@/components/admin-form/AdminWordBankClozeFields';
 import AdminWordSearchFields from '@/components/admin-form/AdminWordSearchFields';
 import AdminDraftRecoveryModal from '@/components/admin-form/AdminDraftRecoveryModal';
@@ -205,6 +206,13 @@ export default function AdminExerciseEditor({
         <AdminEditorHeader
           isEdit={status.isEdit}
           hasUnsavedChanges={status.hasUnsavedChanges}
+          formMeta={{
+            id: form.id,
+            type: form.type,
+            qualityStatus: form.qualityStatus,
+            isActive: form.isActive,
+            seedKey: form.seedKey,
+          }}
           onUndo={actions.onUndo}
           onRedo={actions.onRedo}
           onNewDraft={actions.onNewDraft}
@@ -237,17 +245,24 @@ export default function AdminExerciseEditor({
             />
           </form>
 
-          <AdminPreviewPanel
-            preview={previewState.preview}
-            previewMode={previewState.mode}
-            previewCheckResult={previewState.checkResult}
-            previewFeedbackSections={previewState.feedbackSections}
-            previewDictationText={previewState.dictationText}
-            onPreviewModeChange={actions.onPreviewModeChange}
-            onPreviewSubmit={actions.onPreviewSubmit}
-            onPreviewDictationSubmit={actions.onPreviewDictationSubmit}
-            onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
-          />
+          <aside className="space-y-3 2xl:sticky 2xl:top-4">
+            <AdminPreviewPanel
+              preview={previewState.preview}
+              previewMode={previewState.mode}
+              previewCheckResult={previewState.checkResult}
+              previewFeedbackSections={previewState.feedbackSections}
+              previewDictationText={previewState.dictationText}
+              onPreviewModeChange={actions.onPreviewModeChange}
+              onPreviewSubmit={actions.onPreviewSubmit}
+              onPreviewDictationSubmit={actions.onPreviewDictationSubmit}
+              onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
+            />
+            <AdminQualityInspector
+              form={form}
+              setForm={setForm}
+              preview={previewState.preview}
+            />
+          </aside>
         </div>
           </>
         )}

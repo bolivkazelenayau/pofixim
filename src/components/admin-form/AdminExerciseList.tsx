@@ -68,20 +68,39 @@ export default function AdminExerciseList({
               }`}
             >
               {selectionMode ? (
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[10px] text-foreground/60">Shift/Ctrl</span>
-                  {multiSelectedSet.has(item.id) ? (
-                    <span className="text-[10px] font-semibold text-primary">выбрано</span>
-                  ) : null}
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-foreground/45">
+                    multi-select
+                  </span>
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded border ${
+                      multiSelectedSet.has(item.id)
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-stroke bg-surface-strong'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {multiSelectedSet.has(item.id) ? '✓' : ''}
+                  </span>
                 </div>
               ) : null}
-              <div className="text-xs text-foreground/70">
-                #{item.id} • {item.qualityStatus}
+              <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="font-mono text-[11px] font-semibold text-foreground/55">
+                  #{item.id}
+                </span>
+                <ListBadge tone={statusTone(item.qualityStatus)}>
+                  {item.qualityStatus}
+                </ListBadge>
+                <ListBadge>{examLabel(item.skillTags)}</ListBadge>
+                <ListBadge>{item.type}</ListBadge>
+                {!item.isActive ? <ListBadge tone="muted">inactive</ListBadge> : null}
               </div>
-              <div className="mt-0.5 text-[11px] text-foreground/60">
-                обновлено: {formatUpdatedAt(item.updatedAt)}
+              <div className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
+                {item.prompt}
               </div>
-              <div className="line-clamp-2 text-sm text-foreground">{item.prompt}</div>
+              <div className="mt-1 text-[11px] text-foreground/45">
+                updated {formatUpdatedAt(item.updatedAt)}
+              </div>
             </button>
           ))}
         </div>
@@ -117,4 +136,38 @@ export default function AdminExerciseList({
       )}
     </div>
   );
+}
+
+function ListBadge({
+  children,
+  tone = 'default',
+}: {
+  children: string;
+  tone?: 'default' | 'green' | 'amber' | 'red' | 'muted';
+}) {
+  const className = {
+    default: 'border-stroke bg-surface-strong text-foreground/55',
+    green: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200',
+    amber: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200',
+    red: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200',
+    muted: 'border-stroke bg-foreground/5 text-foreground/45',
+  }[tone];
+
+  return (
+    <span className={`max-w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function statusTone(status: string): 'green' | 'amber' | 'red' | 'muted' {
+  if (status === 'approved') return 'green';
+  if (status === 'review') return 'amber';
+  if (status === 'archived') return 'muted';
+  return 'red';
+}
+
+function examLabel(skillTags: string[]) {
+  const tag = skillTags.find((item) => /^ege\.\d{1,2}$/u.test(item));
+  return tag ? tag.replace('ege.', 'ЕГЭ ') : 'no exam';
 }

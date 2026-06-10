@@ -12,6 +12,8 @@ type MessageBubbleProps = {
   isBot: boolean;
   isQuestion?: boolean;
   createdAt?: number;
+  isFirstInGroup?: boolean;
+  isLastInGroup?: boolean;
 };
 
 type FeedbackSections = {
@@ -50,7 +52,7 @@ function getFeedbackTone(content: string) {
   return null;
 }
 
-export default function MessageBubble({ content, isBot, isQuestion, createdAt }: MessageBubbleProps) {
+export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup }: MessageBubbleProps) {
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
   const timeString = useMemo(() => {
     if (!createdAt) return '';
@@ -64,6 +66,9 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt }:
   const isFeedback = Boolean(feedbackTone || sections);
 
   let bubbleClasses = '';
+  const first = isFirstInGroup !== false;
+  const last = isLastInGroup !== false;
+
   if (isQuestion) {
     bubbleClasses = 'bg-primary text-white shadow-sm';
   } else if (isFeedback) {
@@ -71,9 +76,15 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt }:
       ? 'border border-emerald-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-emerald-400/70 dark:before:bg-emerald-300/65 [&>div>p:first-child]:text-emerald-700 [&>div>p:first-child]:dark:text-emerald-200'
       : 'border border-amber-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-amber-400/75 dark:before:bg-amber-300/70 [&>div>p:first-child]:text-amber-700 [&>div>p:first-child]:dark:text-amber-200';
   } else if (isBot) {
-    bubbleClasses = 'bg-[var(--surface-strong)] text-foreground border border-[var(--stroke)] rounded-bl-none shadow-sm before:absolute before:bottom-[-1px] before:left-[-16px] before:h-4 before:w-4 before:bg-[var(--stroke)] before:[clip-path:polygon(100%_0,100%_100%,0_100%)] after:absolute after:bottom-0 after:left-[-14px] after:h-3.5 after:w-3.5 after:bg-[var(--surface-strong)] after:[clip-path:polygon(100%_0,100%_100%,0_100%)]';
+    bubbleClasses = 'bg-[var(--surface-strong)] text-foreground border border-[var(--stroke)] shadow-sm';
+    if (!first) bubbleClasses += ' rounded-tl-[6px]';
+    if (!last) bubbleClasses += ' rounded-bl-[6px]';
+    if (last) bubbleClasses += ' rounded-bl-none before:absolute before:bottom-[-1px] before:left-[-16px] before:h-4 before:w-4 before:bg-[var(--stroke)] before:[clip-path:polygon(100%_0,100%_100%,0_100%)] after:absolute after:bottom-0 after:left-[-14px] after:h-3.5 after:w-3.5 after:bg-[var(--surface-strong)] after:[clip-path:polygon(100%_0,100%_100%,0_100%)]';
   } else {
-    bubbleClasses = 'bg-[#EEFFDE] text-black border border-[#D5E5C3] dark:border-[#74550d] dark:bg-[#3c2c12] dark:text-amber-50 rounded-br-none shadow-sm dark:shadow-none before:absolute before:bottom-[-1px] before:right-[-16px] before:h-4 before:w-4 before:bg-[#D5E5C3] before:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:before:bg-[#74550d] after:absolute after:bottom-0 after:right-[-14px] after:h-3.5 after:w-3.5 after:bg-[#EEFFDE] after:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:after:bg-[#3c2c12]';
+    bubbleClasses = 'bg-[#EEFFDE] text-black border border-[#D5E5C3] dark:border-[#74550d] dark:bg-[#3c2c12] dark:text-amber-50 shadow-sm dark:shadow-none';
+    if (!first) bubbleClasses += ' rounded-tr-[6px]';
+    if (!last) bubbleClasses += ' rounded-br-[6px]';
+    if (last) bubbleClasses += ' rounded-br-none before:absolute before:bottom-[-1px] before:right-[-16px] before:h-4 before:w-4 before:bg-[#D5E5C3] before:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:before:bg-[#74550d] after:absolute after:bottom-0 after:right-[-14px] after:h-3.5 after:w-3.5 after:bg-[#EEFFDE] after:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:after:bg-[#3c2c12]';
   }
 
   return (
@@ -81,7 +92,7 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt }:
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.2 }}
-      className={`mb-4 flex w-full ${isBot ? 'justify-start' : 'justify-end'}`}
+      className={`${last ? 'mb-4' : 'mb-1'} flex w-full ${isBot ? 'justify-start' : 'justify-end'}`}
     >
       <div
         className={`relative max-w-[88%] rounded-2xl px-5 py-3 shadow-sm before:pointer-events-none after:pointer-events-none [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-[14px] leading-[1.78] tracking-[0.025em]' : 'text-[15px] leading-[1.65]'} ${bubbleClasses}`}
@@ -104,13 +115,17 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt }:
           </div>
         ) : (
           <div className="relative">
-            <div className={!isBot ? 'pr-12' : ''}>
+            <div className={!isBot ? 'pr-12' : 'pr-10'}>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(markdownContent)}</ReactMarkdown>
             </div>
-            {!isBot && (
+            {!isBot ? (
               <div className="absolute -bottom-1 -right-2 flex items-center gap-1 text-[11px] font-medium text-[#7EAC55] dark:text-amber-100/70">
                 {timeString && <span>{timeString}</span>}
                 <CheckCheck className="h-[14px] w-[14px]" strokeWidth={2.5} />
+              </div>
+            ) : (
+              <div className="absolute -bottom-1 -right-1.5 flex items-center gap-1 text-[11px] font-medium text-foreground/40">
+                {timeString && <span>{timeString}</span>}
               </div>
             )}
           </div>
@@ -119,4 +134,3 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt }:
     </motion.div>
   );
 }
-

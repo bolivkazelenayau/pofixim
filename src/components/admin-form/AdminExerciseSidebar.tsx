@@ -104,7 +104,11 @@ export default function AdminExerciseSidebar({
             </span>
           </div>
           <p className="mt-0.5 text-[11px] font-medium text-foreground/50">
-            {stats.initialListPending ? 'Загрузка списка...' : `Показано: ${stats.shownCount}`}
+            {stats.initialListPending
+              ? 'Загрузка списка...'
+              : selection.enabled
+                ? `Показано: ${stats.shownCount} · выбрано: ${selection.selectedCount}`
+                : `Показано: ${stats.shownCount}`}
           </p>
         </div>
         <div className="flex items-center gap-1.5">

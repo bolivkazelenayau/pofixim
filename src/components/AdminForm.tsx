@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AdminCommandPalette from '@/components/admin-form/AdminCommandPalette';
 import AdminEditorContainer from '@/components/admin-form/AdminEditorContainer';
 import AdminSidebarContainer from '@/components/admin-form/AdminSidebarContainer';
 import { EMPTY } from '@/components/admin-form/defaults';
@@ -29,6 +30,7 @@ export default function AdminForm({
   );
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   const {
     setItems,
@@ -76,56 +78,134 @@ export default function AdminForm({
     isError,
   });
 
-  return (
-    <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-      <AdminSidebarContainer
-        sidebarRef={editor.sidebarRef}
-        databaseIndicator={editor.databaseIndicator}
-        selectedId={editor.selectedId}
-        list={{
-          totalItems,
-          matchingItems,
-          initialListPending,
-          hasActiveListFilter,
-          groupedItems,
-          flatFilteredItems,
-          query: listQuery,
-          typeFilter: listTypeFilter,
-          statusFilter: listStatusFilter,
-          examTypeFilter: listExamTypeFilter,
-          sortBy: listSortBy,
-          sortDir: listSortDir,
-          sortPrefsReady,
-          hasMore,
-          loadingMore,
-          setQuery: setListQuery,
-          setTypeFilter: setListTypeFilter,
-          setStatusFilter: setListStatusFilter,
-          setExamTypeFilter: setListExamTypeFilter,
-          setSortBy: setListSortBy,
-          setSortDir: setListSortDir,
-          refresh: refreshList,
-          loadMore,
-        }}
-        onOpenExercise={editor.openExerciseWithAutosave}
-        setIsError={setIsError}
-        setMessage={setMessage}
-      />
+  function openAdjacentExercise(direction: 1 | -1) {
+    if (flatFilteredItems.length === 0) return;
+    const currentIndex = flatFilteredItems.findIndex((item) => item.id === editor.selectedId);
+    const fallbackIndex = direction > 0 ? -1 : flatFilteredItems.length;
+    const nextIndex = currentIndex >= 0 ? currentIndex + direction : fallbackIndex + direction;
+    const nextItem = flatFilteredItems[nextIndex];
+    if (nextItem) {
+      void editor.openExerciseWithAutosave(nextItem.id);
+    }
+  }
 
-      <AdminEditorContainer
-        status={editor.status}
-        formState={{
-          formRef: editor.formRef,
-          form,
-          isDraftLoaded,
-          typeOptions,
-          setForm,
-          mainSaveAnchorRef: editor.mainSaveAnchorRef,
-        }}
-        recovery={editor.recovery}
-        modals={editor.modals}
-        actions={editor.actions}
+  function focusListSearch() {
+    document.getElementById('admin-list-search')?.focus();
+  }
+
+  function setStatusView(status: 'all' | 'draft' | 'review' | 'approved') {
+    setListStatusFilter(status);
+    setListExamTypeFilter('all');
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if ((event.ctrlKey || event.metaKey) && isShortcutKey(event, ['k', 'л'])) {
+        event.preventDefault();
+        event.stopPropagation();
+        setCommandOpen((value) => !value);
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && isShortcutKey(event, ['s', 'ы'])) {
+        event.preventDefault();
+        event.stopPropagation();
+        editor.formRef.current?.requestSubmit();
+        return;
+      }
+
+      if (isEditableTarget || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+      if (event.altKey && event.key === 'ArrowDown') {
+        event.preventDefault();
+        openAdjacentExercise(1);
+      }
+      if (event.altKey && event.key === 'ArrowUp') {
+        event.preventDefault();
+        openAdjacentExercise(-1);
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [editor, flatFilteredItems]);
+
+  return (
+    <>
+      <AdminCommandPalette
+        open={commandOpen}
+        selectedId={editor.selectedId}
+        items={flatFilteredItems}
+        onOpenChange={setCommandOpen}
+        onOpenExercise={(id) => void editor.openExerciseWithAutosave(id)}
+        onSave={() => editor.formRef.current?.requestSubmit()}
+        onNewDraft={editor.actions.onNewDraft}
+        onNext={() => openAdjacentExercise(1)}
+        onPrevious={() => openAdjacentExercise(-1)}
+        onFocusSearch={focusListSearch}
+        onSetStatusView={setStatusView}
       />
-    </div>
+      <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+        <AdminSidebarContainer
+          sidebarRef={editor.sidebarRef}
+          databaseIndicator={editor.databaseIndicator}
+          selectedId={editor.selectedId}
+          list={{
+            totalItems,
+            matchingItems,
+            initialListPending,
+            hasActiveListFilter,
+            groupedItems,
+            flatFilteredItems,
+            query: listQuery,
+            typeFilter: listTypeFilter,
+            statusFilter: listStatusFilter,
+            examTypeFilter: listExamTypeFilter,
+            sortBy: listSortBy,
+            sortDir: listSortDir,
+            sortPrefsReady,
+            hasMore,
+            loadingMore,
+            setQuery: setListQuery,
+            setTypeFilter: setListTypeFilter,
+            setStatusFilter: setListStatusFilter,
+            setExamTypeFilter: setListExamTypeFilter,
+            setSortBy: setListSortBy,
+            setSortDir: setListSortDir,
+            refresh: refreshList,
+            loadMore,
+          }}
+          onOpenExercise={editor.openExerciseWithAutosave}
+          setIsError={setIsError}
+          setMessage={setMessage}
+        />
+
+        <AdminEditorContainer
+          status={editor.status}
+          formState={{
+            formRef: editor.formRef,
+            form,
+            isDraftLoaded,
+            typeOptions,
+            setForm,
+            mainSaveAnchorRef: editor.mainSaveAnchorRef,
+          }}
+          recovery={editor.recovery}
+          modals={editor.modals}
+          actions={editor.actions}
+        />
+      </div>
+    </>
   );
+}
+
+function isShortcutKey(event: KeyboardEvent, keys: string[]) {
+  const key = event.key.toLowerCase();
+  return keys.includes(key);
 }

@@ -94,7 +94,7 @@ export default function AdminCoreFields({
    </div>
 
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-    <Field label="Seed key">
+    <Field id="admin-field-seed-key" label="Seed key">
      <div className="flex gap-2">
       <input
        className={inputClass}
@@ -115,7 +115,7 @@ export default function AdminCoreFields({
       </button>
      </div>
     </Field>
-    <Field label="Skill tags">
+    <Field id="admin-field-skill-tags" label="Skill tags">
      <input
       className={inputClass}
       value={form.skillTags}
@@ -125,12 +125,14 @@ export default function AdminCoreFields({
    </div>
 
    <AdminMarkdownEditor
+    id="admin-field-prompt"
     label="Формулировка"
     value={form.prompt}
     onChange={(prompt) => setForm((current) => ({ ...current, prompt }))}
     colorMode={editorColorMode}
    />
    <AdminMarkdownEditor
+    id="admin-field-explanation"
     label="Объяснение"
     value={form.explanation}
     onChange={(explanation) => setForm((current) => ({ ...current, explanation }))}
@@ -141,14 +143,16 @@ export default function AdminCoreFields({
 }
 
 function Field({
+ id,
  label,
  children,
 }: {
+ id?: string;
  label: string;
  children: ReactNode;
 }) {
  return (
-  <label className="block">
+  <label id={id} className="block">
    <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
    {children}
   </label>
