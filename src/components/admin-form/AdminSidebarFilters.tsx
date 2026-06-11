@@ -175,7 +175,7 @@ export default function AdminSidebarFilters({
               <button
                 type="button"
                 onClick={() => onListSortDirChange(listSortDir === 'asc' ? 'desc' : 'asc')}
-                className="group relative flex w-[38px] self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition hover:bg-stroke hover:text-foreground"
+                className="group relative flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition hover:bg-stroke hover:text-foreground"
               >
                 {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
                 <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
@@ -185,8 +185,8 @@ export default function AdminSidebarFilters({
             </>
           ) : (
             <>
-              <div className="h-[38px] w-full animate-pulse rounded-lg border border-stroke bg-surface" />
-              <div className="h-[38px] w-[38px] animate-pulse rounded-lg border border-stroke bg-surface" />
+              <div className="h-8 w-full animate-pulse rounded-lg border border-stroke bg-surface" />
+              <div className="h-8 w-8 animate-pulse rounded-lg border border-stroke bg-surface" />
             </>
           )}
         </div>

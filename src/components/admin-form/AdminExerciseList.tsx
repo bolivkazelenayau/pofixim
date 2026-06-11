@@ -115,12 +115,12 @@ export default function AdminExerciseList({
       ))}
       {initialListPending ? (
         <div className="space-y-2">
-          <div className="h-6 animate-pulse rounded-md border border-stroke bg-surface" />
-          <div className="h-20 animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-20 animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-20 animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-20 animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-20 animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[26px] animate-pulse rounded-md border border-stroke bg-surface" />
+          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
         </div>
       ) : groupedItems.length === 0 && (
         <div className="rounded-lg border border-dashed border-stroke px-3 py-4 text-sm text-foreground/60">

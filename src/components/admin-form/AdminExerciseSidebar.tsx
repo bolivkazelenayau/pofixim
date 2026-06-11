@@ -195,6 +195,7 @@ export default function AdminExerciseSidebar({
       <AdminExerciseList
         groupedItems={list.groupedItems}
         initialListPending={stats.initialListPending}
+        typeFilter={filters.type}
         selectionMode={selection.enabled}
         selectedId={list.selectedId}
         multiSelectedSet={selection.selectedIds}
