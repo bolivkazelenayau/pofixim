@@ -96,7 +96,7 @@ function buildCardsFromNumberedGaps({
       before: tokenParts.before,
       after: tokenParts.after,
       correctWord,
-      context: extractContextAround(text, match.index ?? 0, token.length),
+      context: extractContextAround(text, match.index ?? 0, token.length, index),
       correctChoice,
       choices: ['Одна Н', 'НН'],
       correctChoiceIndex: correctChoice === 'n' ? 0 : 1,
@@ -194,6 +194,7 @@ function extractContextAround(
   text: string,
   start: number,
   length: number,
+  activeIndex: number,
 ) {
   const leftBoundary = Math.max(
     text.lastIndexOf('.', start),
@@ -206,7 +207,10 @@ function extractContextAround(
     .filter((index) => index >= 0);
   const rightBoundary = nextStops.length > 0 ? Math.min(...nextStops) + 1 : text.length;
   const context = text.slice(leftBoundary >= 0 ? leftBoundary + 1 : 0, rightBoundary);
-  const clean = normalizeSpaces(context).replace(/\(\d+\)/gu, '(?)');
+  const clean = normalizeSpaces(context).replace(
+    new RegExp(`\\(${activeIndex}\\)`, 'gu'),
+    '(?)',
+  );
 
   if (clean.length <= 260) return clean;
 
@@ -221,24 +225,31 @@ function extractExplanationSnippet(
   target: { index?: number; correctWord?: string },
 ) {
   const clean = stripMarkdown(explanation).replace(/<br\s*\/?>/giu, ' ');
+  const byIndex = target.index ? extractExplanationSnippetByIndex(clean, target.index) : undefined;
+  if (byIndex) return byIndex;
+
   const byWord = target.correctWord
     ? extractExplanationSnippetByWord(clean, target.correctWord)
     : undefined;
   if (byWord) return byWord;
 
-  const row = target.index ? extractExplanationSnippetByIndex(clean, target.index) : undefined;
-  const value = row || clean;
-
-  if (!value) return undefined;
-  return value.length > 220 ? `${value.slice(0, 217).trim()}...` : value;
+  return undefined;
 }
 
 function extractExplanationSnippetByIndex(clean: string, index: number) {
-  const rowRe = new RegExp(
-    `(?:^|\\s)${index}\\)\\s*([\\s\\S]*?)(?=\\s+[1-9]\\)\\s*|$)`,
-    'u',
-  );
-  return clean.match(rowRe)?.[1]?.trim();
+  const markerRe = new RegExp(`(?:^|[\\s;:])(?:${index}\\)|\\(${index}\\))\\s*`, 'gu');
+  const matches = [...clean.matchAll(markerRe)];
+
+  const candidates = matches
+    .map((match) => {
+      const markerStart = (match.index ?? 0) + (match[0].match(/^\s/u) ? 1 : 0);
+      const segment = trimExplanationSegment(clean, markerStart, match[0].trim().length);
+      return segment ? { index: markerStart, segment } : null;
+    })
+    .filter((item): item is { index: number; segment: string } => Boolean(item))
+    .filter((item) => countPositionMarkers(item.segment) <= 2);
+
+  return candidates.sort((a, b) => b.index - a.index)[0]?.segment;
 }
 
 function extractExplanationSnippetByWord(clean: string, correctWord: string) {
@@ -264,7 +275,8 @@ function extractExplanationSnippetByWord(clean: string, correctWord: string) {
   const best = matches.sort((a, b) => b.score - a.score || b.index - a.index)[0];
   if (!best) return undefined;
 
-  return trimExplanationSegment(clean, best.index, correctWord.length);
+  const segment = trimExplanationSegment(clean, best.index, correctWord.length);
+  return segment && countPositionMarkers(segment) <= 2 ? segment : undefined;
 }
 
 function trimExplanationSegment(clean: string, wordStart: number, wordLength: number) {
@@ -279,6 +291,10 @@ function trimExplanationSegment(clean: string, wordStart: number, wordLength: nu
 
   if (!segment) return undefined;
   return segment.length > 220 ? `${segment.slice(0, 217).trim()}...` : segment;
+}
+
+function countPositionMarkers(value: string) {
+  return value.match(/(?:^|\s)\d\)|\(\d+\)/gu)?.length ?? 0;
 }
 
 function comparableText(value: string) {
