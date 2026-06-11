@@ -428,8 +428,8 @@ export default function ChatContainer() {
       return `<tr class="${trClass} border-b border-[var(--stroke)] last:border-0">
         <td class="py-1.5 pr-3 text-center w-10">${medal}</td>
         <td class="py-1.5 px-3">${row.name}</td>
-        <td class="py-1.5 px-3 text-right">${row.score}</td>
-        <td class="py-1.5 pl-3 text-right text-foreground/60">${row.streak}</td>
+        <td class="py-1.5 px-3 text-right tabular-nums">${row.score}</td>
+        <td class="py-1.5 pl-3 text-right tabular-nums text-foreground/60">${row.streak}</td>
       </tr>`;
     });
 
@@ -604,8 +604,8 @@ export default function ChatContainer() {
   ]);
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-lg sm:h-[calc(100vh-2rem)]">
-      <AnimatePresence>
+    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-lg sm:h-[calc(100dvh-2rem)]">
+      <AnimatePresence initial={false}>
         {blitz.isOpen && (
           <BlitzGame cards={blitz.cards} onClose={blitz.close} onFinish={blitz.onFinish} />
         )}
@@ -630,7 +630,7 @@ export default function ChatContainer() {
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5 shadow-sm">
-          <div className="flex min-w-14 items-center gap-1 text-sm font-semibold text-foreground/80">
+          <div className="flex min-w-14 items-center gap-1 text-sm font-semibold tabular-nums text-foreground/80">
             <span>Очки:</span>
             {hasHydrated ? (
               <span>{score}</span>
@@ -639,7 +639,7 @@ export default function ChatContainer() {
             )}
           </div>
           <div className="h-4 w-px bg-[var(--stroke)]" />
-          <div className="flex min-w-16 items-center gap-1 text-sm font-semibold text-orange-600">
+          <div className="flex min-w-16 items-center gap-1 text-sm font-semibold tabular-nums text-orange-600">
             <span>Серия:</span>
             {hasHydrated ? (
               <span>{streak}</span>
@@ -719,13 +719,15 @@ export default function ChatContainer() {
           </div>
         ) : (
           <div className="relative">
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {showSlashCommands && (
                 <motion.div
+                  id="slash-command-list"
                   initial={{ opacity: 0, y: 8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
                   transition={{ duration: 0.15 }}
+                  role="listbox"
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
                   {visibleSlashCommands.map((item) => {
@@ -734,14 +736,16 @@ export default function ChatContainer() {
                       <button
                         key={item.command}
                         type="button"
+                        role="option"
+                        aria-selected="false"
                         onMouseDown={(event) => {
                           event.preventDefault();
                           runSlashCommand(item.command);
                         }}
                         className="flex w-full items-center gap-3 border-b border-[var(--stroke)] px-3 py-2.5 text-left transition last:border-b-0 hover:bg-[var(--surface)]"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white">
-                          <Icon className="h-4 w-4" />
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                          <Icon className="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-black text-foreground">
@@ -767,6 +771,9 @@ export default function ChatContainer() {
                   globalInputRef.current?.focus();
                 }}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition hover:bg-[var(--stroke)] hover:text-foreground"
+                aria-label="Open command menu"
+                aria-expanded={showSlashCommands}
+                aria-controls="slash-command-list"
                 title="Меню команд"
               >
                 <span className="font-mono text-xl font-bold leading-none opacity-80">/</span>
@@ -789,15 +796,17 @@ export default function ChatContainer() {
                 }}
                 placeholder={supportsGlobalInput ? 'Ваш ответ...' : 'Написать сообщение...'}
                 className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm leading-5 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
+                aria-label={supportsGlobalInput ? 'Exercise answer' : 'Message or command'}
                 autoFocus
               />
               <button
                 type="submit"
                 disabled={!globalInputValue.trim()}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:bg-primary-strong disabled:opacity-50"
+                aria-label="Send"
                 title="Отправить"
               >
-                <svg className="h-5 w-5 translate-x-0.5 rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="h-5 w-5 translate-x-0.5 rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>

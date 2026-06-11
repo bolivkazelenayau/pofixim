@@ -153,12 +153,12 @@ export default function Ege13QuickGame({
   }, [answer, finish, nextCard, status]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-md sm:items-center sm:px-3 sm:py-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:px-3 sm:py-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
-        className="relative flex max-h-[94svh] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-2xl sm:max-h-[92vh] sm:rounded-[22px]"
+        className="relative flex max-h-[94svh] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[22px]"
         role="dialog"
         aria-modal="true"
         aria-label="Быстрый тип 13"
@@ -166,10 +166,11 @@ export default function Ege13QuickGame({
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground sm:h-9 sm:w-9"
+          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
+          aria-label="Close quick game"
           title="Закрыть"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
 
         {status === 'offer' && (
@@ -202,12 +203,12 @@ export default function Ege13QuickGame({
           <div className="flex flex-1 flex-col p-3 sm:p-5">
             <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-2 pr-9 sm:mb-4 sm:pr-10">
               {combo > 0 && (
-                <div className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
+                <div className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
                   x{combo}
                 </div>
               )}
               {!combo && <div />}
-              <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
+              <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
             </div>
@@ -248,7 +249,7 @@ export default function Ege13QuickGame({
                 <button
                   type="button"
                   onClick={nextCard}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong active:scale-[0.98] sm:text-lg"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong active:scale-[0.96] sm:text-lg"
                 >
                   Далее
                   <ArrowRight className="h-5 w-5" />
@@ -333,11 +334,11 @@ function ChoiceButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-14 min-w-0 items-center justify-center gap-2 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-70 sm:text-lg"
+      className="flex h-14 min-w-0 items-center justify-center gap-2 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-70 sm:text-lg"
     >
-      {icon === 'left' && <Icon className="h-4 w-4 text-foreground/50" />}
+      {icon === 'left' && <Icon className="h-4 w-4 text-foreground/50" aria-hidden="true" />}
       <span className="truncate">{label}</span>
-      {icon === 'right' && <Icon className="h-4 w-4 text-foreground/50" />}
+      {icon === 'right' && <Icon className="h-4 w-4 text-foreground/50" aria-hidden="true" />}
     </button>
   );
 }
@@ -348,7 +349,7 @@ function ResultCell({ label, value }: { label: string; value: number }) {
       <div className="text-xs font-bold uppercase tracking-[0.08em] text-foreground/45">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-black text-foreground">{value}</div>
+      <div className="mt-1 text-2xl font-black tabular-nums text-foreground">{value}</div>
     </div>
   );
 }

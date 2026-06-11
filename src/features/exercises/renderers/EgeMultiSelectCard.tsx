@@ -61,7 +61,7 @@ export default function EgeMultiSelectCard({
         })}
       </div>
       <motion.button
-        whileTap={!disabled && canSubmit ? { scale: 0.98 } : {}}
+        whileTap={!disabled && canSubmit ? { scale: 0.96 } : {}}
         disabled={disabled || !canSubmit}
         onClick={() =>
           onSubmit(

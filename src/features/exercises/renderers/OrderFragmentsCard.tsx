@@ -116,7 +116,7 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
           Сбросить порядок
         </button>
         <motion.button
-          whileTap={!disabled ? { scale: 0.98 } : {}}
+          whileTap={!disabled ? { scale: 0.96 } : {}}
           disabled={disabled}
           onClick={() =>
             onSubmit(

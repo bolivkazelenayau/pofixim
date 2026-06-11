@@ -174,7 +174,7 @@ export default function WordSearchCard({
                     }
                   }}
                   disabled={disabled}
-                  className={`flex h-9 w-9 select-none items-center justify-center rounded border text-sm font-semibold transition ${
+                  className={`flex h-10 w-10 select-none items-center justify-center rounded border text-sm font-semibold transition ${
                     inDrag
                       ? 'border-blue-500 bg-blue-100 text-blue-900'
                       : inFound
@@ -224,7 +224,7 @@ export default function WordSearchCard({
       </div>
 
       <motion.button
-        whileTap={!disabled && foundWords.length > 0 ? { scale: 0.98 } : {}}
+        whileTap={!disabled && foundWords.length > 0 ? { scale: 0.96 } : {}}
         disabled={disabled || foundWords.length === 0}
         onClick={submit}
         className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"

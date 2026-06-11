@@ -4,6 +4,10 @@ import { exercises } from '@/db/schema';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
 import { mapExerciseRowToEditorResult } from './admin-exercise-mapper';
 
+function isUnauthorizedError(error: unknown) {
+  return error instanceof Error && error.message === 'Unauthorized';
+}
+
 export async function getExerciseById(id: number) {
   try {
     await assertAdminAuthorized();
@@ -14,6 +18,10 @@ export async function getExerciseById(id: number) {
 
     return mapExerciseRowToEditorResult(row);
   } catch (error) {
+    if (isUnauthorizedError(error)) {
+      return { success: false as const, error: 'Unauthorized' };
+    }
+
     console.error('Failed to get exercise:', error);
     return { success: false as const, error: 'Unexpected error' };
   }

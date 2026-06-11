@@ -46,12 +46,12 @@ export default function OptionsList({ options, correctIndex, onSelect, disabled 
           <motion.button
             key={idx}
             whileHover={!showResult ? { scale: 1.01 } : {}}
-            whileTap={!showResult ? { scale: 0.98 } : {}}
+            whileTap={!showResult ? { scale: 0.96 } : {}}
             animate={isSelected && !isCorrect ? { x: [-5, 5, -5, 5, 0] } : {}}
             transition={{ duration: 0.3 }}
             onClick={() => handleSelect(idx)}
             disabled={showResult || disabled}
-            className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-200 ${bgColor} ${borderColor} ${textColor} shadow-sm font-medium`}
+            className={`w-full text-left px-5 py-3.5 rounded-xl border transition-[background-color,border-color,color,box-shadow] duration-200 ${bgColor} ${borderColor} ${textColor} shadow-sm font-medium`}
           >
             {option}
           </motion.button>

@@ -102,7 +102,7 @@ export default function AdminExerciseSidebar({
               {stats.totalItems ?? '...'}
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] font-medium text-foreground/50">
+          <p className="mt-0.5 text-[11px] font-medium tabular-nums text-foreground/50">
             {stats.initialListPending
               ? 'Загрузка списка...'
               : selection.enabled
@@ -112,31 +112,37 @@ export default function AdminExerciseSidebar({
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
+            type="button"
+            aria-label="Refresh exercise list"
+            className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
             onClick={list.onRefresh}
           >
-            <RefreshCw className="h-4 w-4" />
-            <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
               Обновить список
             </span>
           </button>
           {!selection.enabled ? (
             <button
-              className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
+              type="button"
+              aria-label="Enable exercise selection"
+              className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
               onClick={selection.onEnable}
             >
-              <CheckSquare className="h-4 w-4" />
-              <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+              <CheckSquare className="h-4 w-4" aria-hidden="true" />
+              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
                 Выбрать задания
               </span>
             </button>
           ) : (
             <button
-              className="group relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
+              type="button"
+              aria-label="Clear exercise selection"
+              className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
               onClick={selection.onClear}
             >
-              <XSquare className="h-4 w-4" />
-              <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
+              <XSquare className="h-4 w-4" aria-hidden="true" />
+              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
                 Отмена выбора
               </span>
             </button>

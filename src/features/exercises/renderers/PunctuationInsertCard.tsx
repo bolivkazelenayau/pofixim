@@ -89,7 +89,7 @@ export default function PunctuationInsertCard({
       </div>
 
       <motion.button
-        whileTap={!disabled ? { scale: 0.98 } : {}}
+        whileTap={!disabled ? { scale: 0.96 } : {}}
         disabled={disabled}
         onClick={() => {
           let label = '';

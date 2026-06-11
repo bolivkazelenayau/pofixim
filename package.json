@@ -41,7 +41,8 @@
     "main:p95:http": "node scripts/main-http-p95.mjs",
     "admin:proxy-cookie-check": "node scripts/check-local-proxy-admin-cookie.mjs",
     "proxy:dev": "node local-proxy.js dev",
-    "proxy:prod": "node local-proxy.js prod"
+    "proxy:prod": "node local-proxy.js prod",
+    "proxy:both": "node local-proxy.js both"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

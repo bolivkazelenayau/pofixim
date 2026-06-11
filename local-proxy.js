@@ -1,7 +1,6 @@
 const http = require("http");
 const net = require("net");
 
-const PROFILE = process.env.PROXY_PROFILE || process.argv[2] || "dev";
 const PROFILE_DEFAULTS = {
   dev: {
     listenPort: 3001,
@@ -12,19 +11,12 @@ const PROFILE_DEFAULTS = {
     targetPort: 3002,
   },
 };
-const defaults = PROFILE_DEFAULTS[PROFILE] || PROFILE_DEFAULTS.dev;
-
-const LISTEN_HOST = process.env.PROXY_HOST || "0.0.0.0";
-const LISTEN_PORT = Number(process.env.PROXY_PORT || defaults.listenPort);
-const TARGET_HOST = process.env.PROXY_TARGET_HOST || "127.0.0.1";
-const TARGET_PORT = Number(process.env.PROXY_TARGET_PORT || defaults.targetPort);
-const TARGET_ORIGIN =
-  process.env.PROXY_TARGET_ORIGIN || `http://localhost:${TARGET_PORT}`;
 const DEFAULT_ALLOWED_REMOTE_CIDRS = "127.0.0.1/32,100.64.0.0/10,::1";
 const ALLOWED_REMOTE_CIDRS = (process.env.PROXY_ALLOWED_REMOTE_CIDRS || DEFAULT_ALLOWED_REMOTE_CIDRS)
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const MULTI_PROFILE_ALIASES = new Set(["all", "both", "dev+prod", "dev,prod"]);
 
 const TRANSIENT_NETWORK_ERRORS = new Set([
   "ECONNRESET",
@@ -38,10 +30,11 @@ function isTransientNetworkError(error) {
   return Boolean(error && TRANSIENT_NETWORK_ERRORS.has(error.code));
 }
 
-function logProxyError(context, error) {
+function logProxyError(context, error, profile) {
   const code = error?.code || "ERROR";
   const message = error?.message || String(error);
-  console.warn(`[proxy:${context}] ${code}: ${message}`);
+  const prefix = profile ? `[proxy:${profile}:${context}]` : `[proxy:${context}]`;
+  console.warn(`${prefix} ${code}: ${message}`);
 }
 
 function appendForwardedFor(existing, remoteAddress) {
@@ -77,13 +70,13 @@ function isIPv4InCidr(address, cidr) {
   return (addressNumber & mask) === (rangeNumber & mask);
 }
 
-function isRemoteAllowed(remoteAddress) {
+function isRemoteAllowed(remoteAddress, allowedRemoteCidrs) {
   const address = normalizeRemoteAddress(remoteAddress);
   if (!address) return false;
   const ipVersion = net.isIP(address);
   if (!ipVersion) return false;
 
-  return ALLOWED_REMOTE_CIDRS.some((rule) => {
+  return allowedRemoteCidrs.some((rule) => {
     if (rule.includes("/")) {
       return ipVersion === 4 && isIPv4InCidr(address, rule);
     }
@@ -99,9 +92,9 @@ function writeForbidden(res) {
   res.end("Forbidden: remote address is not allowed by local proxy");
 }
 
-function buildHeaders(req) {
+function buildHeaders(req, config) {
   const headers = req.headers;
-  const incomingHost = headers.host || `localhost:${LISTEN_PORT}`;
+  const incomingHost = headers.host || `localhost:${config.listenPort}`;
   const forwardedProto = headers['x-forwarded-proto'] || 'http';
 
   return {
@@ -113,7 +106,7 @@ function buildHeaders(req) {
     ),
     'x-forwarded-host': headers['x-forwarded-host'] || incomingHost,
     'x-forwarded-port':
-      headers['x-forwarded-port'] || String(incomingHost).split(':')[1] || String(LISTEN_PORT),
+      headers['x-forwarded-port'] || String(incomingHost).split(':')[1] || String(config.listenPort),
     'x-forwarded-proto': forwardedProto,
   };
 }
@@ -133,149 +126,224 @@ function writeBadGateway(res, error) {
   res.end(`Bad Gateway: ${error?.code || error?.message || "upstream unavailable"}`);
 }
 
-const server = http.createServer((req, res) => {
-  if (!isRemoteAllowed(req.socket.remoteAddress)) {
-    console.warn(`[proxy:forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.method} ${req.url}`);
-    writeForbidden(res);
-    return;
+function profileEnv(profile, key) {
+  return process.env[`PROXY_${profile.toUpperCase()}_${key}`];
+}
+
+function readNumberEnv(value, fallback) {
+  if (value == null || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function resolveRequestedProfiles() {
+  const rawProfile = process.env.PROXY_PROFILE || process.argv[2] || "dev";
+  const normalizedProfile = rawProfile.trim().toLowerCase();
+
+  if (MULTI_PROFILE_ALIASES.has(normalizedProfile)) {
+    return ["dev", "prod"];
   }
 
-  const proxy = http.request(
-    {
-      hostname: TARGET_HOST,
-      port: TARGET_PORT,
-      path: req.url,
-      method: req.method,
-      headers: buildHeaders(req),
-    },
-    (targetRes) => {
-      targetRes.on("error", (error) => {
-        logProxyError("target-response", error);
-        safeDestroy(res);
-      });
+  const requestedProfiles = normalizedProfile
+    .split(",")
+    .map((profile) => profile.trim())
+    .filter(Boolean);
 
-      res.writeHead(targetRes.statusCode ?? 502, targetRes.headers);
-      targetRes.pipe(res);
-    },
+  return requestedProfiles.length ? requestedProfiles : ["dev"];
+}
+
+function createProfileConfig(profile, isMultiProfile) {
+  const defaults = PROFILE_DEFAULTS[profile] || PROFILE_DEFAULTS.dev;
+  const listenPort = readNumberEnv(
+    profileEnv(profile, "PORT") || (isMultiProfile ? undefined : process.env.PROXY_PORT),
+    defaults.listenPort,
+  );
+  const targetHost =
+    profileEnv(profile, "TARGET_HOST") ||
+    (isMultiProfile ? undefined : process.env.PROXY_TARGET_HOST) ||
+    "127.0.0.1";
+  const targetPort = readNumberEnv(
+    profileEnv(profile, "TARGET_PORT") || (isMultiProfile ? undefined : process.env.PROXY_TARGET_PORT),
+    defaults.targetPort,
   );
 
-  req.on("error", (error) => {
-    logProxyError("client-request", error);
-    safeDestroy(proxy);
-  });
+  return {
+    profile,
+    isMultiProfile,
+    listenHost:
+      profileEnv(profile, "HOST") ||
+      (isMultiProfile ? undefined : process.env.PROXY_HOST) ||
+      "0.0.0.0",
+    listenPort,
+    targetHost,
+    targetPort,
+    targetOrigin:
+      profileEnv(profile, "TARGET_ORIGIN") ||
+      (isMultiProfile ? undefined : process.env.PROXY_TARGET_ORIGIN) ||
+      `http://localhost:${targetPort}`,
+    allowedRemoteCidrs: ALLOWED_REMOTE_CIDRS,
+  };
+}
 
-  res.on("error", (error) => {
-    logProxyError("client-response", error);
-    safeDestroy(proxy);
-  });
+function createProxyServer(config) {
+  const server = http.createServer((req, res) => {
+    if (!isRemoteAllowed(req.socket.remoteAddress, config.allowedRemoteCidrs)) {
+      console.warn(`[proxy:${config.profile}:forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.method} ${req.url}`);
+      writeForbidden(res);
+      return;
+    }
 
-  proxy.on("error", (error) => {
-    logProxyError("upstream-request", error);
-    writeBadGateway(res, error);
-  });
+    const proxy = http.request(
+      {
+        hostname: config.targetHost,
+        port: config.targetPort,
+        path: req.url,
+        method: req.method,
+        headers: buildHeaders(req, config),
+      },
+      (targetRes) => {
+        targetRes.on("error", (error) => {
+          logProxyError("target-response", error, config.profile);
+          safeDestroy(res);
+        });
 
-  req.pipe(proxy);
-});
+        res.writeHead(targetRes.statusCode ?? 502, targetRes.headers);
+        targetRes.pipe(res);
+      },
+    );
 
-server.on("upgrade", (req, socket, head) => {
-  if (!isRemoteAllowed(req.socket.remoteAddress)) {
-    console.warn(`[proxy:upgrade-forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.url}`);
-    socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
-    return;
-  }
-
-  const proxy = http.request({
-    hostname: TARGET_HOST,
-    port: TARGET_PORT,
-    path: req.url,
-    method: req.method,
-    headers: buildHeaders(req),
-  });
-
-  let upgraded = false;
-
-  socket.on("error", (error) => {
-    logProxyError("upgrade-client-socket", error);
-    safeDestroy(proxy);
-  });
-
-  proxy.on("upgrade", (targetRes, targetSocket, targetHead) => {
-    upgraded = true;
-
-    targetSocket.on("error", (error) => {
-      logProxyError("upgrade-target-socket", error);
-      safeDestroy(socket);
+    req.on("error", (error) => {
+      logProxyError("client-request", error, config.profile);
+      safeDestroy(proxy);
     });
 
-    const responseHeaders = Object.entries(targetRes.headers)
-      .flatMap(([key, value]) => {
-        if (Array.isArray(value)) return value.map((item) => `${key}: ${item}`);
-        if (value == null) return [];
-        return [`${key}: ${value}`];
-      })
-      .join("\r\n");
+    res.on("error", (error) => {
+      logProxyError("client-response", error, config.profile);
+      safeDestroy(proxy);
+    });
 
-    socket.write(
-      `HTTP/1.1 101 Switching Protocols\r\n${responseHeaders}\r\n\r\n`,
-    );
+    proxy.on("error", (error) => {
+      logProxyError("upstream-request", error, config.profile);
+      writeBadGateway(res, error);
+    });
 
-    if (targetHead?.length) {
-      socket.write(targetHead);
-    }
-    if (head?.length) {
-      targetSocket.write(head);
-    }
-
-    targetSocket.pipe(socket);
-    socket.pipe(targetSocket);
+    req.pipe(proxy);
   });
 
-  proxy.on("response", (targetRes) => {
-    socket.write(
-      `HTTP/1.1 ${targetRes.statusCode ?? 502} ${targetRes.statusMessage ?? "Bad Gateway"}\r\n`,
-    );
-    for (const [key, value] of Object.entries(targetRes.headers)) {
-      if (Array.isArray(value)) {
-        for (const item of value) socket.write(`${key}: ${item}\r\n`);
-      } else if (value != null) {
-        socket.write(`${key}: ${value}\r\n`);
+  server.on("upgrade", (req, socket, head) => {
+    if (!isRemoteAllowed(req.socket.remoteAddress, config.allowedRemoteCidrs)) {
+      console.warn(`[proxy:${config.profile}:upgrade-forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.url}`);
+      socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+      return;
+    }
+
+    const proxy = http.request({
+      hostname: config.targetHost,
+      port: config.targetPort,
+      path: req.url,
+      method: req.method,
+      headers: buildHeaders(req, config),
+    });
+
+    let upgraded = false;
+
+    socket.on("error", (error) => {
+      logProxyError("upgrade-client-socket", error, config.profile);
+      safeDestroy(proxy);
+    });
+
+    proxy.on("upgrade", (targetRes, targetSocket, targetHead) => {
+      upgraded = true;
+
+      targetSocket.on("error", (error) => {
+        logProxyError("upgrade-target-socket", error, config.profile);
+        safeDestroy(socket);
+      });
+
+      const responseHeaders = Object.entries(targetRes.headers)
+        .flatMap(([key, value]) => {
+          if (Array.isArray(value)) return value.map((item) => `${key}: ${item}`);
+          if (value == null) return [];
+          return [`${key}: ${value}`];
+        })
+        .join("\r\n");
+
+      socket.write(
+        `HTTP/1.1 101 Switching Protocols\r\n${responseHeaders}\r\n\r\n`,
+      );
+
+      if (targetHead?.length) {
+        socket.write(targetHead);
       }
-    }
-    socket.write("\r\n");
+      if (head?.length) {
+        targetSocket.write(head);
+      }
 
-    targetRes.on("error", (error) => {
-      logProxyError("upgrade-target-response", error);
-      safeDestroy(socket);
+      targetSocket.pipe(socket);
+      socket.pipe(targetSocket);
     });
-    targetRes.pipe(socket);
+
+    proxy.on("response", (targetRes) => {
+      socket.write(
+        `HTTP/1.1 ${targetRes.statusCode ?? 502} ${targetRes.statusMessage ?? "Bad Gateway"}\r\n`,
+      );
+      for (const [key, value] of Object.entries(targetRes.headers)) {
+        if (Array.isArray(value)) {
+          for (const item of value) socket.write(`${key}: ${item}\r\n`);
+        } else if (value != null) {
+          socket.write(`${key}: ${value}\r\n`);
+        }
+      }
+      socket.write("\r\n");
+
+      targetRes.on("error", (error) => {
+        logProxyError("upgrade-target-response", error, config.profile);
+        safeDestroy(socket);
+      });
+      targetRes.pipe(socket);
+    });
+
+    proxy.on("error", (error) => {
+      logProxyError("upgrade-upstream-request", error, config.profile);
+      if (!upgraded && !socket.destroyed) {
+        socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+      } else {
+        safeDestroy(socket);
+      }
+    });
+
+    proxy.end();
   });
 
-  proxy.on("error", (error) => {
-    logProxyError("upgrade-upstream-request", error);
-    if (!upgraded && !socket.destroyed) {
-      socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
-    } else {
-      safeDestroy(socket);
+  server.on("clientError", (error, socket) => {
+    logProxyError("client-error", error, config.profile);
+    if (!socket.destroyed) {
+      socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
     }
   });
 
-  proxy.end();
-});
+  server.on("error", (error) => {
+    logProxyError("server", error, config.profile);
+    if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+      if (config.isMultiProfile) {
+        console.warn(
+          `[proxy:${config.profile}:skip] Cannot listen on ${config.listenHost}:${config.listenPort}; other requested profiles will keep running.`,
+        );
+        return;
+      }
 
-server.on("clientError", (error, socket) => {
-  logProxyError("client-error", error);
-  if (!socket.destroyed) {
-    socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
-  }
-});
+      process.exitCode = 1;
+      setImmediate(() => process.exit(1));
+    }
+  });
 
-server.on("error", (error) => {
-  logProxyError("server", error);
-  if (error.code === "EADDRINUSE" || error.code === "EACCES") {
-    process.exitCode = 1;
-    setImmediate(() => process.exit(1));
-  }
-});
+  return server;
+}
+
+const requestedProfiles = resolveRequestedProfiles();
+const profileConfigs = requestedProfiles.map((profile) =>
+  createProfileConfig(profile, requestedProfiles.length > 1),
+);
 
 process.on("uncaughtException", (error) => {
   if (isTransientNetworkError(error)) {
@@ -293,8 +361,11 @@ process.on("unhandledRejection", (reason) => {
   console.error("[proxy:unhandled-rejection]", reason);
 });
 
-server.listen(LISTEN_PORT, LISTEN_HOST, () => {
-  console.log(
-    `Proxy (${PROFILE}) listening on http://${LISTEN_HOST}:${LISTEN_PORT} -> ${TARGET_ORIGIN}; allowed remotes: ${ALLOWED_REMOTE_CIDRS.join(", ")}`,
-  );
-});
+for (const config of profileConfigs) {
+  const server = createProxyServer(config);
+  server.listen(config.listenPort, config.listenHost, () => {
+    console.log(
+      `Proxy (${config.profile}) listening on http://${config.listenHost}:${config.listenPort} -> ${config.targetOrigin}; allowed remotes: ${config.allowedRemoteCidrs.join(", ")}`,
+    );
+  });
+}

@@ -257,7 +257,7 @@ export default function OrthographyRepairCard({
           Сбросить
         </button>
         <motion.button
-          whileTap={!disabled ? { scale: 0.98 } : {}}
+          whileTap={!disabled ? { scale: 0.96 } : {}}
           disabled={disabled || !canSubmit}
           onClick={submit}
           className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"

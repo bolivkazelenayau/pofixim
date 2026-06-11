@@ -99,6 +99,8 @@ export default function DictationCard({ exercise }: Props) {
   const waveform = decodedWaveform ?? exercise.payload.waveform ?? FALLBACK_WAVEFORM;
   const displayDuration = duration;
   const progress = displayDuration > 0 ? currentTime / displayDuration : 0;
+  const currentTimeLabel = formatTime(currentTime);
+  const durationLabel = formatTime(displayDuration);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,9 +228,15 @@ export default function DictationCard({ exercise }: Props) {
             type="button"
             onClick={togglePlayback}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm transition hover:bg-primary-strong"
+            aria-label={isPlaying ? 'Пауза' : 'Слушать'}
+            aria-pressed={isPlaying}
             title={isPlaying ? 'Пауза' : 'Слушать'}
           >
-            {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
+            {isPlaying ? (
+              <Pause className="h-5 w-5 fill-current" aria-hidden="true" />
+            ) : (
+              <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden="true" />
+            )}
           </button>
 
           <div className="min-w-0 flex-1">
@@ -239,6 +247,8 @@ export default function DictationCard({ exercise }: Props) {
               aria-valuenow={Math.round(progress * 100)}
               aria-valuemin={0}
               aria-valuemax={100}
+              aria-valuetext={`${currentTimeLabel} of ${durationLabel}`}
+              aria-orientation="horizontal"
               tabIndex={0}
               onPointerDown={(event) => {
                 const audio = audioRef.current;
@@ -284,6 +294,12 @@ export default function DictationCard({ exercise }: Props) {
                   audio.currentTime = Math.min(seekDuration, Math.max(0, audio.currentTime + delta));
                   if (duration <= 0) setDuration(seekDuration);
                 }
+                if (event.key === 'Home' || event.key === 'End') {
+                  event.preventDefault();
+                  audio.currentTime = event.key === 'Home' ? 0 : seekDuration;
+                  setCurrentTime(audio.currentTime);
+                  if (duration <= 0) setDuration(seekDuration);
+                }
               }}
               className="group flex h-10 cursor-ew-resize touch-none select-none items-center gap-px overflow-hidden rounded-lg px-1 outline-none focus:ring-2 focus:ring-primary/30 sm:gap-px md:gap-[3px]"
             >
@@ -300,9 +316,9 @@ export default function DictationCard({ exercise }: Props) {
                 );
               })}
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs font-medium text-foreground/55">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(displayDuration)}</span>
+            <div className="mt-1 flex items-center justify-between text-xs font-medium tabular-nums text-foreground/55">
+              <span>{currentTimeLabel}</span>
+              <span>{durationLabel}</span>
             </div>
           </div>
         </div>
@@ -313,16 +329,21 @@ export default function DictationCard({ exercise }: Props) {
             onClick={restart}
             className="inline-flex items-center gap-1.5 rounded-lg border border-stroke bg-surface-strong px-2.5 py-1.5 text-xs font-bold text-foreground/80 transition hover:bg-stroke"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
             Заново
           </button>
-          <div className="inline-flex items-center gap-1 rounded-lg border border-stroke bg-surface-strong px-1.5 py-1">
-            <Gauge className="h-3.5 w-3.5 text-foreground/55" />
+          <div
+            className="inline-flex items-center gap-1 rounded-lg border border-stroke bg-surface-strong px-1.5 py-1"
+            role="group"
+            aria-label="Playback speed"
+          >
+            <Gauge className="h-3.5 w-3.5 text-foreground/55" aria-hidden="true" />
             {rates.map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setRate(item)}
+                aria-pressed={rate === item}
                 className={`rounded-md px-2 py-1 text-xs font-black transition ${
                   rate === item
                     ? 'bg-primary text-white'

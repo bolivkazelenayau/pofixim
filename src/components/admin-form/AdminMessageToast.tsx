@@ -39,9 +39,11 @@ export default function AdminMessageToast({ message, isError }: AdminMessageToas
 
  if (!visibleMessage) return null;
 
- return (
+  return (
   <div
-   className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-2xl transition-all duration-200 ease-out ${
+   role={isError ? 'alert' : 'status'}
+   aria-live={isError ? 'assertive' : 'polite'}
+   className={`fixed right-6 bottom-6 z-50 mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-xl transition-[opacity,transform] duration-200 ease-out ${
     isVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
    } ${
     isError

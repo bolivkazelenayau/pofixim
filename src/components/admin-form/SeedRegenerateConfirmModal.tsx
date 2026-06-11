@@ -1,3 +1,5 @@
+import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
+
 type SeedRegenerateConfirmModalProps = {
  onCancel: () => void;
  onConfirm: () => void;
@@ -8,29 +10,37 @@ export default function SeedRegenerateConfirmModal({
  onConfirm,
 }: SeedRegenerateConfirmModalProps) {
  return (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
-   <div className="w-full max-w-md rounded-2xl border border-stroke bg-surface-strong p-5 shadow-xl ">
-    <h4 className="text-base font-semibold text-foreground ">Подтверждение</h4>
-    <p className="mt-2 text-sm text-foreground/80 ">
-     Вы уверены, что хотите перегенерировать сид?
-    </p>
-    <div className="mt-4 flex justify-end gap-2">
-     <button
-      type="button"
-      className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 hover:bg-surface "
-      onClick={onCancel}
-     >
-      Отмена
-     </button>
-     <button
-      type="button"
-      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-strong"
-      onClick={onConfirm}
-     >
-      Перегенерировать
-     </button>
-    </div>
-   </div>
-  </div>
+  <AlertDialogPrimitive.Root open onOpenChange={(open) => !open && onCancel()}>
+   <AlertDialogPrimitive.Portal>
+    <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-900/45" />
+    <AlertDialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-stroke bg-surface-strong p-5 text-foreground shadow-xl outline-none">
+     <AlertDialogPrimitive.Title className="text-base font-semibold">
+      Подтверждение
+     </AlertDialogPrimitive.Title>
+     <AlertDialogPrimitive.Description className="mt-2 text-sm text-foreground/80">
+      Вы уверены, что хотите перегенерировать сид?
+     </AlertDialogPrimitive.Description>
+     <div className="mt-4 flex justify-end gap-2">
+      <AlertDialogPrimitive.Cancel asChild>
+       <button
+        type="button"
+        className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors hover:bg-surface"
+       >
+        Отмена
+       </button>
+      </AlertDialogPrimitive.Cancel>
+      <AlertDialogPrimitive.Action asChild>
+       <button
+        type="button"
+        className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-strong"
+        onClick={onConfirm}
+       >
+        Перегенерировать
+       </button>
+      </AlertDialogPrimitive.Action>
+     </div>
+    </AlertDialogPrimitive.Content>
+   </AlertDialogPrimitive.Portal>
+  </AlertDialogPrimitive.Root>
  );
 }

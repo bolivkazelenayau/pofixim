@@ -20,7 +20,7 @@ export default function MultipleChoiceCard({
         <motion.button
           key={`${exercise.id}-${idx}`}
           whileHover={!disabled ? { scale: 1.01 } : {}}
-          whileTap={!disabled ? { scale: 0.98 } : {}}
+          whileTap={!disabled ? { scale: 0.96 } : {}}
           onClick={() =>
             onSubmit(
               { type: 'multiple_choice', selectedOptionIndex: idx },
@@ -28,7 +28,7 @@ export default function MultipleChoiceCard({
             )
           }
           disabled={disabled}
-          className="w-full text-left px-5 py-3.5 rounded-xl border border-stroke bg-surface-strong hover:bg-surface disabled:opacity-60 disabled:hover:bg-white text-foreground/80 shadow-sm font-medium transition-all"
+          className="w-full text-left px-5 py-3.5 rounded-xl border border-stroke bg-surface-strong hover:bg-surface disabled:opacity-60 disabled:hover:bg-white text-foreground/80 shadow-sm font-medium transition-[background-color,border-color,color,box-shadow]"
         >
           {option}
         </motion.button>

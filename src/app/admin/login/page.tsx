@@ -11,19 +11,15 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
-      {/* Decorative blurred background blobs */}
-      <div className="absolute -left-[10%] top-[10%] h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px] dark:bg-primary/15" />
-      <div className="absolute -right-[10%] bottom-[10%] h-[500px] w-[500px] rounded-full bg-purple-500/20 blur-[120px] dark:bg-purple-600/15" />
-      
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-10">
       <div className="absolute right-5 top-5 z-50">
         <ThemeToggle />
       </div>
 
-      <section className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-stroke/60 bg-surface-strong/80 p-8 shadow-2xl backdrop-blur-xl dark:border-stroke/30 dark:bg-surface-strong/60">
+      <section className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-stroke/60 bg-surface-strong p-8 shadow-xl dark:border-stroke/30">
         <div className="mb-8 flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-strong text-white shadow-lg shadow-primary/30">
-            <Database className="h-6 w-6" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-md shadow-primary/20">
+            <Database className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -43,7 +39,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
               Мастер-пароль
             </span>
             <div className="relative group">
-              <LockKeyhole className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40 transition-colors group-focus-within:text-primary" />
+              <LockKeyhole className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40 transition-colors group-focus-within:text-primary" aria-hidden="true" />
               <input
                 autoComplete="current-password"
                 autoFocus
@@ -51,7 +47,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
                 required
                 type="password"
                 placeholder="••••••••••••"
-                className="w-full rounded-xl border border-stroke/80 bg-surface/50 py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-foreground/30 outline-none transition-all hover:bg-surface focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10 dark:focus:ring-primary/20"
+                className="w-full rounded-xl border border-stroke/80 bg-surface/50 py-3.5 pl-11 pr-4 text-sm text-foreground placeholder:text-foreground/30 outline-none transition-[background-color,border-color,box-shadow] hover:bg-surface focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10 dark:focus:ring-primary/20"
               />
             </div>
           </label>
@@ -70,7 +66,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-gradient-to-r from-primary to-primary-strong px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 active:translate-y-0"
+            className="w-full rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 active:scale-[0.96]"
           >
             Войти в систему
           </button>

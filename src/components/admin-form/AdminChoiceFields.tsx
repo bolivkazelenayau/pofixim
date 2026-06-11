@@ -20,6 +20,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
      {form.type === 'multiple_choice' ? (
       <input
        type="radio"
+       aria-label={`Mark option ${index + 1} as correct`}
        checked={form.correctOptionIndex === index}
        onChange={() => setForm((current) => ({ ...current, correctOptionIndex: index }))}
       />
@@ -30,6 +31,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
      )}
      <input
       className={inputClass}
+      aria-label={`Option ${index + 1}`}
       value={option}
       onChange={(event) =>
        setForm((current) => ({
@@ -53,9 +55,10 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
         })
        }
        className="p-1 text-slate-400 transition hover:text-red-500"
+       aria-label={`Remove option ${index + 1}`}
        title="Удалить вариант"
       >
-       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
        </svg>
       </button>

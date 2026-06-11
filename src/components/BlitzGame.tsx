@@ -207,12 +207,12 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   }, [answer, finish, status]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-md sm:items-center sm:px-3 sm:py-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:px-3 sm:py-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
-        className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-2xl sm:max-h-[92vh] sm:rounded-[22px] ${
+        className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[22px] ${
           status === 'running' ? 'min-h-[68svh] sm:min-h-0' : ''
         }`}
         role="dialog"
@@ -222,10 +222,11 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground sm:h-9 sm:w-9"
+          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
+          aria-label="Close blitz"
           title="Закрыть"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
 
         {status === 'offer' && (
@@ -274,16 +275,16 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         {status === 'running' && currentCard && (
           <div className="flex flex-1 flex-col p-3 sm:block sm:p-5">
             <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pr-9 sm:mb-3 sm:pr-10">
-              <div className="justify-self-start rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black text-foreground shadow-sm sm:px-3 sm:text-sm">
+              <div className="justify-self-start rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black tabular-nums text-foreground shadow-sm sm:px-3 sm:text-sm">
                 {timeLeftSeconds} c
               </div>
               {combo > 0 && (
-                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:gap-1.5 sm:px-3 sm:text-sm">
+                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black tabular-nums text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:gap-1.5 sm:px-3 sm:text-sm">
                   <Zap className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
                   {combo}
                 </div>
               )}
-              <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
+              <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
             </div>
@@ -404,7 +405,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(0)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96]"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[0]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
@@ -414,7 +415,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(1)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.98]"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96]"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[1]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
@@ -469,7 +470,7 @@ function ResultCell({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-3">
       <div className="text-xs font-bold uppercase text-foreground/50">{label}</div>
-      <div className="mt-1 text-2xl font-black text-foreground">{value}</div>
+      <div className="mt-1 text-2xl font-black tabular-nums text-foreground">{value}</div>
     </div>
   );
 }
