@@ -44,6 +44,9 @@ type SubmitExerciseAnswerInput = {
   exerciseId: number;
   submittedAnswer: unknown;
   timeSpentMs?: number;
+  returnNextExercise?: boolean;
+  seenExerciseIds?: number[];
+  category?: ExerciseCategory;
 };
 
 type GetBlitzPoolInput = {
@@ -115,46 +118,16 @@ export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
   const startedAt = Date.now();
   try {
     const session = await getOrCreateLearningSession(input.sessionId);
-    const recentAttempts = await getRecentAttempts(session.id);
-    const recentFingerprints = await getRecentExerciseFingerprints(
-      recentAttempts.map((attempt) => attempt.exerciseId),
-    );
-    const seenExerciseIds = [
-      ...(input.seenExerciseIds ?? []),
-      ...recentAttempts.map((attempt) => attempt.exerciseId),
-    ];
-    const targetDifficulty = targetDifficultyForSession(session);
-    const candidates = await getExerciseCandidates({
+    const next = await getNextExerciseForSession({
+      session,
       category: input.category,
       forceType: input.forceType,
-      seenExerciseIds,
-      targetDifficulty,
-      recentFingerprints,
+      seenExerciseIds: input.seenExerciseIds,
     });
-    const exercise = selectBestExerciseCandidate({
-      candidates,
-      session,
-      recentAttempts,
-    });
-
-    if (!exercise) {
-      return {
-        success: true,
-        sessionId: session.id,
-        exercise: null,
-        noMoreExercises: true,
-      };
-    }
-
     return {
       success: true,
       sessionId: session.id,
-      exercise,
-      matchmaking: {
-        targetDifficulty,
-        currentRating: session.currentRating,
-        currentStreak: session.currentStreak,
-      },
+      ...next,
     };
   } catch (error) {
     console.error('Failed to fetch next exercise:', error);
@@ -240,16 +213,38 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
       })
       .where(eq(learningSessions.id, session.id));
 
+    const updatedSession = {
+      ...session,
+      currentRating: Math.max(800, session.currentRating + ratingDelta),
+      currentStreak: nextStreak,
+      bestStreak: nextBestStreak,
+      totalScore: session.totalScore + result.scoreDelta,
+      completedCount: session.completedCount + 1,
+      correctCount: session.correctCount + (result.isCorrect ? 1 : 0),
+      lastCategory: exercise.category,
+      lastExerciseType: exercise.type,
+    };
+    const next = input.returnNextExercise
+      ? await getNextExerciseForSession({
+          session: updatedSession,
+          category: input.category,
+          seenExerciseIds: [...new Set([...(input.seenExerciseIds ?? []), exercise.id!])],
+        })
+      : null;
+
     return {
       success: true,
       sessionId: session.id,
       result,
       session: {
-        currentRating: Math.max(800, session.currentRating + ratingDelta),
-        currentStreak: nextStreak,
-        bestStreak: nextBestStreak,
-        totalScore: session.totalScore + result.scoreDelta,
+        currentRating: updatedSession.currentRating,
+        currentStreak: updatedSession.currentStreak,
+        bestStreak: updatedSession.bestStreak,
+        totalScore: updatedSession.totalScore,
       },
+      nextExercise: next?.exercise ?? null,
+      noMoreExercises: next?.noMoreExercises ?? false,
+      matchmaking: next?.matchmaking,
     };
   } catch (error) {
     console.error('Failed to submit exercise answer:', error);
@@ -421,6 +416,64 @@ async function getOrCreateLearningSession(sessionId?: string) {
     .returning();
 
   return created[0];
+}
+
+type LearningSessionRow = Awaited<ReturnType<typeof getOrCreateLearningSession>>;
+
+async function getNextExerciseForSession({
+  session,
+  category,
+  forceType,
+  seenExerciseIds,
+}: {
+  session: LearningSessionRow;
+  category?: ExerciseCategory;
+  forceType?: ExerciseType;
+  seenExerciseIds?: number[];
+}) {
+  const recentAttempts = await getRecentAttempts(session.id);
+  const recentFingerprints = await getRecentExerciseFingerprints(
+    recentAttempts.map((attempt) => attempt.exerciseId),
+  );
+  const blockedExerciseIds = [
+    ...(seenExerciseIds ?? []),
+    ...recentAttempts.map((attempt) => attempt.exerciseId),
+  ];
+  const targetDifficulty = targetDifficultyForSession(session);
+  const candidates = await getExerciseCandidates({
+    category,
+    forceType,
+    seenExerciseIds: blockedExerciseIds,
+    targetDifficulty,
+    recentFingerprints,
+  });
+  const exercise = selectBestExerciseCandidate({
+    candidates,
+    session,
+    recentAttempts,
+  });
+
+  if (!exercise) {
+    return {
+      exercise: null,
+      noMoreExercises: true,
+      matchmaking: {
+        targetDifficulty,
+        currentRating: session.currentRating,
+        currentStreak: session.currentStreak,
+      },
+    };
+  }
+
+  return {
+    exercise,
+    noMoreExercises: false,
+    matchmaking: {
+      targetDifficulty,
+      currentRating: session.currentRating,
+      currentStreak: session.currentStreak,
+    },
+  };
 }
 
 async function getRecentAttempts(sessionId: string) {

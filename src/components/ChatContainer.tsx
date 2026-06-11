@@ -260,7 +260,7 @@ export default function ChatContainer() {
             seenExerciseIds: dynamicBlocked,
             forceType,
           });
-          const returnedId = res.success ? res.exercise?.id : undefined;
+          const returnedId = res.success && 'exercise' in res ? res.exercise?.id : undefined;
           const isBlocked = typeof returnedId === 'number' && dynamicBlocked.includes(returnedId);
           if (!isBlocked) break;
           dynamicBlocked = [...new Set([...dynamicBlocked, returnedId])];
@@ -270,7 +270,7 @@ export default function ChatContainer() {
         isFetchingExercise.current = false;
       }
 
-      if (!res.success) {
+      if (!res.success || !('sessionId' in res)) {
         addMessage({
           id: createMessageId('error'),
           isBot: true,
@@ -285,7 +285,7 @@ export default function ChatContainer() {
         setSessionId(res.sessionId);
       }
 
-      if (res.exercise?.id) {
+      if ('exercise' in res && res.exercise?.id) {
         markExercisePresented(res.exercise.id);
         addMessage({
           id: createMessageId('exercise'),
@@ -297,7 +297,7 @@ export default function ChatContainer() {
         return;
       }
 
-      if (res.noMoreExercises) {
+      if ('noMoreExercises' in res && res.noMoreExercises) {
         addMessage({
           id: createMessageId('end'),
           isBot: true,
@@ -346,6 +346,8 @@ export default function ChatContainer() {
       sessionId,
       exerciseId: exercise.id,
       submittedAnswer,
+      returnNextExercise: true,
+      seenExerciseIds: [...new Set([...cooldownExerciseIds, ...seenExerciseIds, exercise.id])],
     });
 
     setTyping(false);
@@ -378,6 +380,27 @@ export default function ChatContainer() {
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
+      if ('nextExercise' in res && res.nextExercise?.id) {
+        markExercisePresented(res.nextExercise.id);
+        addMessage({
+          id: createMessageId('exercise'),
+          isBot: true,
+          content: res.nextExercise.prompt,
+          type: 'exercise',
+          exercise: res.nextExercise,
+        });
+        return;
+      }
+      if ('noMoreExercises' in res && res.noMoreExercises) {
+        addMessage({
+          id: createMessageId('end'),
+          isBot: true,
+          content:
+            'Ð”Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹Ðµ ÑƒÐ¿Ñ€Ð°Ð¶Ð½ÐµÐ½Ð¸Ñ Ð·Ð°ÐºÐ¾Ð½Ñ‡Ð¸Ð»Ð¸ÑÑŒ. Ð”Ð¾Ð±Ð°Ð²ÑŒÑ‚Ðµ Ð½Ð¾Ð²Ñ‹Ðµ Ð² Ð°Ð´Ð¼Ð¸Ð½ÐºÐµ Ð¸Ð»Ð¸ ÑÐ±Ñ€Ð¾ÑÑŒÑ‚Ðµ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ.',
+          type: 'text',
+        });
+        return;
+      }
       fetchNextExercise([...seenExerciseIds, exercise.id]);
     }, 800);
   };
