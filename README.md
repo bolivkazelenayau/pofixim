@@ -117,6 +117,27 @@ $env:PROXY_ALLOWED_REMOTE_CIDRS="127.0.0.1/32,100.x.y.z/32"
 npm.cmd run proxy:prod
 ```
 
+Для локального HTTP-доступа с телефона/другого компьютера к `next start` нужно отключить Secure-cookie, иначе браузер на `http://192.168...` может не отправлять admin session:
+
+```powershell
+$env:ADMIN_COOKIE_SECURE="false"
+$env:PORT="3002"
+npm.cmd run start
+```
+
+Если доступ идёт через proxy из обычной LAN, а не через Tailscale, добавьте CIDR локальной сети:
+
+```powershell
+$env:PROXY_ALLOWED_REMOTE_CIDRS="127.0.0.1/32,100.64.0.0/10,192.168.0.0/16"
+npm.cmd run proxy:prod
+```
+
+Если LAN IP хоста поменялся, добавьте origin без изменения кода:
+
+```powershell
+$env:NEXT_EXTRA_ALLOWED_ORIGINS="192.168.1.44:3002,192.168.1.44:3003"
+```
+
 ## P95
 
 Admin:
@@ -172,4 +193,3 @@ node --check local-proxy.js
 ## Подробная архитектура
 
 См. `ARCHITECTURE_V2.MD`.
-

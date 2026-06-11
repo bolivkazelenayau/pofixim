@@ -33,6 +33,13 @@ function createSessionToken() {
   return `${expiresAt}.${signSessionPayload(expiresAt)}`;
 }
 
+function shouldUseSecureAdminCookie() {
+  const override = process.env.ADMIN_COOKIE_SECURE?.trim().toLowerCase();
+  if (override === 'false' || override === '0' || override === 'no') return false;
+  if (override === 'true' || override === '1' || override === 'yes') return true;
+  return process.env.NODE_ENV === 'production';
+}
+
 function isValidSessionToken(token: string | undefined) {
   if (!token) return false;
   const [expiresAt, signature, extra] = token.split('.');
@@ -53,7 +60,7 @@ export async function createAdminSession() {
     maxAge: ADMIN_SESSION_TTL_SECONDS,
     path: '/',
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureAdminCookie(),
   });
 }
 
@@ -64,7 +71,7 @@ export async function clearAdminSession() {
     maxAge: 0,
     path: '/',
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureAdminCookie(),
   });
 }
 

@@ -370,6 +370,26 @@ npm.cmd run proxy:prod
 
 Для Server Actions в `next.config.ts` добавлены allowed origins для localhost и Tailscale-портов, включая `100.75.225.52:3003`.
 
+Для локального HTTP-доступа с телефона к production-start важно выставить:
+
+```powershell
+$env:ADMIN_COOKIE_SECURE="false"
+```
+
+Иначе в `NODE_ENV=production` cookie по умолчанию ставится как `Secure`, а браузер на `http://192.168...` может не отправлять её в API/Server Actions. Это выглядит как внезапный logout при открытии задания.
+
+LAN origins можно расширить без изменения кода:
+
+```powershell
+$env:NEXT_EXTRA_ALLOWED_ORIGINS="192.168.1.44:3002,192.168.1.44:3003"
+```
+
+Если proxy должен принимать не только Tailscale, но и обычную локальную сеть:
+
+```powershell
+$env:PROXY_ALLOWED_REMOTE_CIDRS="127.0.0.1/32,100.64.0.0/10,192.168.0.0/16"
+```
+
 ## 15. Ingest и seed pipeline
 
 Основные источники:
