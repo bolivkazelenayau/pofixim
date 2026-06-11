@@ -214,8 +214,8 @@ export function useExerciseSubmit({
       storeLocalDraft(form);
       setIsError(true);
       setMessage(
-        `Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾, Ð½Ð¾ Ð½Ðµ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ñ‹ Ð² Ð±Ð°Ð·Ñƒ: ${
-          error instanceof Error ? error.message : 'Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ'
+        `Изменения сохранены локально, но не записаны в базу: ${
+          error instanceof Error ? error.message : 'ошибка сохранения'
         }.`,
       );
       return;
@@ -318,7 +318,7 @@ export function useExerciseSubmit({
     } catch (error) {
       rollbackOptimisticDelete();
       setIsError(true);
-      setMessage(error instanceof Error ? error.message : 'ÐžÑˆÐ¸Ð±ÐºÐ° ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.');
+      setMessage(error instanceof Error ? error.message : 'Ошибка удаления.');
       setDeleting(false);
       return;
     }

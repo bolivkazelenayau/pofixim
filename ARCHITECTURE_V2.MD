@@ -1,231 +1,502 @@
-# Архитектура V2 (обновлено: 2026-05-22)
+# Архитектура V2
 
-## 1) Цель
+Обновлено: 2026-06-11
 
-Платформа должна:
-- хранить и валидировать задания ЕГЭ 9–21;
-- адаптивно выдавать задания без смысловых дублей;
-- поддерживать ingest из `local` и `live`;
-- иметь прозрачный DX: CLI-команды, отчеты, quality gate, дедуп.
+## 1. Назначение проекта
 
-Стек:
-- Next.js (app/actions + UI),
-- PostgreSQL + Drizzle,
-- Zod (валидация домена),
-- Zustand (клиентское состояние).
+PoFixim - платформа для хранения, проверки, редактирования и адаптивной выдачи упражнений по русскому языку, в первую очередь под банк ЕГЭ 9-21.
 
----
+Система состоит из:
 
-## 2) Доменные типы заданий
+- основного тренировочного интерфейса на главной странице;
+- быстрых режимов для отдельных типов ЕГЭ;
+- админки для управления банком заданий;
+- ingest/seed pipeline для загрузки заданий из Markdown и live-источников;
+- PostgreSQL-базы с доменной валидацией через Zod;
+- набора perf-скриптов для p95-аудита.
 
-Ключевые типы:
+Основной принцип: контент может меняться в базе и сразу попадать в пользовательские сценарии без пересборки приложения. Пересборка нужна для изменения кода, UI, маршрутов и серверной логики.
+
+## 2. Технологический стек
+
+- Next.js App Router, Server Components, Route Handlers и Server Actions.
+- React 19.
+- TanStack Query для клиентского кэша админки.
+- PostgreSQL + Drizzle ORM.
+- Zod для строгой доменной валидации упражнений.
+- Zustand persist для состояния тренировки на клиенте.
+- `postgres` для служебных Node-скриптов.
+- Tailwind/CSS + локальные UI-компоненты.
+
+Важное правило проекта: Next.js здесь версии 16, поэтому перед изменением Next API надо сверяться с `node_modules/next/dist/docs/`.
+
+## 3. Данные и база
+
+Ключевые таблицы:
+
+- `exercises` - банк заданий.
+- `exercise_attempts` - попытки пользователя.
+- `learning_sessions` - состояние тренировочной сессии, рейтинг, стрик.
+- `skill_progress` - задел под прогресс по навыкам.
+- `questions` - старый/легаси банк простых вопросов.
+
+Ключевые поля `exercises`:
+
+- `seed_key` - уникальный внешний ключ задания.
+- `type` - доменный тип упражнения.
+- `category` - орфография, пунктуация или смешанный тип.
+- `difficulty` - текущая сложность.
+- `skill_tags` - теги навыков и ЕГЭ, например `ege.13`.
+- `payload`, `answer` - JSONB-структуры упражнения.
+- `explanation` - объяснение, которое должно обновляться из базы без пересборки.
+- `quality_status` - `draft`, `review`, `approved`, `archived`.
+- `is_active` - участвует ли задание в выдаче.
+- `search_blob`, `search_blob_normalized` - ускоренный поиск в админке.
+
+Индексы, важные для текущей производительности:
+
+- `exercises_updated_at_idx`
+- `exercises_type_idx`
+- `exercises_quality_status_idx`
+- `exercises_skill_tags_gin_idx`
+- `exercises_type_quality_updated_id_idx`
+- trigram/search indexes из admin search migration scripts
+
+## 4. Доменные типы упражнений
+
+Поддерживаемые типы задаются в:
+
+- `src/features/exercises/types.ts`
+- `src/features/exercises/schemas.ts`
+- `src/features/exercises/checkers`
+- `src/features/exercises/renderers`
+- `src/components/admin-form`
+
+Актуальные типы:
+
 - `multiple_choice`
 - `ege_multi_select`
 - `fill_blank`
+- `word_bank_cloze`
 - `punctuation_insert`
 - `ege20_complex_sentence_punctuation`
 - `ege21_punctuation_analysis`
+- `highlight_error`
+- `match_pairs`
+- `order_fragments`
+- `text_correction`
+- `dictation`
+- `word_search`
+- `punctuation_constructor`
+- `orthography_repair`
 
-Источники схем:
-- `src/features/exercises/types.ts`
+Не каждый тип одинаково активно используется в пользовательском matchmaking. Список поддержанных для основной выдачи лежит в `SUPPORTED_EXERCISE_TYPES`.
+
+## 5. Валидация и обработка плохих строк
+
+Главная точка доменной валидации:
+
 - `src/features/exercises/schemas.ts`
 
----
+Маппинг строки БД в доменную модель:
 
-## 3) БД и целостность
+- `dbExerciseToDomainExercise` в `src/app/actions/exercises.ts`
 
-Ключевые таблицы:
-- `exercises`
-- `exercise_attempts`
-- `learning_sessions`
-- `skill_progress`
+Если строка не проходит Zod, она не должна валить всю выдачу. Сейчас невалидные упражнения:
 
-Целостность и дедуп:
-1. `seed_key` уникален в `exercises`, импорт идет через `ON CONFLICT (seed_key) DO UPDATE`.
-2. В сидах есть in-batch дедуп по fingerprint (чтобы не дублить идентичные записи в одном прогоне).
-3. В выдаче заданий есть anti-repeat:
-   - фильтр недавно виденных `exerciseId`,
-   - фильтр по semantic fingerprint (`exerciseFingerprint`).
-4. В админке усилен контроль:
-   - создание без `seedKey` запрещено,
-   - при создании и обновлении есть проверка конфликта по `seedKey`.
+- логируются компактно как `Skipped invalid exercise row`;
+- добавляются в in-memory `invalidExerciseIds`;
+- исключаются из последующих подборов в рамках жизни процесса.
 
----
+Это нужно, чтобы один шумный ряд в базе не ломал тренировку.
 
-## 4) Проверка ответов
+## 6. Главная страница и тренировка
 
-Центральный вход:
-- `src/features/exercises/checkers/index.ts`
+Главная страница:
 
-На выходе единый `CheckResult`:
-- корректность,
-- нормализованный ответ,
-- список ошибок,
-- feedback,
-- score/rating delta.
+- `src/app/page.tsx`
+- `src/components/ChatContainer.tsx`
+- `src/store/chatStore.ts`
 
----
+Состояние пользователя хранится в Zustand persist:
 
-## 5) Выдача заданий (matchmaking)
+- сообщения;
+- `sessionId`;
+- виденные упражнения;
+- cooldown-список;
+- отвеченные упражнения;
+- score/streak;
+- флаг первого запроса.
+
+Серверные действия:
+
+- `getNextExerciseAction`
+- `submitExerciseAnswerAction`
+- `getBlitzPoolAction`
+- `getEge13QuickPoolAction`
+- `getEge15QuickPoolAction`
+- `refreshEge13QuickCardAction`
+- `refreshEge15QuickCardAction`
+
+`submitExerciseAnswerAction` теперь делает атомарную запись:
+
+1. валидирует submitted answer;
+2. получает/создаёт learning session;
+3. достаёт упражнение;
+4. проверяет ответ;
+5. считает score/rating delta;
+6. в одной транзакции пишет `exercise_attempts` и обновляет `learning_sessions`;
+7. при `returnNextExercise: true` сразу возвращает следующее упражнение.
+
+Это уменьшает лишний round-trip после ответа.
+
+## 7. Matchmaking
 
 Файлы:
+
 - `src/features/exercises/matchmaking.ts`
 - `src/app/actions/exercises.ts`
 
-Принципы:
-- учитывать сложность, тип, историю попыток;
-- исключать недавно виденные `exerciseId`;
-- дополнительно исключать семантические дубли по fingerprint.
+Текущий flow:
 
----
+1. Берётся session state.
+2. Загружаются последние попытки.
+3. Загружаются semantic fingerprints последних упражнений.
+4. Формируется список blocked ids: клиентские `seenExerciseIds` + последние попытки + невалидные строки.
+5. Из БД берётся широкий случайный пул:
+   - обычный режим: до `180` упражнений;
+   - `forceType`: до `80` упражнений.
+6. Пул фильтруется по Zod и semantic fingerprint.
+7. `selectBestExerciseCandidate` выбирает итоговое упражнение.
 
-## 6) Админка и DX
+Скоринг учитывает:
+
+- target difficulty от рейтинга/стрика;
+- round-robin по типам через `nextExerciseType`;
+- recent type penalty, чтобы типы не залипали;
+- recently seen penalty;
+- weak skill bonus;
+- deterministic tie-break noise.
+
+Важная деталь: предварительного среза по difficulty больше нет. Difficulty влияет на score, но не выкидывает типы до матчмейкера. Это сохраняет разнообразие.
+
+## 8. Быстрые режимы
+
+Быстрые режимы:
+
+- blitz по ЕГЭ 9;
+- quick ЕГЭ 13;
+- quick ЕГЭ 15.
 
 Файлы:
-- `src/components/AdminForm.tsx`
+
+- `src/hooks/useBlitzGame.ts`
+- `src/hooks/useEge13QuickGame.ts`
+- `src/hooks/useEge15QuickGame.ts`
+- `src/components/BlitzGame.tsx`
+- `src/components/Ege13QuickGame.tsx`
+- `src/components/Ege15QuickGame.tsx`
+- `src/features/exercises/ege9Blitz.ts`
+- `src/features/exercises/ege13Quick.ts`
+- `src/features/exercises/ege15Quick.ts`
+
+Пулы quick modes берутся случайно из активных упражнений нужного типа/тега:
+
+- `ege.9` + `ege_multi_select`
+- `ege.13` + `ege_multi_select`
+- `ege.15` + `fill_blank`
+
+Для ЕГЭ 13/15 сохранено важное поведение: карточки могут refresh-иться из БД уже после рендера. Это нужно, чтобы изменения `explanation` в админке подтягивались без пересборки приложения и без полного сброса UI.
+
+## 9. Админка
+
+Маршруты:
+
+- `/admin`
+- `/admin/login`
+- `/admin/markdown-preview`
+- `/api/admin/exercises`
+- `/api/admin/exercises/[id]`
+
+Главные файлы:
+
+- `src/app/admin/page.tsx`
+- `src/components/admin-form/AdminFormClient.tsx`
+- `src/hooks/useExerciseList.ts`
+- `src/hooks/useExerciseLoader.ts`
+- `src/hooks/useExerciseSubmit.ts`
+- `src/hooks/useBatchActions.ts`
 - `src/app/actions/admin.ts`
+- `src/app/actions/admin-exercise-*`
 
-Есть:
-- создание/редактирование задач;
-- preview;
-- поддержка `ege_multi_select`;
-- управление quality status и `isActive`;
-- защита от дублей по `seedKey` при create/update.
+Админка умеет:
 
----
+- создавать упражнения;
+- редактировать упражнения;
+- удалять упражнения;
+- делать batch status/isActive updates;
+- искать по id, seed_key, prompt, explanation, payload/answer blobs;
+- фильтровать по type, quality status, exam type;
+- сортировать по id, updatedAt, type, status;
+- открывать упражнение из URL `?exercise=ID`;
+- сохранять локальный draft при ошибке;
+- восстанавливать draft;
+- показывать preview и quality inspector.
 
-## 7) Ingest/Harvest pipeline
+## 10. TanStack Query в админке
 
-### 7.1 Local source pipeline (из `test_sources/*.md`)
+Файлы:
+
+- `src/components/query-provider.tsx`
+- `src/components/admin-form/queryKeys.ts`
+- `src/components/admin-form/queryCache.ts`
+- `src/hooks/useExerciseList.ts`
+- `src/hooks/useExerciseLoader.ts`
+- `src/hooks/useExerciseSubmit.ts`
+- `src/hooks/useBatchActions.ts`
+
+Глобальные query defaults:
+
+- `staleTime: 15_000`
+- `retry: 1`
+- `refetchOnMount: false`
+- `refetchOnReconnect: false`
+- `refetchOnWindowFocus: false`
+
+Почему так:
+
+- админка не должна дёргать сеть на каждый focus/refocus;
+- SSR даёт свежий первый экран;
+- ручной refresh и mutation invalidation остаются под контролем пользователя;
+- optimistic updates дают быстрый UX.
+
+SSR/hydration flow `/admin`:
+
+1. `AdminPage` проверяет admin session.
+2. Читает sort prefs из cookies.
+3. Prefetch-ит первый list page через QueryClient.
+4. Параллельно грузит selected exercise, если есть `?exercise=ID`.
+5. Отдаёт dehydrated query state клиенту.
+6. Клиент продолжает работу через `useInfiniteQuery`.
+
+Мутации:
+
+- edit оптимистично патчит list/detail cache;
+- delete оптимистично убирает item и уменьшает totals;
+- batch actions патчат списки и потом refresh-ят totals;
+- create делает refresh списка.
+
+## 11. Авторизация админки
+
+Файл:
+
+- `src/lib/admin-auth.ts`
+
+Механика:
+
+- пароль берётся из `ADMIN_PASSWORD`;
+- session cookie называется `admin_session`;
+- cookie `httpOnly`;
+- payload подписан HMAC через `ADMIN_SESSION_SECRET`;
+- TTL 8 часов;
+- `secure` включается в production.
+
+Важно: Server Actions и API routes не полагаются только на страницу. Каждая admin action вызывает `assertAdminAuthorized`. Это соответствует рекомендациям Next.js: авторизация должна быть внутри server action/data access path.
+
+Login rate limit:
+
+- in-memory;
+- 5 попыток на 10 минут;
+- подходит для локального/однопроцессного сценария;
+- для публичного multi-instance production нужен внешний rate limiter.
+
+## 12. Theme Hydration
+
+Файлы:
+
+- `src/app/layout.tsx`
+- `src/components/theme-provider.tsx`
+- `src/components/ThemeToggle.tsx`
+- `src/app/globals.css`
+
+Чтобы не было вспышки светлой темы при refresh в тёмной теме:
+
+- `layout.tsx` запускает `beforeInteractive` script;
+- script читает `localStorage.theme`;
+- сразу ставит/снимает класс `dark`;
+- выставляет `documentElement.style.colorScheme`;
+- `ThemeProvider` при hydration читает текущий класс документа.
+
+## 13. SSR, CSR и кэш
+
+Что SSR решает в проекте:
+
+- первый `/admin` экран приходит с серверными данными из БД;
+- контент из БД обновляется без пересборки приложения;
+- protected routes могут проверять cookie на сервере;
+- серверные actions держат DB logic вне клиента.
+
+Что SSR не решает:
+
+- изменение кода всё равно требует rebuild/restart;
+- клиентское состояние Zustand живёт в браузере;
+- React Query cache живёт на клиенте и управляется отдельно.
+
+Главная страница `/` сейчас статическая оболочка, но данные упражнений приходят через Server Actions. Админка `/admin` dynamic, потому что использует cookies/searchParams и серверные данные.
+
+## 14. Local Proxy и Tailscale
+
+Файл:
+
+- `local-proxy.js`
+
+NPM scripts:
+
+- `npm run proxy:dev` - listen `3001`, target `3000`.
+- `npm run proxy:prod` - listen `3003`, target `3002`.
+
+По умолчанию proxy слушает `0.0.0.0`, потому что нужен доступ с другого компьютера через Tailscale. Чтобы это не было полностью открытым локальным сервером, добавлен allowlist:
+
+- `127.0.0.1/32`
+- `::1`
+- `100.64.0.0/10` - Tailscale IPv4 range.
+
+Можно сузить доступ до конкретного Tailscale IP:
+
+```powershell
+$env:PROXY_ALLOWED_REMOTE_CIDRS="127.0.0.1/32,100.x.y.z/32"
+npm.cmd run proxy:prod
+```
+
+Для Server Actions в `next.config.ts` добавлены allowed origins для localhost и Tailscale-портов, включая `100.75.225.52:3003`.
+
+## 15. Ingest и seed pipeline
+
+Основные источники:
+
+- локальные Markdown-файлы в `test_sources`;
+- live HTML с внешнего источника;
+- валидированные JSONL;
+- специализированные seed/normalize/fix скрипты.
+
+Ключевые команды:
+
+```powershell
+npm.cmd run harvest:ege -- --types 9-21 --source local
+npm.cmd run harvest:ege -- --types 15 --source live --count 1
+npm.cmd run harvest:ege:parse-live
+npm.cmd run db:seed:ege-live
+npm.cmd run db:seed:ege9-21
+```
+
+Live pipeline:
+
+1. Harvest raw HTML в `test_sources/raw_live/<timestamp>/`.
+2. Parse + validate в `test_sources/parsed_live/<timestamp>/`.
+3. Seed/import только validated rows.
+4. Upsert по `seed_key`.
+5. In-batch dedup по semantic fingerprint.
+
+## 16. Perf и p95
 
 Скрипты:
-- `scripts/seed-ege9-11-from-md.mjs`
-- `scripts/seed-ege12-19-from-md.mjs`
-- `scripts/seed-ege20-from-md.mjs`
-- `scripts/seed-ege21-from-md.mjs`
-- `scripts/apply-ege-multi-select-enum.mjs`
-- `scripts/apply-ege20-enum.mjs`
 
-Единый запуск:
-- `npm run harvest:ege -- --types 15 --source local`
-- `npm run harvest:ege -- --types 9-21 --source local`
-- `npm run harvest:ege -- --types 20,21 --source local`
+- `scripts/admin-http-p95.mjs`
+- `scripts/admin-http-p95-matrix.mjs`
+- `scripts/main-http-p95.mjs`
+- `scripts/admin-perf-p95.mjs`
 
----
+Команды:
 
-### 7.2 Live source pipeline (новый 2-этапный)
+```powershell
+npm.cmd run admin:p95:http
+npm.cmd run admin:p95:http:matrix
+npm.cmd run main:p95:http
+```
 
-#### Этап A: Harvest + Parse + Validation
+Admin HTTP p95:
 
-1) Harvest raw HTML:
-- `npm run harvest:ege -- --types 15 --source live --count 1`
+- `/admin?exercise=ID`
+- `/api/admin/exercises/ID`
+- `/api/admin/exercises?...`
 
-Что делает `scripts/harvest-ege-live.mjs`:
-- открывает `https://rus-ege.sdamgia.ru/`,
-- находит конструктор,
-- заполняет `probN` (приоритет exact mapping: `--types N -> probN`, fallback `probN+1`),
-- submit формы (с fallback-click логикой),
-- ловит `test?id=...` через URL/сеть,
-- переходит в print URL,
-- сохраняет HTML + `manifest.json` в:
-  - `test_sources/raw_live/<timestamp>/`.
+Admin matrix:
 
-2) Parse + validate:
-- `npm run harvest:ege:parse-live`
-- или вручную:
-  - `node scripts/parse-ege-live-html.mjs --rawDir "<abs_path_to_raw_live_run>"`
+- list all;
+- list by status;
+- list by selected EGE tags;
+- list/detail/page per exercise type.
 
-Результат:
-- `test_sources/parsed_live/<timestamp>/report.json`
-- `test_sources/parsed_live/<timestamp>/variants.json`
-- `test_sources/parsed_live/<timestamp>/validated.jsonl`
-- `test_sources/parsed_live/<timestamp>/invalid.jsonl`
+Полезные env:
 
-По умолчанию strict-mode включен: если есть невалидные варианты, процесс падает с ошибкой.
+```powershell
+$env:ADMIN_HTTP_BENCH_BASE_URL="http://localhost:3002"
+$env:ADMIN_HTTP_BENCH_RUNS="200"
+$env:ADMIN_HTTP_BENCH_WARMUP="10"
+$env:ADMIN_HTTP_BENCH_EXAM_TYPES="17,20"
+```
 
-#### Этап B: Validated JSON -> Exercises (seed/import)
+Main p95:
 
-- `npm run db:seed:ege-live`
-- или вручную:
-  - `node scripts/seed-ege-live-validated.mjs --parsedDir "<abs_path_to_parsed_live_run>"`
+- `next`
+- `next-seen`
+- `blitz`
+- `ege13`
+- `ege15`
 
-Что делает:
-- читает `validated.jsonl`,
-- маппит в доменную структуру `exercises`,
-- валидирует,
-- дедупит внутри батча по fingerprint,
-- upsert в БД по `seed_key`.
+Полезные env:
 
----
+```powershell
+$env:MAIN_HTTP_BENCH_BASE_URL="http://localhost:3002"
+$env:MAIN_HTTP_BENCH_RUNS="200"
+$env:MAIN_HTTP_BENCH_WARMUP="10"
+$env:MAIN_HTTP_BENCH_CASES="next,next-seen,blitz,ege13,ege15"
+```
 
-## 8) CLI команды (актуальные)
+Последние ориентиры локального `next start`:
 
-Из `package.json`:
-- `npm run harvest:ege`
-- `npm run harvest:ege:parse-live`
-- `npm run db:seed:ege-live`
-- `npm run db:seed:ege9-11`
-- `npm run db:seed:ege12-19`
-- `npm run db:seed:ege20`
-- `npm run db:seed:ege21`
-- `npm run db:seed:ege9-21`
+- admin list/detail API обычно в районе single-digit/low tens ms p95;
+- admin page refresh обычно десятки ms p95, иногда с локальными max-хвостами;
+- main `next` около `p95 ~74 ms`;
+- quick modes после правок примерно `p95 ~30-47 ms`;
+- все эти цифры для локального самописного приложения выглядят здоровыми.
 
-Параметры `harvest:ege`:
-- `--types` (`15`, `9,10,11`, `9-21`)
-- `--source` (`local` | `live`)
-- `--count` (для live — число вариантов)
-- `--profile` (зарезервировано)
+## 17. Проверки перед завершением работ
 
-Отладочные ENV для live:
-- `HARVEST_HEADLESS=false`
-- `HARVEST_BROWSER_CHANNEL=chrome`
-- `HARVEST_FILL_VALUE=2` (или `100`)
-- `HARVEST_DEBUG_FILL_ONLY=true`
-- `HARVEST_DEBUG_CLICK_COMPOSE_ONLY=true`
+Минимальный набор:
 
----
+```powershell
+npx.cmd tsc --noEmit
+npm.cmd run lint
+npm.cmd run build
+```
 
-## 9) Проверки после прогона
+Для proxy:
 
-Быстрый чек:
-1. Открыть `manifest.json` в `raw_live/<timestamp>`.
-2. Убедиться, что есть `variant-*.html`.
-3. Открыть `report.json` в `parsed_live/<timestamp>`:
-   - `variantsInvalid = 0` для strict-прохода.
-4. Проверить, что `validated.jsonl` не пуст.
-5. После `db:seed:ege-live` проверить количество upserted в логе.
+```powershell
+node --check local-proxy.js
+```
 
----
+Для кодировки UI-строк полезен Node-based scan по типичным mojibake-маркерам. После последнего прохода в `src` таких строк не осталось.
 
-## 10) Рекомендуемый рабочий флоу
+## 18. Текущие сильные стороны
 
-### Local
-1. Подготовить `test_sources/*.md`.
-2. `npm run harvest:ege -- --types 9-21 --source local`
-3. Проверка в админке (preview + выборка).
+- Админка защищена и не полагается только на UI route guard.
+- Первый экран админки SSR-prefetched и hydrates into React Query.
+- Клиентские refetch не шумят.
+- Мутации имеют optimistic updates.
+- Delete/edit batch sync теперь предсказуемее.
+- Theme flash исправлен.
+- Submit ответа атомарен на уровне БД.
+- Quick EGE13/EGE15 сохраняют live refresh explanation.
+- Matchmaking вернул широкий пул без сужения по difficulty до скоринга.
+- Tailscale proxy стал безопаснее через CIDR allowlist.
+- Есть воспроизводимые p95-скрипты для админки и главной.
 
-### Live
-1. `npm run harvest:ege -- --types 15 --source live --count 1`
-2. `npm run harvest:ege:parse-live`
-3. `npm run db:seed:ege-live`
-4. Проверка выдачи в UI/боте на предмет:
-   - корректного типа,
-   - отсутствия дублей,
-   - валидной проверки ответа.
+## 19. Известные ограничения
 
----
-
-## 11) Что уже закрыто
-
-- Стабильный submit конструктора live (не только click по тексту).
-- Fallback на сетевой детект `test?id=...`, если `waitForURL` промахивается.
-- Корректный mapping `--types N -> probN` (с fallback на `probN+1`).
-- Отдельные 2 пайплайна:
-  - Harvest+Parse+Validate,
-  - Validated Import/Seed.
-- Усилен дедуп:
-  - в БД (`seed_key` + upsert),
-  - в батче (fingerprint),
-  - в админке (конфликт `seedKey`),
-  - в выдаче (anti-repeat + semantic fingerprint).
-
+- `order by random()` нормально работает на текущем размере банка, но при сильном росте БД может стать дорогим. Тогда нужен sampling strategy без полного random sort.
+- Login rate limit in-memory.
+- Build зависит от доступа к Google Fonts через `next/font/google`, если fonts cache пустой.
+- Некоторые старые docs/скрипты исторические и не отражают текущий best path.
+- Production hardening ещё можно усилить: persistent rate limit, backup policy, structured logs, CI perf snapshots.

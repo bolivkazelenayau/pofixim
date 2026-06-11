@@ -37,7 +37,11 @@
     "db:apply:admin-search-blob-columns": "node scripts/apply-admin-search-blob-columns.mjs",
     "admin:p95": "node scripts/admin-perf-p95.mjs",
     "admin:p95:http": "node scripts/admin-http-p95.mjs",
-    "admin:proxy-cookie-check": "node scripts/check-local-proxy-admin-cookie.mjs"
+    "admin:p95:http:matrix": "node scripts/admin-http-p95-matrix.mjs",
+    "main:p95:http": "node scripts/main-http-p95.mjs",
+    "admin:proxy-cookie-check": "node scripts/check-local-proxy-admin-cookie.mjs",
+    "proxy:dev": "node local-proxy.js dev",
+    "proxy:prod": "node local-proxy.js prod"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

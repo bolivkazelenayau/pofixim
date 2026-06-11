@@ -1,74 +1,175 @@
-# PoFixim: Платформа подготовки к ЕГЭ
+# PoFixim
 
-PoFixim — это платформа для хранения, парсинга, валидации и адаптивной выдачи заданий ЕГЭ (с акцентом на типы 9–21). Проект поддерживает автоматический харвестинг (ingest) заданий как из локальных Markdown-файлов, так и напрямую с live-источников (например, РешуЕГЭ), с последующей нормализацией, дедупликацией и умной выдачей пользователю.
+Платформа для тренировки русского языка и управления банком упражнений ЕГЭ. Проект объединяет пользовательскую тренировку, быстрые режимы, админку, импорт заданий, доменную валидацию и p95-аудит производительности.
 
-Стек технологий:
-- **Next.js** (App Router, Server Actions, UI)
-- **PostgreSQL + Drizzle ORM** (База данных)
-- **Zod** (Строгая валидация домена)
-- **Zustand** (Клиентское состояние)
+## Стек
 
----
+- Next.js 16 App Router
+- React 19
+- PostgreSQL + Drizzle ORM
+- Zod
+- TanStack Query
+- Zustand
+- Tailwind/CSS
 
-## Архитектура проекта
+## Основные части
 
-### 1. Доменные типы заданий
-Поддерживаются сложные форматы заданий:
-- `multiple_choice`, `ege_multi_select`, `fill_blank`, `punctuation_insert`, `ege20_complex_sentence_punctuation`, `ege21_punctuation_analysis`.
+- `/` - тренировочный интерфейс.
+- `/admin` - админка упражнений.
+- `/admin/login` - вход в админку.
+- `/api/admin/exercises` - list API для админки.
+- `/api/admin/exercises/[id]` - detail API для админки.
+- `/api/bench/main` - admin-protected endpoint для p95 главной/quick modes.
 
-### 2. База данных и целостность
-Ключевые таблицы: `exercises`, `exercise_attempts`, `learning_sessions`, `skill_progress`.
-- **Дедупликация:** Импорт идет через `ON CONFLICT (seed_key) DO UPDATE`.
-- **In-batch дедуп:** По семантическому fingerprint.
-- **Anti-repeat:** Алгоритм выдачи исключает недавно виденные задания и их семантические дубли.
+## Главная
 
-### 3. Выдача заданий (Matchmaking)
-Алгоритм учитывает сложность, тип и историю попыток ученика. 
-Полностью исключает повторения на основе `exerciseId` и семантического `exerciseFingerprint`.
+Главная работает через Server Actions:
 
-### 4. Проверка ответов
-Централизованный чекер (`CheckResult`) возвращает нормализованный ответ, список ошибок, подробный фидбек (feedback) и изменение рейтинга (score delta).
+- `getNextExerciseAction`
+- `submitExerciseAnswerAction`
+- `getBlitzPoolAction`
+- `getEge13QuickPoolAction`
+- `getEge15QuickPoolAction`
 
-### 5. Ingest / Harvest Pipeline (2-этапный сбор данных)
+Состояние пользователя хранится в Zustand persist. Submit ответа пишет попытку и обновляет learning session в одной транзакции. При `returnNextExercise` сервер сразу возвращает следующее упражнение.
 
-**Этап A: Harvest + Parse + Validation**
-- Сбор сырого HTML с live-источников через автоматизированный headless браузер.
-- Парсинг HTML с помощью детерминированного обхода дерева (учет вложенных `<div>` и сохранение параграфов).
-- Выгрузка в валидированные JSONL форматы (со строгим режимом: при невалидных данных процесс падает).
+## Matchmaking
 
-**Этап B: Validated JSON -> Exercises (Seed)**
-- Маппинг валидированных JSONL в доменную структуру БД.
-- Автоматическое извлечение ответов из текстовых объяснений на основе вариантов с помощью Regex.
-- Upsert в базу данных с защитой от дублей.
+Подбор упражнения берёт широкий случайный пул из активных заданий, фильтрует повторы и semantic duplicates, затем выбирает кандидата через scorer.
 
-### 6. Админка и DX
-Встроенная админ-панель позволяет:
-- Создавать и редактировать задачи.
-- Просматривать Live Preview.
-- Управлять статусом качества (Quality Gate) и активностью (`isActive`).
+Scorer учитывает:
 
----
+- сложность по рейтингу/стрику;
+- round-robin по типам;
+- штраф за недавно встречавшийся тип;
+- штраф за повтор;
+- bonus слабых навыков;
+- небольшой deterministic tie-break noise.
 
-## CLI Команды
+## Быстрые режимы
 
-- `npm run harvest:ege -- --types 15 --source live --count 1` — собрать сырые данные.
-- `npm run harvest:ege:parse-live` — распарсить собранные данные.
-- `npm run db:seed:ege-live` — загрузить распарсенные данные в БД.
-- `npm run db:seed:ege9-21` — загрузка локальных заданий из Markdown.
+Поддержаны:
 
-Отладочные переменные:
-- `HARVEST_HEADLESS=false`
-- `HARVEST_DEBUG_FILL_ONLY=true`
+- blitz по ЕГЭ 9;
+- quick ЕГЭ 13;
+- quick ЕГЭ 15.
 
-## Доступ к админке
+ЕГЭ 13/15 сохраняют live refresh explanation: если объяснение изменилось в админке, карточка может подтянуть свежие данные из БД без пересборки приложения.
 
-Маршрут `/admin` и административные операции требуют password-session. Для локального
-запуска задайте в `.env`:
+## Админка
 
-```env
-ADMIN_PASSWORD=replace-with-local-password
-ADMIN_SESSION_SECRET=replace-with-long-random-secret
+Админка использует SSR prefetch + TanStack Query hydration.
+
+Работает:
+
+- list/detail cache;
+- infinite list;
+- фильтры по type/status/exam type;
+- поиск;
+- сортировки;
+- optimistic edit/delete/batch updates;
+- draft recovery;
+- preview;
+- manual refresh;
+- URL selection через `?exercise=ID`.
+
+Авторизация:
+
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+- signed `httpOnly` cookie `admin_session`
+- `assertAdminAuthorized` внутри admin actions/API paths
+
+## Локальный запуск
+
+```powershell
+npm.cmd run dev
 ```
 
-`ADMIN_SESSION_SECRET` используется для подписи `httpOnly` cookie сессии. После его
-изменения перезапустите `next dev`, чтобы сервер прочитал новое значение.
+Production-style локально:
+
+```powershell
+npm.cmd run build
+$env:PORT="3002"
+npm.cmd run start
+```
+
+## Proxy
+
+Для доступа через Tailscale:
+
+```powershell
+npm.cmd run proxy:dev
+npm.cmd run proxy:prod
+```
+
+Профили:
+
+- `proxy:dev`: listen `3001`, target `3000`
+- `proxy:prod`: listen `3003`, target `3002`
+
+По умолчанию proxy принимает только localhost и Tailscale IPv4 range `100.64.0.0/10`.
+
+Сузить до одного Tailscale IP:
+
+```powershell
+$env:PROXY_ALLOWED_REMOTE_CIDRS="127.0.0.1/32,100.x.y.z/32"
+npm.cmd run proxy:prod
+```
+
+## P95
+
+Admin:
+
+```powershell
+$env:ADMIN_HTTP_BENCH_BASE_URL="http://localhost:3002"
+$env:ADMIN_HTTP_BENCH_RUNS="200"
+$env:ADMIN_HTTP_BENCH_WARMUP="10"
+npm.cmd run admin:p95:http
+```
+
+Admin matrix:
+
+```powershell
+$env:ADMIN_HTTP_BENCH_EXAM_TYPES="17,20"
+npm.cmd run admin:p95:http:matrix
+```
+
+Main/quick modes:
+
+```powershell
+$env:MAIN_HTTP_BENCH_BASE_URL="http://localhost:3002"
+$env:MAIN_HTTP_BENCH_RUNS="200"
+$env:MAIN_HTTP_BENCH_WARMUP="10"
+npm.cmd run main:p95:http
+```
+
+## Ingest
+
+Локальный Markdown:
+
+```powershell
+npm.cmd run harvest:ege -- --types 9-21 --source local
+```
+
+Live source:
+
+```powershell
+npm.cmd run harvest:ege -- --types 15 --source live --count 1
+npm.cmd run harvest:ege:parse-live
+npm.cmd run db:seed:ege-live
+```
+
+## Проверки
+
+```powershell
+npx.cmd tsc --noEmit
+npm.cmd run lint
+npm.cmd run build
+node --check local-proxy.js
+```
+
+## Подробная архитектура
+
+См. `ARCHITECTURE_V2.MD`.
+

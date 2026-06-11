@@ -181,38 +181,6 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
     const nextStreak = result.isCorrect ? session.currentStreak + 1 : 0;
     const nextBestStreak = Math.max(session.bestStreak, nextStreak);
 
-    await db.insert(exerciseAttempts).values({
-      sessionId: session.id,
-      userId: session.userId,
-      exerciseId: exercise.id!,
-      exerciseType: exercise.type,
-      category: exercise.category,
-      difficulty: exercise.difficulty,
-      skillTags: exercise.skillTags,
-      submittedAnswer: result.normalizedAnswer,
-      isCorrect: result.isCorrect,
-      scoreDelta: result.scoreDelta,
-      ratingDelta,
-      mistakeCode: result.mistakeCode,
-      failedStepIds: result.failedStepIds,
-      timeSpentMs: input.timeSpentMs,
-    });
-
-    await db
-      .update(learningSessions)
-      .set({
-        currentRating: Math.max(800, session.currentRating + ratingDelta),
-        currentStreak: nextStreak,
-        bestStreak: nextBestStreak,
-        totalScore: session.totalScore + result.scoreDelta,
-        completedCount: session.completedCount + 1,
-        correctCount: session.correctCount + (result.isCorrect ? 1 : 0),
-        lastCategory: exercise.category,
-        lastExerciseType: exercise.type,
-        updatedAt: sql`now()::timestamp`,
-      })
-      .where(eq(learningSessions.id, session.id));
-
     const updatedSession = {
       ...session,
       currentRating: Math.max(800, session.currentRating + ratingDelta),
@@ -224,6 +192,40 @@ export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInpu
       lastCategory: exercise.category,
       lastExerciseType: exercise.type,
     };
+
+    await db.transaction(async (tx) => {
+      await tx.insert(exerciseAttempts).values({
+        sessionId: session.id,
+        userId: session.userId,
+        exerciseId: exercise.id!,
+        exerciseType: exercise.type,
+        category: exercise.category,
+        difficulty: exercise.difficulty,
+        skillTags: exercise.skillTags,
+        submittedAnswer: result.normalizedAnswer,
+        isCorrect: result.isCorrect,
+        scoreDelta: result.scoreDelta,
+        ratingDelta,
+        mistakeCode: result.mistakeCode,
+        failedStepIds: result.failedStepIds,
+        timeSpentMs: input.timeSpentMs,
+      });
+
+      await tx
+        .update(learningSessions)
+        .set({
+          currentRating: updatedSession.currentRating,
+          currentStreak: updatedSession.currentStreak,
+          bestStreak: updatedSession.bestStreak,
+          totalScore: updatedSession.totalScore,
+          completedCount: updatedSession.completedCount,
+          correctCount: updatedSession.correctCount,
+          lastCategory: updatedSession.lastCategory,
+          lastExerciseType: updatedSession.lastExerciseType,
+          updatedAt: sql`now()::timestamp`,
+        })
+        .where(eq(learningSessions.id, session.id));
+    });
     const next = input.returnNextExercise
       ? await getNextExerciseForSession({
           session: updatedSession,
@@ -284,6 +286,7 @@ export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
       .select()
       .from(exercises)
       .where(and(...conditions))
+      .orderBy(sql`random()`)
       .limit(limit);
 
     const cards = rows
@@ -329,6 +332,7 @@ export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}
       .select()
       .from(exercises)
       .where(and(...conditions))
+      .orderBy(sql`random()`)
       .limit(limit);
 
     const cards = rows
@@ -374,6 +378,7 @@ export async function getEge15QuickPoolAction(input: GetEge15QuickPoolInput = {}
       .select()
       .from(exercises)
       .where(and(...conditions))
+      .orderBy(sql`random()`)
       .limit(limit);
 
     const cards = rows
@@ -444,7 +449,6 @@ async function getNextExerciseForSession({
     category,
     forceType,
     seenExerciseIds: blockedExerciseIds,
-    targetDifficulty,
     recentFingerprints,
   });
   const exercise = selectBestExerciseCandidate({
@@ -493,13 +497,11 @@ async function getExerciseCandidates({
   category,
   forceType,
   seenExerciseIds,
-  targetDifficulty,
   recentFingerprints,
 }: {
   category?: ExerciseCategory;
   forceType?: ExerciseType;
   seenExerciseIds: number[];
-  targetDifficulty: number;
   recentFingerprints: Set<string>;
 }) {
   const conditions = [
@@ -526,7 +528,8 @@ async function getExerciseCandidates({
     .select()
     .from(exercises)
     .where(and(...conditions))
-    .limit(80);
+    .orderBy(sql`random()`)
+    .limit(forceType ? 80 : 180);
 
   return rows
     .map(dbExerciseToDomainExercise)
@@ -534,13 +537,7 @@ async function getExerciseCandidates({
     .filter((exercise) => {
       const fp = exerciseFingerprint(exercise);
       return fp ? !recentFingerprints.has(fp) : true;
-    })
-    .sort(
-      (a, b) =>
-        Math.abs(a.difficulty - targetDifficulty) -
-        Math.abs(b.difficulty - targetDifficulty),
-    )
-    .slice(0, 30);
+    });
 }
 
 async function getRecentExerciseFingerprints(exerciseIds: number[]) {

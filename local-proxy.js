@@ -1,11 +1,30 @@
 const http = require("http");
+const net = require("net");
+
+const PROFILE = process.env.PROXY_PROFILE || process.argv[2] || "dev";
+const PROFILE_DEFAULTS = {
+  dev: {
+    listenPort: 3001,
+    targetPort: 3000,
+  },
+  prod: {
+    listenPort: 3003,
+    targetPort: 3002,
+  },
+};
+const defaults = PROFILE_DEFAULTS[PROFILE] || PROFILE_DEFAULTS.dev;
 
 const LISTEN_HOST = process.env.PROXY_HOST || "0.0.0.0";
-const LISTEN_PORT = Number(process.env.PROXY_PORT || 3001);
+const LISTEN_PORT = Number(process.env.PROXY_PORT || defaults.listenPort);
 const TARGET_HOST = process.env.PROXY_TARGET_HOST || "127.0.0.1";
-const TARGET_PORT = Number(process.env.PROXY_TARGET_PORT || 3000);
+const TARGET_PORT = Number(process.env.PROXY_TARGET_PORT || defaults.targetPort);
 const TARGET_ORIGIN =
   process.env.PROXY_TARGET_ORIGIN || `http://localhost:${TARGET_PORT}`;
+const DEFAULT_ALLOWED_REMOTE_CIDRS = "127.0.0.1/32,100.64.0.0/10,::1";
+const ALLOWED_REMOTE_CIDRS = (process.env.PROXY_ALLOWED_REMOTE_CIDRS || DEFAULT_ALLOWED_REMOTE_CIDRS)
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 const TRANSIENT_NETWORK_ERRORS = new Set([
   "ECONNRESET",
@@ -29,6 +48,55 @@ function appendForwardedFor(existing, remoteAddress) {
   const address = remoteAddress || '';
   if (!address) return existing;
   return existing ? `${existing}, ${address}` : address;
+}
+
+function normalizeRemoteAddress(address) {
+  if (!address) return "";
+  if (address.startsWith("::ffff:")) return address.slice("::ffff:".length);
+  return address;
+}
+
+function ipv4ToNumber(address) {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return null;
+  }
+  return parts.reduce((acc, part) => (acc << 8) + part, 0) >>> 0;
+}
+
+function isIPv4InCidr(address, cidr) {
+  const [rangeAddress, prefixRaw] = cidr.split("/");
+  const prefix = Number(prefixRaw);
+  const addressNumber = ipv4ToNumber(address);
+  const rangeNumber = ipv4ToNumber(rangeAddress);
+  if (addressNumber === null || rangeNumber === null || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
+    return false;
+  }
+  if (prefix === 0) return true;
+  const mask = (0xffffffff << (32 - prefix)) >>> 0;
+  return (addressNumber & mask) === (rangeNumber & mask);
+}
+
+function isRemoteAllowed(remoteAddress) {
+  const address = normalizeRemoteAddress(remoteAddress);
+  if (!address) return false;
+  const ipVersion = net.isIP(address);
+  if (!ipVersion) return false;
+
+  return ALLOWED_REMOTE_CIDRS.some((rule) => {
+    if (rule.includes("/")) {
+      return ipVersion === 4 && isIPv4InCidr(address, rule);
+    }
+    return address === rule;
+  });
+}
+
+function writeForbidden(res) {
+  if (res.destroyed) return;
+  res.writeHead(403, {
+    "content-type": "text/plain; charset=utf-8",
+  });
+  res.end("Forbidden: remote address is not allowed by local proxy");
 }
 
 function buildHeaders(req) {
@@ -66,6 +134,12 @@ function writeBadGateway(res, error) {
 }
 
 const server = http.createServer((req, res) => {
+  if (!isRemoteAllowed(req.socket.remoteAddress)) {
+    console.warn(`[proxy:forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.method} ${req.url}`);
+    writeForbidden(res);
+    return;
+  }
+
   const proxy = http.request(
     {
       hostname: TARGET_HOST,
@@ -104,6 +178,12 @@ const server = http.createServer((req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
+  if (!isRemoteAllowed(req.socket.remoteAddress)) {
+    console.warn(`[proxy:upgrade-forbidden] ${normalizeRemoteAddress(req.socket.remoteAddress)} ${req.url}`);
+    socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+    return;
+  }
+
   const proxy = http.request({
     hostname: TARGET_HOST,
     port: TARGET_PORT,
@@ -215,6 +295,6 @@ process.on("unhandledRejection", (reason) => {
 
 server.listen(LISTEN_PORT, LISTEN_HOST, () => {
   console.log(
-    `Proxy listening on http://${LISTEN_HOST}:${LISTEN_PORT} -> ${TARGET_ORIGIN}`,
+    `Proxy (${PROFILE}) listening on http://${LISTEN_HOST}:${LISTEN_PORT} -> ${TARGET_ORIGIN}; allowed remotes: ${ALLOWED_REMOTE_CIDRS.join(", ")}`,
   );
 });
