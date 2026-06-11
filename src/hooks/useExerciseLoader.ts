@@ -1,8 +1,10 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import type { Form } from '@/components/admin-form/types';
 import { fetchExerciseById } from '@/components/admin-form/api';
+import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
 import { formFromExerciseItem } from '@/components/admin-form/formMapping';
 import { loadFormState } from '@/components/admin-form/draftStorage';
 import { logDraftRecoveryDebug } from '@/components/admin-form/draftStorage';
@@ -41,6 +43,7 @@ export function useExerciseLoader({
   offerExistingDraftRecovery,
   autosaveCurrentToDbIfNeeded,
 }: UseExerciseLoaderConfig) {
+  const queryClient = useQueryClient();
   const loadExerciseSeqRef = useRef(0);
 
   function cancelPendingExerciseLoad(reason: string) {
@@ -69,7 +72,11 @@ export function useExerciseLoader({
       currentFormId: form.id ?? null,
       url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
     });
-    const res = await fetchExerciseById(id);
+    const res = await queryClient.fetchQuery({
+      queryKey: adminExerciseKeys.detail(id),
+      queryFn: () => fetchExerciseById(id),
+      staleTime: 0,
+    });
     if (requestSeq !== loadExerciseSeqRef.current) {
       logDraftRecoveryDebug('loadExercise:staleResultIgnored', { id, requestSeq });
       logAdminDebug('loadExercise:staleResultIgnored', { id, requestSeq });

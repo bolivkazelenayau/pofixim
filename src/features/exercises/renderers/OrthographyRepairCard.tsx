@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import type { OrthographyRepairExercise, SubmittedAnswer } from '../schemas';
 
@@ -113,13 +113,6 @@ export default function OrthographyRepairCard({
   const [repairs, setRepairs] = useState<Record<string, string>>({});
   const [wrongClickKey, setWrongClickKey] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    setSelectedTargetId(null);
-    setRepairs({});
-    setWrongClickKey(null);
-    setChecked(false);
-  }, [exercise.id, exercise.seedKey]);
 
   const selectedTarget = exercise.payload.targets.find(
     (target) => target.id === selectedTargetId,

@@ -1,7 +1,10 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import type { RefObject } from 'react';
+import { fetchExerciseById } from '@/components/admin-form/api';
 import AdminExerciseSidebar from '@/components/admin-form/AdminExerciseSidebar';
+import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
 import type { DatabaseIndicator } from '@/components/admin-form/DatabaseSaveIndicator';
 import { formatUpdatedAt } from '@/components/admin-form/utils';
 import { useBatchActions } from '@/hooks/useBatchActions';
@@ -54,6 +57,7 @@ export default function AdminSidebarContainer({
   setIsError,
   setMessage,
 }: AdminSidebarContainerProps) {
+  const queryClient = useQueryClient();
   const {
     multiSelectedIds,
     selectionMode,
@@ -86,6 +90,14 @@ export default function AdminSidebarContainer({
     setIsError,
     setMessage,
   });
+
+  function prefetchExercise(id: number) {
+    void queryClient.prefetchQuery({
+      queryKey: adminExerciseKeys.detail(id),
+      queryFn: () => fetchExerciseById(id),
+      staleTime: 30_000,
+    });
+  }
 
   return (
     <AdminExerciseSidebar
@@ -151,6 +163,7 @@ export default function AdminSidebarContainer({
         hasMore: list.hasMore,
         loadingMore: list.loadingMore,
         onRefresh: () => void list.refresh({ includeTotal: true, force: true }),
+        onPrefetchExercise: prefetchExercise,
         onOpenExercise: (id) => void onOpenExercise(id),
         onLoadMore: () => void list.loadMore(),
         formatUpdatedAt,

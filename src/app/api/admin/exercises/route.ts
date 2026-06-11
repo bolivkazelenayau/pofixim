@@ -1,4 +1,5 @@
 import { listExercisesAction } from '@/app/actions/admin';
+import type { ExerciseListSortBy } from '@/app/actions/admin-list-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     type: params.get('type') ?? undefined,
     qualityStatus: params.get('qualityStatus') ?? undefined,
     examType: params.get('examType') ?? undefined,
-    sortBy: params.get('sortBy') === 'updatedAt' ? 'updatedAt' : 'id',
+    sortBy: parseSortBy(params.get('sortBy')),
     sortDir: params.get('sortDir') === 'asc' ? 'asc' : 'desc',
     includeTotal: params.get('includeTotal') === 'true',
   });
@@ -28,4 +29,9 @@ export async function GET(request: Request) {
   const error = 'error' in result ? result.error : undefined;
   const status = result.success ? 200 : error === 'Unauthorized' ? 401 : 500;
   return Response.json(result, { status });
+}
+
+function parseSortBy(value: string | null): ExerciseListSortBy {
+  if (value === 'updatedAt' || value === 'type' || value === 'status') return value;
+  return 'id';
 }

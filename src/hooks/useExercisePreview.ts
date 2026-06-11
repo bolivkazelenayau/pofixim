@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import type { PreviewCheckResult, Form } from '@/components/admin-form/types';
 import { buildPreviewExercise } from '@/components/admin-form/previewModel';
 import { splitFeedbackSections } from '@/components/admin-form/feedback';
@@ -31,14 +31,18 @@ function buildStepFeedbackText(
 }
 
 export function useExercisePreview(form: Form) {
-  const [previewCheckResult, setPreviewCheckResult] = useState<PreviewCheckResult | null>(null);
-  const [previewDictationText, setPreviewDictationText] = useState('');
+  const [previewCheckState, setPreviewCheckState] = useState<{
+    form: Form;
+    result: PreviewCheckResult | null;
+  } | null>(null);
+  const [previewDictationState, setPreviewDictationState] = useState<{
+    form: Form;
+    text: string;
+  } | null>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
-  useEffect(() => {
-    setPreviewCheckResult(null);
-    setPreviewDictationText('');
-  }, [form]);
+  const previewCheckResult = previewCheckState?.form === form ? previewCheckState.result : null;
+  const previewDictationText = previewDictationState?.form === form ? previewDictationState.text : '';
 
   const parsedSkillTags = useMemo(
     () => form.skillTags.split(',').map((v) => v.trim()).filter(Boolean),
@@ -69,9 +73,12 @@ export function useExercisePreview(form: Form) {
     if (!preview.exercise) return;
     const result = checkExerciseAnswer(preview.exercise, answer, { streak: 0 });
     if (preview.exercise.type === 'dictation') {
-      setPreviewCheckResult({
-        isCorrect: result.isCorrect,
-        text: buildDictationFeedbackText(result.normalizedAnswer),
+      setPreviewCheckState({
+        form,
+        result: {
+          isCorrect: result.isCorrect,
+          text: buildDictationFeedbackText(result.normalizedAnswer),
+        },
       });
       return;
     }
@@ -89,15 +96,18 @@ export function useExercisePreview(form: Form) {
         ? ''
         : answerFeedbackPrefix(result.isCorrect);
     const prefixText = prefix ? `${prefix}\n\n` : '';
-    setPreviewCheckResult({
-      isCorrect: result.isCorrect,
-      text: `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(
-        result,
-        preview.exercise.type,
-      )}`,
-      correctAnswer: computedCorrectAnswer || fallbackCorrectAnswer,
-      detailedExplanation:
-        previewFeedback?.explanation.join('\n') ?? result.feedback.detailedExplanation,
+    setPreviewCheckState({
+      form,
+      result: {
+        isCorrect: result.isCorrect,
+        text: `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(
+          result,
+          preview.exercise.type,
+        )}`,
+        correctAnswer: computedCorrectAnswer || fallbackCorrectAnswer,
+        detailedExplanation:
+          previewFeedback?.explanation.join('\n') ?? result.feedback.detailedExplanation,
+      },
     });
   }
 
@@ -109,13 +119,13 @@ export function useExercisePreview(form: Form) {
   }
 
   function handlePreviewDictationTextChange(text: string) {
-    setPreviewDictationText(text);
-    setPreviewCheckResult(null);
+    setPreviewDictationState({ form, text });
+    setPreviewCheckState({ form, result: null });
   }
 
   function resetPreview() {
-    setPreviewCheckResult(null);
-    setPreviewDictationText('');
+    setPreviewCheckState({ form, result: null });
+    setPreviewDictationState({ form, text: '' });
   }
 
   return {

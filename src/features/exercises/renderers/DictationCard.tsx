@@ -97,7 +97,7 @@ export default function DictationCard({ exercise }: Props) {
     ? exercise.payload.playbackRates
     : [0.75, 1, 1.25, 1.5];
   const waveform = decodedWaveform ?? exercise.payload.waveform ?? FALLBACK_WAVEFORM;
-  const displayDuration = getMediaDuration(audioRef.current, duration);
+  const displayDuration = duration;
   const progress = displayDuration > 0 ? currentTime / displayDuration : 0;
 
   useEffect(() => {

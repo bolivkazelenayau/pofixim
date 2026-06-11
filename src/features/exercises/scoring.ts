@@ -9,7 +9,6 @@ type ScoreInput = {
 
 export function calculateScoreDelta({
   isCorrect,
-  difficulty,
   streak = 0,
   usedHint = false,
 }: ScoreInput) {

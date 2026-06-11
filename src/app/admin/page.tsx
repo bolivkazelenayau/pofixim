@@ -1,8 +1,27 @@
 import Link from 'next/link';
+import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query';
+import { cookies } from 'next/headers';
 import AdminFormClient from '@/components/admin-form/AdminFormClient';
 import ThemeToggle from '@/components/ThemeToggle';
+import { getExerciseByIdAction, listExercisesAction } from '@/app/actions/admin';
 import { logoutAdminAction } from '@/app/admin/login/actions';
+import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
+import type { ExerciseListResponse } from '@/components/admin-form/types';
 import { requireAdminPageSession } from '@/lib/admin-auth';
+
+const ADMIN_INITIAL_LIST_LIMIT = 100;
+
+type AdminExerciseListPageParam = {
+  offset: number;
+  cursorId: number | null;
+  cursorUpdatedAt: string | null;
+};
+
+const ADMIN_FIRST_PAGE_PARAM: AdminExerciseListPageParam = {
+  offset: 0,
+  cursorId: null,
+  cursorUpdatedAt: null,
+};
 
 type AdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -17,6 +36,43 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     ?? (Array.isArray(resolved.exerciseId) ? resolved.exerciseId[0] : resolved.exerciseId);
   const selectedId = Number(rawId ?? NaN);
   const initialSelectedId = Number.isInteger(selectedId) && selectedId > 0 ? selectedId : null;
+  const cookieStore = await cookies();
+  const initialListFilters = {
+    query: '',
+    type: 'all',
+    qualityStatus: 'all',
+    examType: 'all',
+    sortBy: parseAdminListSortBy(cookieStore.get('admin_list_sort_by')?.value),
+    sortDir: parseAdminListSortDir(cookieStore.get('admin_list_sort_dir')?.value),
+  } satisfies AdminExerciseListFilters;
+  const queryClient = new QueryClient();
+  const [, initialSelectedResult] = await Promise.all([
+    queryClient.prefetchInfiniteQuery({
+      queryKey: adminExerciseKeys.list(initialListFilters),
+      initialPageParam: ADMIN_FIRST_PAGE_PARAM,
+      queryFn: () =>
+        listExercisesAction({
+          ...initialListFilters,
+          limit: ADMIN_INITIAL_LIST_LIMIT,
+          offset: 0,
+          includeTotal: true,
+        }),
+      getNextPageParam: (lastPage: ExerciseListResponse) =>
+        lastPage.success && lastPage.hasMore
+          ? {
+              offset: lastPage.nextOffset ?? 0,
+              cursorId: lastPage.nextCursorId ?? null,
+              cursorUpdatedAt: lastPage.nextCursorUpdatedAt ?? null,
+            }
+          : undefined,
+    }),
+    initialSelectedId ? getExerciseByIdAction(initialSelectedId) : Promise.resolve(null),
+  ]);
+
+  const initialSelectedExercise =
+    initialSelectedResult?.success && initialSelectedResult.item
+      ? initialSelectedResult.item
+      : null;
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -46,14 +102,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </div>
 
-      <AdminFormClient
-        initialItems={[]}
-        initialTotalItems={null}
-        initialSelectedId={initialSelectedId}
-        initialSelectedExercise={null}
-      />
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <AdminFormClient
+          initialSelectedId={initialSelectedId}
+          initialSelectedExercise={initialSelectedExercise}
+        />
+      </HydrationBoundary>
     </div>
   );
+}
+
+function parseAdminListSortBy(value: string | undefined) {
+  if (value === 'updatedAt' || value === 'type' || value === 'status') return value;
+  return 'id';
+}
+
+function parseAdminListSortDir(value: string | undefined) {
+  return value === 'asc' ? 'asc' : 'desc';
 }
 
 

@@ -5,6 +5,7 @@
 @custom-variant data-closed (&[data-state=closed]);
 
 :root {
+  color-scheme: light;
   --background: #E4EAEF;
   --foreground: #000000;
   --surface: #F4F5F7;
@@ -15,6 +16,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #11100f;
   --foreground: #f0ece5;
   --surface: #171512;

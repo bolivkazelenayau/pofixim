@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { useMemo, useState } from 'react';
 import type {
   Ege20ComplexSentencePunctuationExercise,
   SubmittedAnswer,
@@ -23,27 +22,9 @@ function extractSlotIndexes(textWithSlots: string) {
   return [...set].sort((a, b) => a - b);
 }
 
-function normalizeDigits(input: string, availableIndexes: number[]) {
-  return [
-    ...new Set(
-      input
-        .replace(/[^\d]/g, '')
-        .split('')
-        .map((v) => Number(v))
-        .filter(
-          (n) =>
-            Number.isInteger(n) &&
-            n > 0 &&
-            availableIndexes.includes(n),
-        ),
-    ),
-  ].sort((a, b) => a - b);
-}
-
 export default function Ege20ComplexSentenceCard({
   exercise,
   disabled,
-  onSubmit,
 }: Props) {
   const availableIndexes = useMemo(
     () => extractSlotIndexes(exercise.payload.textWithSlots),
@@ -51,9 +32,6 @@ export default function Ege20ComplexSentenceCard({
   );
 
   const [selected, setSelected] = useState<number[]>([]);
-  const value = useMemo(() => selected.join(''), [selected]);
-  const trimmed = value.trim();
-
 
   function toggleIndex(index: number) {
     setSelected((prev) => {

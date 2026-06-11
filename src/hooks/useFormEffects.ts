@@ -132,7 +132,7 @@ export function useFormEffects({
     );
     observer.observe(anchor);
     return () => observer.disconnect();
-  }, []);
+  }, [mainSaveAnchorRef, setShowFloatingSave]);
 
   useEffect(() => {
     if (selectedId) {
@@ -168,7 +168,7 @@ export function useFormEffects({
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, []);
+  }, [sidebarRef]);
 
   useEffect(() => {
     if (!isDraftLoaded || !initialSelectionPending) return;

@@ -56,10 +56,11 @@ export async function listExercises(params: ListExercisesParams = {}) {
     const type = (params.type ?? 'all').trim();
     const qualityStatus = (params.qualityStatus ?? 'all').trim();
     const examType = (params.examType ?? 'all').trim();
-    const sortBy = params.sortBy === 'updatedAt' ? 'updatedAt' : 'id';
+    const sortBy = normalizeExerciseListSortBy(params.sortBy);
     const sortDir = params.sortDir === 'asc' ? 'asc' : 'desc';
     const includeTotal = Boolean(params.includeTotal);
-    const hasCursor = Number.isInteger(cursorId) && cursorId > 0;
+    const supportsCursorPagination = sortBy === 'id' || sortBy === 'updatedAt';
+    const hasCursor = supportsCursorPagination && Number.isInteger(cursorId) && cursorId > 0;
 
     const baseWhereParts = buildBaseExerciseListWhereParts({
       type,
@@ -175,7 +176,7 @@ export async function listExercises(params: ListExercisesParams = {}) {
     };
   } finally {
     logSlowServerAction('listExercisesAction', startedAt, {
-      sortBy: params.sortBy === 'updatedAt' ? 'updatedAt' : 'id',
+      sortBy: normalizeExerciseListSortBy(params.sortBy),
       sortDir: params.sortDir === 'asc' ? 'asc' : 'desc',
       hasQuery: Boolean((params.query ?? '').trim()),
       type: (params.type ?? 'all').trim(),
@@ -185,4 +186,11 @@ export async function listExercises(params: ListExercisesParams = {}) {
       includeTotal: Boolean(params.includeTotal),
     });
   }
+}
+
+function normalizeExerciseListSortBy(sortBy: ListExercisesParams['sortBy']) {
+  if (sortBy === 'updatedAt' || sortBy === 'type' || sortBy === 'status') {
+    return sortBy;
+  }
+  return 'id';
 }

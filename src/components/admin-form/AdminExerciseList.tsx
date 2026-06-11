@@ -11,6 +11,7 @@ type AdminExerciseListProps = {
   hasMore: boolean;
   loadingMore: boolean;
   onToggleSelection: (id: number, event: MouseEvent<HTMLButtonElement>) => void;
+  onPrefetchExercise: (id: number) => void;
   onOpenExercise: (id: number) => void;
   onLoadMore: () => void;
   formatUpdatedAt: (value: string) => string;
@@ -25,6 +26,7 @@ export default function AdminExerciseList({
   hasMore,
   loadingMore,
   onToggleSelection,
+  onPrefetchExercise,
   onOpenExercise,
   onLoadMore,
   formatUpdatedAt,
@@ -52,6 +54,12 @@ export default function AdminExerciseList({
               }}
               onDoubleClick={() => {
                 onOpenExercise(item.id);
+              }}
+              onMouseEnter={() => {
+                onPrefetchExercise(item.id);
+              }}
+              onFocus={() => {
+                onPrefetchExercise(item.id);
               }}
               onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
                 if (event.key === 'Enter') {

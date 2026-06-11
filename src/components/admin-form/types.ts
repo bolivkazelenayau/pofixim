@@ -1,4 +1,5 @@
 import type { ExerciseEditorInput } from '@/app/actions/admin-types';
+import type { ExerciseListSortBy } from '@/app/actions/admin-list-types';
 import type { ExerciseCategory } from '@/features/exercises/types';
 import type { qualityStatuses } from './constants';
 
@@ -53,7 +54,7 @@ export type ExerciseListRequest = {
   type: string;
   qualityStatus: string;
   examType: string;
-  sortBy: 'id' | 'updatedAt';
+  sortBy: ExerciseListSortBy;
   sortDir: 'asc' | 'desc';
   includeTotal: boolean;
   signal?: AbortSignal;
@@ -96,7 +97,7 @@ export type RawPreviewItem = {
 };
 
 export type AdminFormProps = {
-  initialItems: ListItem[];
+  initialItems?: ListItem[];
   initialTotalItems?: number | null;
   initialSelectedId?: number | null;
   initialSelectedExercise?: Record<string, unknown> | null;

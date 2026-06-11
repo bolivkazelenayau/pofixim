@@ -73,7 +73,7 @@ export function useFormPersistence({
     if (form.id) {
       document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
     }
-  }, [form, isDraftLoaded]);
+  }, [form, isDraftLoaded, sessionDraftIdsRef]);
 
   function storeLocal(source: Form) {
     writeStoredDraft(source.id ?? null, source);
@@ -163,6 +163,8 @@ export function useFormPersistence({
       if (!saved && form.id) scheduleRetry(form, snapshot, form.id);
       return saved;
     },
+    // performSave and scheduleRetry intentionally close over this autosave cycle snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [form, isEdit, saving, deleting],
   );
 
@@ -184,6 +186,8 @@ export function useFormPersistence({
         autosaveTimerRef.current = null;
       }
     };
+    // performSave and scheduleRetry intentionally close over this autosave cycle snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, isDraftLoaded, isEdit, saving, deleting]);
 
   return {

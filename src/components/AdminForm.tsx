@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AdminCommandPalette from '@/components/admin-form/AdminCommandPalette';
 import AdminEditorContainer from '@/components/admin-form/AdminEditorContainer';
 import AdminSidebarContainer from '@/components/admin-form/AdminSidebarContainer';
@@ -13,7 +13,7 @@ import { useExerciseList } from '@/hooks/useExerciseList';
 import { EXERCISE_TYPES } from '@/features/exercises/types';
 
 export default function AdminForm({
-  initialItems,
+  initialItems = [],
   initialTotalItems,
   initialSelectedId = null,
   initialSelectedExercise = null,
@@ -78,7 +78,7 @@ export default function AdminForm({
     isError,
   });
 
-  function openAdjacentExercise(direction: 1 | -1) {
+  const openAdjacentExercise = useCallback((direction: 1 | -1) => {
     if (flatFilteredItems.length === 0) return;
     const currentIndex = flatFilteredItems.findIndex((item) => item.id === editor.selectedId);
     const fallbackIndex = direction > 0 ? -1 : flatFilteredItems.length;
@@ -87,7 +87,7 @@ export default function AdminForm({
     if (nextItem) {
       void editor.openExerciseWithAutosave(nextItem.id);
     }
-  }
+  }, [editor, flatFilteredItems]);
 
   function focusListSearch() {
     document.getElementById('admin-list-search')?.focus();
@@ -134,7 +134,7 @@ export default function AdminForm({
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [editor, flatFilteredItems]);
+  }, [editor, flatFilteredItems, openAdjacentExercise]);
 
   return (
     <>

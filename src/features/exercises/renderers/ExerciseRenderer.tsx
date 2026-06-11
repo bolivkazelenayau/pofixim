@@ -88,6 +88,7 @@ export default function ExerciseRenderer({
     case 'orthography_repair':
       content = (
         <OrthographyRepairCard
+          key={exercise.id ?? `orthography-repair-${exercise.seedKey ?? 'unknown'}`}
           exercise={exercise}
           disabled={disabled}
           onSubmit={onSubmit}

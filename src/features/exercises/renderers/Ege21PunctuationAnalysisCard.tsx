@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { useMemo, useState } from 'react';
 import type { Ege21PunctuationAnalysisExercise, SubmittedAnswer } from '../schemas';
 
 type Ege21PunctuationAnalysisCardProps = {
@@ -20,27 +19,9 @@ const PUNCTUATION_LABEL: Record<
   semicolon: 'точка с запятой',
 };
 
-function normalizeDigits(input: string, availableIndexes: number[]) {
-  return [
-    ...new Set(
-      input
-        .replace(/[^\d]/g, '')
-        .split('')
-        .map((v) => Number(v))
-        .filter(
-          (n) =>
-            Number.isInteger(n) &&
-            n > 0 &&
-            availableIndexes.includes(n),
-        ),
-    ),
-  ].sort((a, b) => a - b);
-}
-
 export default function Ege21PunctuationAnalysisCard({
   exercise,
   disabled,
-  onSubmit,
 }: Ege21PunctuationAnalysisCardProps) {
   const availableIndexes = useMemo(
     () =>
@@ -51,8 +32,6 @@ export default function Ege21PunctuationAnalysisCard({
   );
 
   const [selected, setSelected] = useState<number[]>([]);
-  const value = useMemo(() => selected.join(''), [selected]);
-  const trimmed = value.trim();
 
   const inlineText = exercise.payload.sentences
     .map((sentence) => `(${sentence.index})${sentence.text}`)

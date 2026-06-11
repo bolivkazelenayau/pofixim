@@ -806,29 +806,6 @@ function fillGapsInOptionRowWithBold(optionLine: string, explanationRowText: str
     .trim();
 }
 
-function splitByTopLevelCommas(value: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let depth = 0;
-
-  for (const char of value) {
-    if (char === '(') depth++;
-    if (char === ')') depth = Math.max(0, depth - 1);
-
-    if (char === ',' && depth === 0) {
-      result.push(current.trim());
-      current = '';
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.trim()) result.push(current.trim());
-
-  return result;
-}
-
 function replaceMaskedWordsInText(optionText: string, donorWords: string[]): string {
   const optionClean = stripMarkdown(optionText).trim();
   const maskedMatches = findMaskedWordMatches(optionClean);

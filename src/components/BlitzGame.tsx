@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react';
-import { ArrowLeft, ArrowRight, Timer, Trophy, X, Zap } from 'lucide-react';
+import { animate, motion, useMotionValue, useTransform } from 'motion/react';
+import { Timer, Trophy, X, Zap } from 'lucide-react';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
 
 type BlitzDuration = 30 | 60 | 120;
@@ -41,7 +41,6 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
   const [scoreDelta, setScoreDelta] = useState(0);
-  const [lastAnswerDirection, setLastAnswerDirection] = useState<-1 | 1 | null>(null);
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const finishedRef = useRef(false);
@@ -118,7 +117,6 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     setCombo(0);
     setBestCombo(0);
     setScoreDelta(0);
-    setLastAnswerDirection(null);
     setLastAnswerCorrect(null);
     setIsDraggingCard(false);
     dragX.stop();
@@ -149,7 +147,6 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     }
 
     setLastAnswerCorrect(isCorrect);
-    setLastAnswerDirection(direction);
     setIsDraggingCard(false);
 
     // Animate card off-screen
@@ -165,12 +162,11 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
       dragX.stop();
       dragX.set(0);
       setIndex((value) => value + 1);
-      setLastAnswerDirection(null);
       setLastAnswerCorrect(null);
       answerLockedRef.current = false;
       feedbackTimeoutRef.current = null;
     }, 190);
-  }, [currentCard, dragX, status, combo]);
+  }, [currentCard, dragX, status]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

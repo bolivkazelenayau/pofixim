@@ -360,7 +360,6 @@ export default function PunctuationConstructorCard({
 
   const currentHint =
     hintIndex >= 0 ? exercise.payload.hints?.[hintIndex] : undefined;
-  const slotExplanations = exercise.answer.slotExplanations ?? [];
   const hasStructure = Boolean(exercise.payload.segments?.length);
   const guidedSteps = exercise.payload.guidedSteps ?? [];
   const currentGuidedStep = guidedMode ? guidedSteps[guidedStepIndex] : undefined;

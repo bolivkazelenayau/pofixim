@@ -1,3 +1,5 @@
+export type ExerciseListSortBy = 'id' | 'updatedAt' | 'type' | 'status';
+
 export type ListExercisesParams = {
   limit?: number;
   offset?: number;
@@ -7,7 +9,7 @@ export type ListExercisesParams = {
   type?: string;
   qualityStatus?: string;
   examType?: string;
-  sortBy?: 'id' | 'updatedAt';
+  sortBy?: ExerciseListSortBy;
   sortDir?: 'asc' | 'desc';
   includeTotal?: boolean;
 };

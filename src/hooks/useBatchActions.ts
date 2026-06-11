@@ -1,9 +1,17 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { batchUpdateExercisesMetaAction } from '@/app/actions/admin';
 import { previewRawNormalizationAction } from '@/app/actions/admin-preview';
 import { qualityStatuses } from '@/components/admin-form/constants';
+import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
+import {
+  patchAdminExerciseLists,
+  restoreAdminExerciseLists,
+  snapshotAdminExerciseLists,
+  upsertAdminExerciseDetail,
+} from '@/components/admin-form/queryCache';
 import type { ListItem, RawPreviewItem } from '@/components/admin-form/types';
 
 type UseBatchActionsConfig = {
@@ -23,19 +31,23 @@ export function useBatchActions({
   setIsError,
   setMessage,
 }: UseBatchActionsConfig) {
+  const queryClient = useQueryClient();
   const [multiSelectedIds, setMultiSelectedIds] = useState<number[]>([]);
   const [lastMultiSelectedId, setLastMultiSelectedId] = useState<number | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [showMoreBatchActions, setShowMoreBatchActions] = useState(false);
   const [batchStatus, setBatchStatus] = useState<(typeof qualityStatuses)[number]>('review');
   const [batchIsActive, setBatchIsActive] = useState<'active' | 'inactive'>('active');
-  const [batchSaving, setBatchSaving] = useState(false);
   const [rawPreviewFilter, setRawPreviewFilter] = useState('');
   const [rawPreviewLimit, setRawPreviewLimit] = useState(3);
   const [rawPreviewLoading, setRawPreviewLoading] = useState(false);
   const [rawPreviewItems, setRawPreviewItems] = useState<RawPreviewItem[]>([]);
+  const batchUpdateMutation = useMutation({
+    mutationFn: batchUpdateExercisesMetaAction,
+  });
 
   const multiSelectedSet = useMemo(() => new Set(multiSelectedIds), [multiSelectedIds]);
+  const batchSaving = batchUpdateMutation.isPending;
 
   function toggleMultiSelectionByClick(itemId: number, event: React.MouseEvent<HTMLButtonElement>) {
     const isShift = event.shiftKey;
@@ -99,21 +111,50 @@ export function useBatchActions({
 
   async function applyBatchStatus() {
     if (multiSelectedIds.length === 0 || batchSaving) return;
-    setBatchSaving(true);
-    const res = await batchUpdateExercisesMetaAction({
-      ids: multiSelectedIds,
-      qualityStatus: batchStatus,
-    });
+    const ids = [...multiSelectedIds];
+    const idSet = new Set(ids);
+    await queryClient.cancelQueries({ queryKey: adminExerciseKeys.lists() });
+    const optimisticListSnapshot = snapshotAdminExerciseLists(queryClient);
+    const optimisticDetailSnapshots = ids.map((id) => [
+      id,
+      queryClient.getQueryData(adminExerciseKeys.detail(id)),
+    ] as const);
+    patchAdminExerciseLists(queryClient, (item) =>
+      idSet.has(item.id) ? { ...item, qualityStatus: batchStatus } : item,
+    );
+    for (const id of ids) {
+      upsertAdminExerciseDetail(queryClient, id, { qualityStatus: batchStatus });
+    }
+
+    const rollbackOptimisticBatch = () => {
+      restoreAdminExerciseLists(queryClient, optimisticListSnapshot);
+      for (const [id, data] of optimisticDetailSnapshots) {
+        queryClient.setQueryData(adminExerciseKeys.detail(id), data);
+      }
+    };
+
+    let res: Awaited<ReturnType<typeof batchUpdateExercisesMetaAction>>;
+    try {
+      res = await batchUpdateMutation.mutateAsync({
+        ids,
+        qualityStatus: batchStatus,
+      });
+    } catch (error) {
+      rollbackOptimisticBatch();
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : 'Batch update failed.');
+      return;
+    }
     if (res.success) {
       setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
       setIsError(false);
       clearMultiSelection();
       await refreshList({ includeTotal: true, force: true });
     } else {
+      rollbackOptimisticBatch();
       setIsError(true);
       setMessage(res.error || 'Ошибка массового обновления.');
     }
-    setBatchSaving(false);
   }
 
   async function runRawPreviewAudit() {
@@ -136,21 +177,51 @@ export function useBatchActions({
 
   async function applyBatchActivity() {
     if (multiSelectedIds.length === 0 || batchSaving) return;
-    setBatchSaving(true);
-    const res = await batchUpdateExercisesMetaAction({
-      ids: multiSelectedIds,
-      isActive: batchIsActive === 'active',
-    });
+    const ids = [...multiSelectedIds];
+    const idSet = new Set(ids);
+    const isActive = batchIsActive === 'active';
+    await queryClient.cancelQueries({ queryKey: adminExerciseKeys.lists() });
+    const optimisticListSnapshot = snapshotAdminExerciseLists(queryClient);
+    const optimisticDetailSnapshots = ids.map((id) => [
+      id,
+      queryClient.getQueryData(adminExerciseKeys.detail(id)),
+    ] as const);
+    patchAdminExerciseLists(queryClient, (item) =>
+      idSet.has(item.id) ? { ...item, isActive } : item,
+    );
+    for (const id of ids) {
+      upsertAdminExerciseDetail(queryClient, id, { isActive });
+    }
+
+    const rollbackOptimisticBatch = () => {
+      restoreAdminExerciseLists(queryClient, optimisticListSnapshot);
+      for (const [id, data] of optimisticDetailSnapshots) {
+        queryClient.setQueryData(adminExerciseKeys.detail(id), data);
+      }
+    };
+
+    let res: Awaited<ReturnType<typeof batchUpdateExercisesMetaAction>>;
+    try {
+      res = await batchUpdateMutation.mutateAsync({
+        ids,
+        isActive,
+      });
+    } catch (error) {
+      rollbackOptimisticBatch();
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : 'Batch update failed.');
+      return;
+    }
     if (res.success) {
       setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
       setIsError(false);
       clearMultiSelection();
       await refreshList({ force: true });
     } else {
+      rollbackOptimisticBatch();
       setIsError(true);
       setMessage(res.error || 'Ошибка массового обновления.');
     }
-    setBatchSaving(false);
   }
 
   useEffect(() => {
@@ -177,7 +248,6 @@ export function useBatchActions({
     batchIsActive,
     setBatchIsActive,
     batchSaving,
-    setBatchSaving,
     rawPreviewFilter,
     setRawPreviewFilter,
     rawPreviewLimit,

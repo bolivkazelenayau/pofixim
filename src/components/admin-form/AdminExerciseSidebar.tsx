@@ -4,7 +4,6 @@ import AdminBatchActions from './AdminBatchActions';
 import AdminExerciseList from './AdminExerciseList';
 import AdminSidebarFilters from './AdminSidebarFilters';
 import DatabaseSaveIndicator, { type DatabaseIndicator } from './DatabaseSaveIndicator';
-import RawPreviewAuditPanel from './RawPreviewAuditPanel';
 import { qualityStatuses } from './constants';
 import type { ListItem, RawPreviewItem } from './types';
 
@@ -71,6 +70,7 @@ type AdminExerciseSidebarProps = {
     hasMore: boolean;
     loadingMore: boolean;
     onRefresh: () => void;
+    onPrefetchExercise: (id: number) => void;
     onOpenExercise: (id: number) => void;
     onLoadMore: () => void;
     formatUpdatedAt: (value: string) => string;
@@ -84,7 +84,6 @@ export default function AdminExerciseSidebar({
   selection,
   batch,
   filters,
-  rawPreview,
   list,
 }: AdminExerciseSidebarProps) {
   return (
@@ -187,15 +186,6 @@ export default function AdminExerciseSidebar({
         onListSortByChange={filters.onSortByChange}
         onListSortDirChange={filters.onSortDirChange}
       />
-      {/* <RawPreviewAuditPanel
-        filter={rawPreview.filter}
-        limit={rawPreview.limit}
-        loading={rawPreview.loading}
-        items={rawPreview.items}
-        onFilterChange={rawPreview.onFilterChange}
-        onLimitChange={rawPreview.onLimitChange}
-        onRun={rawPreview.onRun}
-      /> */}
       <AdminExerciseList
         groupedItems={list.groupedItems}
         initialListPending={stats.initialListPending}
@@ -205,6 +195,7 @@ export default function AdminExerciseSidebar({
         hasMore={list.hasMore}
         loadingMore={list.loadingMore}
         onToggleSelection={selection.onToggle}
+        onPrefetchExercise={list.onPrefetchExercise}
         onOpenExercise={list.onOpenExercise}
         onLoadMore={list.onLoadMore}
         formatUpdatedAt={list.formatUpdatedAt}

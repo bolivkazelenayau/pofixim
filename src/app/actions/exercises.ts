@@ -73,6 +73,8 @@ type RefreshEge15QuickCardInput = {
   positionIndex?: number;
 };
 
+const invalidExerciseIds = new Set<number>();
+
 export async function refreshEge13QuickCardAction(input: RefreshEge13QuickCardInput) {
   try {
     const exercise = await getExerciseById(input.exerciseId);
@@ -461,9 +463,10 @@ async function getExerciseCandidates({
   }
 
   const uniqueSeenIds = [...new Set(seenExerciseIds)];
+  const excludedIds = [...new Set([...uniqueSeenIds, ...invalidExerciseIds])];
 
-  if (uniqueSeenIds.length > 0) {
-    conditions.push(notInArray(exercises.id, uniqueSeenIds));
+  if (excludedIds.length > 0) {
+    conditions.push(notInArray(exercises.id, excludedIds));
   }
 
   const rows = await db
@@ -653,7 +656,17 @@ function dbExerciseToDomainExercise(row: typeof exercises.$inferSelect | undefin
   });
 
   if (!parsed.success) {
-    console.error(`Failed to parse exercise ${row.id}:`, parsed.error);
+    if (row.id) invalidExerciseIds.add(row.id);
+    console.warn('Skipped invalid exercise row', {
+      id: row.id,
+      type: row.type,
+      seedKey: row.seedKey,
+      qualityStatus: row.qualityStatus,
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
     return null;
   }
 

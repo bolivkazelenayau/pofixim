@@ -1,7 +1,7 @@
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { exercises } from '@/db/schema';
-import type { ExerciseListItem } from './admin-list-types';
+import type { ExerciseListItem, ExerciseListSortBy } from './admin-list-types';
 
 export function normalizeSearchQuery(input: string) {
   return input
@@ -111,7 +111,7 @@ export function addCursorCondition(input: {
   whereParts: ReturnType<typeof buildBaseExerciseListWhereParts>;
   cursorId: number;
   cursorUpdatedAt: string;
-  sortBy: 'id' | 'updatedAt';
+  sortBy: ExerciseListSortBy;
   sortDir: 'asc' | 'desc';
 }) {
   const { whereParts, cursorId, cursorUpdatedAt, sortBy, sortDir } = input;
@@ -128,7 +128,7 @@ export function addCursorCondition(input: {
 
 export async function fetchExerciseListRows(input: {
   whereExpr: ReturnType<typeof and>;
-  sortBy: 'id' | 'updatedAt';
+  sortBy: ExerciseListSortBy;
   sortDir: 'asc' | 'desc';
   normalizedLimit: number;
   normalizedOffset: number;
@@ -152,9 +152,7 @@ export async function fetchExerciseListRows(input: {
     .from(exercises)
     .where(whereExpr)
     .orderBy(
-      sortBy === 'updatedAt'
-        ? (sortDir === 'desc' ? desc(exercises.updatedAt) : sql`${exercises.updatedAt} asc`)
-        : (sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`),
+      getPrimaryOrderExpression(sortBy, sortDir),
       sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`,
     )
     .limit(normalizedLimit + 1)
@@ -166,7 +164,7 @@ export type ExerciseListRow = Awaited<ReturnType<typeof fetchExerciseListRows>>[
 function compareExerciseListRows(
   left: ExerciseListRow,
   right: ExerciseListRow,
-  sortBy: 'id' | 'updatedAt',
+  sortBy: ExerciseListSortBy,
   sortDir: 'asc' | 'desc',
 ) {
   if (sortBy === 'updatedAt') {
@@ -176,13 +174,23 @@ function compareExerciseListRows(
         : left.updatedAtCursor.localeCompare(right.updatedAtCursor);
     }
   }
+  if (sortBy === 'type' && left.type !== right.type) {
+    return sortDir === 'desc'
+      ? right.type.localeCompare(left.type)
+      : left.type.localeCompare(right.type);
+  }
+  if (sortBy === 'status' && left.qualityStatus !== right.qualityStatus) {
+    return sortDir === 'desc'
+      ? right.qualityStatus.localeCompare(left.qualityStatus)
+      : left.qualityStatus.localeCompare(right.qualityStatus);
+  }
 
   return sortDir === 'desc' ? right.id - left.id : left.id - right.id;
 }
 
 export function mergeExerciseListRows(
   rows: ExerciseListRow[],
-  sortBy: 'id' | 'updatedAt',
+  sortBy: ExerciseListSortBy,
   sortDir: 'asc' | 'desc',
 ) {
   const deduped = new Map<number, ExerciseListRow>();
@@ -195,6 +203,19 @@ export function mergeExerciseListRows(
   return Array.from(deduped.values()).sort((left, right) =>
     compareExerciseListRows(left, right, sortBy, sortDir),
   );
+}
+
+function getPrimaryOrderExpression(sortBy: ExerciseListSortBy, sortDir: 'asc' | 'desc') {
+  if (sortBy === 'updatedAt') {
+    return sortDir === 'desc' ? desc(exercises.updatedAt) : sql`${exercises.updatedAt} asc`;
+  }
+  if (sortBy === 'type') {
+    return sortDir === 'desc' ? desc(exercises.type) : sql`${exercises.type} asc`;
+  }
+  if (sortBy === 'status') {
+    return sortDir === 'desc' ? desc(exercises.qualityStatus) : sql`${exercises.qualityStatus} asc`;
+  }
+  return sortDir === 'desc' ? desc(exercises.id) : sql`${exercises.id} asc`;
 }
 
 export function buildExerciseListResult(input: {

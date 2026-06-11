@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { fetchExerciseList } from '@/components/admin-form/api';
+import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
 import type { ExerciseListResponse, ListItem } from '@/components/admin-form/types';
 
 const EXERCISE_LIST_PAGE_SIZE = 100;
+
+type ExerciseListPageParam = {
+  offset: number;
+  cursorId: number | null;
+  cursorUpdatedAt: string | null;
+};
+
+const FIRST_PAGE_PARAM: ExerciseListPageParam = {
+  offset: 0,
+  cursorId: null,
+  cursorUpdatedAt: null,
+};
+const ADMIN_LIST_SORT_BY_COOKIE = 'admin_list_sort_by';
+const ADMIN_LIST_SORT_DIR_COOKIE = 'admin_list_sort_dir';
 
 type UseExerciseListConfig = {
   initialItems: ListItem[];
@@ -30,20 +46,40 @@ function examTypeOf(item: ListItem) {
   return 'n/a';
 }
 
-export function useExerciseList({ initialItems, initialTotalItems, setIsError, setMessage }: UseExerciseListConfig) {
-  const [items, setItems] = useState<ListItem[]>(initialItems);
+function persistAdminListSortCookie(name: string, value: string) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; samesite=lax`;
+}
+
+function buildInitialData(
+  initialItems: ListItem[],
+  initialTotalItems: number | null | undefined,
+): InfiniteData<ExerciseListResponse, ExerciseListPageParam> | undefined {
+  if (initialItems.length === 0) return undefined;
+  return {
+    pages: [
+      {
+        success: true,
+        items: initialItems,
+        total: initialTotalItems ?? initialItems.length,
+        hasMore: initialItems.length >= EXERCISE_LIST_PAGE_SIZE,
+        nextOffset: initialItems.length,
+        nextCursorId: initialItems[initialItems.length - 1]?.id ?? null,
+        nextCursorUpdatedAt: initialItems[initialItems.length - 1]?.updatedAtCursor ?? null,
+      },
+    ],
+    pageParams: [FIRST_PAGE_PARAM],
+  };
+}
+
+export function useExerciseList({
+  initialItems,
+  initialTotalItems,
+  setIsError,
+  setMessage,
+}: UseExerciseListConfig) {
+  const queryClient = useQueryClient();
   const [totalItems, setTotalItems] = useState<number | null>(initialTotalItems ?? null);
-  const [nextOffset, setNextOffset] = useState<number>(initialItems.length);
-  const [hasMore, setHasMore] = useState<boolean>(initialItems.length >= EXERCISE_LIST_PAGE_SIZE);
-  const [nextCursorId, setNextCursorId] = useState<number | null>(
-    initialItems.length > 0 ? initialItems[initialItems.length - 1].id : null,
-  );
-  const [nextCursorUpdatedAt, setNextCursorUpdatedAt] = useState<string | null>(
-    initialItems.length > 0 ? initialItems[initialItems.length - 1].updatedAtCursor : null,
-  );
-  const [initialListPending, setInitialListPending] = useState(initialItems.length === 0);
   const [matchingItems, setMatchingItems] = useState<number | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [listQuery, setListQuery] = useState('');
   const [serverListQuery, setServerListQuery] = useState('');
   const [listTypeFilter, setListTypeFilter] = useState<string>('all');
@@ -54,10 +90,7 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
   const [sortPrefsReady, setSortPrefsReady] = useState(false);
 
   const sortPrefsReadyRef = useRef(false);
-  const lastAppliedRefreshKeyRef = useRef('');
-  const inFlightRefreshKeyRef = useRef<string | null>(null);
-  const refreshSeqRef = useRef(0);
-  const refreshAbortControllerRef = useRef<AbortController | null>(null);
+  const includeTotalOnNextFetchRef = useRef(initialItems.length === 0);
 
   const hasActiveListFilter =
     serverListQuery.trim().length > 0 ||
@@ -65,7 +98,27 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     listStatusFilter !== 'all' ||
     listExamTypeFilter !== 'all';
 
-  const listTypes = useMemo(() => ['all'], []);
+  const serverSortBy = listSortBy;
+  const supportsCursorPagination = serverSortBy === 'id' || serverSortBy === 'updatedAt';
+  const listFilters = useMemo<AdminExerciseListFilters>(
+    () => ({
+      query: serverListQuery,
+      type: listTypeFilter,
+      qualityStatus: listStatusFilter,
+      examType: listExamTypeFilter,
+      sortBy: serverSortBy,
+      sortDir: listSortDir,
+    }),
+    [serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, serverSortBy, listSortDir],
+  );
+  const queryKey = adminExerciseKeys.list(listFilters);
+  const isDefaultInitialListQuery =
+    serverListQuery === '' &&
+    listTypeFilter === 'all' &&
+    listStatusFilter === 'all' &&
+    listExamTypeFilter === 'all' &&
+    listSortBy === 'id' &&
+    listSortDir === 'desc';
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -74,9 +127,11 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
         const savedSortDir = localStorage.getItem('admin_list_sort_dir');
         if (savedSortBy === 'id' || savedSortBy === 'updatedAt' || savedSortBy === 'type' || savedSortBy === 'status') {
           setListSortBy(savedSortBy);
+          persistAdminListSortCookie(ADMIN_LIST_SORT_BY_COOKIE, savedSortBy);
         }
         if (savedSortDir === 'asc' || savedSortDir === 'desc') {
           setListSortDir(savedSortDir);
+          persistAdminListSortCookie(ADMIN_LIST_SORT_DIR_COOKIE, savedSortDir);
         }
       } catch {}
       sortPrefsReadyRef.current = true;
@@ -90,6 +145,8 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     try {
       localStorage.setItem('admin_list_sort_by', listSortBy);
       localStorage.setItem('admin_list_sort_dir', listSortDir);
+      persistAdminListSortCookie(ADMIN_LIST_SORT_BY_COOKIE, listSortBy);
+      persistAdminListSortCookie(ADMIN_LIST_SORT_DIR_COOKIE, listSortDir);
     } catch {}
   }, [listSortBy, listSortDir]);
 
@@ -100,137 +157,152 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     return () => clearTimeout(timer);
   }, [listQuery]);
 
-  useEffect(() => () => {
-    refreshAbortControllerRef.current?.abort();
-  }, []);
+  const listQueryResult = useInfiniteQuery<
+    ExerciseListResponse,
+    Error,
+    InfiniteData<ExerciseListResponse, ExerciseListPageParam>,
+    ReturnType<typeof adminExerciseKeys.list>,
+    ExerciseListPageParam
+  >({
+    queryKey,
+    enabled: sortPrefsReady,
+    initialPageParam: FIRST_PAGE_PARAM,
+    initialData: isDefaultInitialListQuery
+      ? buildInitialData(initialItems, initialTotalItems)
+      : undefined,
+    queryFn: async ({ pageParam, signal }) => {
+      const hasSearchQuery = serverListQuery.trim().length > 0;
+      const includeTotal =
+        pageParam.offset === 0 &&
+        (includeTotalOnNextFetchRef.current || (hasActiveListFilter && !hasSearchQuery));
 
-  useEffect(() => {
-    if (!sortPrefsReady) return;
-    const timer = setTimeout(() => {
-      void refreshList();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [sortPrefsReady, serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
-
-  async function refreshList(options?: { includeTotal?: boolean; force?: boolean }) {
-    const hasSearchQuery = serverListQuery.trim().length > 0;
-    const includeTotal = options?.includeTotal ?? ((hasActiveListFilter && !hasSearchQuery) || initialListPending);
-    const requestKey = JSON.stringify({
-      query: serverListQuery,
-      type: listTypeFilter,
-      qualityStatus: listStatusFilter,
-      examType: listExamTypeFilter,
-      sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
-      sortDir: listSortDir,
-      includeTotal,
-    });
-    if (!options?.force) {
-      if (requestKey === lastAppliedRefreshKeyRef.current) return;
-      if (requestKey === inFlightRefreshKeyRef.current) return;
-    }
-    refreshAbortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    refreshAbortControllerRef.current = abortController;
-    inFlightRefreshKeyRef.current = requestKey;
-    const requestSeq = ++refreshSeqRef.current;
-    let res: ExerciseListResponse;
-    try {
-      res = await fetchExerciseList({
+      const result = await fetchExerciseList({
         limit: EXERCISE_LIST_PAGE_SIZE,
-        offset: 0,
-        sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
+        offset: pageParam.offset,
+        cursorId: supportsCursorPagination ? pageParam.cursorId : null,
+        cursorUpdatedAt: supportsCursorPagination ? pageParam.cursorUpdatedAt : null,
+        sortBy: serverSortBy,
         sortDir: listSortDir,
         includeTotal,
         query: serverListQuery,
         type: listTypeFilter,
         qualityStatus: listStatusFilter,
         examType: listExamTypeFilter,
-        signal: abortController.signal,
+        signal,
       });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        if (inFlightRefreshKeyRef.current === requestKey) {
-          inFlightRefreshKeyRef.current = null;
-        }
-        return;
+
+      if (pageParam.offset === 0) {
+        includeTotalOnNextFetchRef.current = false;
       }
-      throw error;
+
+      return result;
+    },
+    getNextPageParam: (lastPage): ExerciseListPageParam | undefined =>
+      lastPage.success && lastPage.hasMore
+        ? {
+            offset: lastPage.nextOffset ?? 0,
+            cursorId: lastPage.nextCursorId ?? null,
+            cursorUpdatedAt: lastPage.nextCursorUpdatedAt ?? null,
+          }
+        : undefined,
+  });
+
+  const items = useMemo(() => {
+    const merged: ListItem[] = [];
+    const known = new Set<number>();
+    for (const page of listQueryResult.data?.pages ?? []) {
+      if (!page.success) continue;
+      for (const item of (page.items as ListItem[]) ?? []) {
+        if (known.has(item.id)) continue;
+        known.add(item.id);
+        merged.push(item);
+      }
     }
-    if (requestSeq !== refreshSeqRef.current) return;
-    if (res.success) {
-      setItems(res.items as ListItem[]);
-      setNextOffset(res.nextOffset ?? (res.items?.length ?? 0));
-      setHasMore(Boolean(res.hasMore));
-      const cursorId = typeof res.nextCursorId === 'number' ? res.nextCursorId : null;
-      const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
-      setNextCursorId(cursorId);
-      setNextCursorUpdatedAt(cursorUpdatedAt);
-      if (includeTotal) {
-        const resultCount = Number(res.total ?? res.items.length);
-        if (hasActiveListFilter) {
-          setMatchingItems(resultCount);
-        } else {
-          setTotalItems(resultCount);
-          setMatchingItems(null);
-        }
-      } else {
-        setMatchingItems(null);
-      }
-      lastAppliedRefreshKeyRef.current = requestKey;
-    } else {
+    return merged;
+  }, [listQueryResult.data]);
+
+  const firstPage = listQueryResult.data?.pages[0];
+  const firstPageCount =
+    firstPage?.success && typeof firstPage.total === 'number' && serverListQuery.trim().length === 0
+      ? Number(firstPage.total)
+      : null;
+  const defaultListData = queryClient.getQueryData<InfiniteData<ExerciseListResponse, ExerciseListPageParam>>(
+    adminExerciseKeys.list({
+      query: '',
+      type: 'all',
+      qualityStatus: 'all',
+      examType: 'all',
+      sortBy: serverSortBy,
+      sortDir: listSortDir,
+    }),
+  );
+  const defaultFirstPage = defaultListData?.pages[0];
+  const cachedTotalItems =
+    defaultFirstPage?.success && typeof defaultFirstPage.total === 'number'
+      ? Number(defaultFirstPage.total)
+      : null;
+  const displayedTotalItems = hasActiveListFilter
+    ? totalItems ?? cachedTotalItems
+    : firstPageCount ?? totalItems ?? cachedTotalItems;
+  const displayedMatchingItems = hasActiveListFilter ? firstPageCount ?? matchingItems : null;
+
+  useEffect(() => {
+    if (firstPage && !firstPage.success) {
       setIsError(true);
-      setMessage(res.error || 'Ошибка загрузки списка заданий.');
+      setMessage(firstPage.error || 'Ошибка загрузки списка заданий.');
     }
-    if (initialListPending) {
-      setInitialListPending(false);
+  }, [firstPage, setIsError, setMessage]);
+
+  useEffect(() => {
+    if (!listQueryResult.error) return;
+    setIsError(true);
+    setMessage(listQueryResult.error.message || 'Ошибка загрузки списка заданий.');
+  }, [listQueryResult.error, setIsError, setMessage]);
+
+  function setItems(updater: SetStateAction<ListItem[]>) {
+    queryClient.setQueriesData<InfiniteData<ExerciseListResponse, ExerciseListPageParam>>(
+      { queryKey: adminExerciseKeys.lists() },
+      (data) => {
+        if (!data) return data;
+        const current = data.pages.flatMap((page) => (page.success ? (page.items as ListItem[]) : []));
+        const next = typeof updater === 'function' ? updater(current) : updater;
+        const nextById = new Map(next.map((item) => [item.id, item]));
+        return {
+          ...data,
+          pages: data.pages.map((page) => {
+            if (!page.success) return page;
+            return {
+              ...page,
+              items: page.items
+                .filter((item) => nextById.has(item.id))
+                .map((item) => nextById.get(item.id) ?? item),
+            };
+          }),
+        };
+      },
+    );
+  }
+
+  async function refreshList(options?: { includeTotal?: boolean; force?: boolean }) {
+    if (options?.includeTotal) {
+      includeTotalOnNextFetchRef.current = true;
     }
-    if (inFlightRefreshKeyRef.current === requestKey) {
-      inFlightRefreshKeyRef.current = null;
+    if (options?.force) {
+      await queryClient.invalidateQueries({
+        queryKey: adminExerciseKeys.lists(),
+        refetchType: 'none',
+      });
     }
-    if (refreshAbortControllerRef.current === abortController) {
-      refreshAbortControllerRef.current = null;
-    }
+    await listQueryResult.refetch();
   }
 
   async function loadMore() {
-    if (!hasMore || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const res = await fetchExerciseList({
-        limit: EXERCISE_LIST_PAGE_SIZE,
-        offset: nextOffset,
-        cursorId: nextCursorId,
-        cursorUpdatedAt: nextCursorUpdatedAt,
-        sortBy: listSortBy === 'updatedAt' ? 'updatedAt' : 'id',
-        sortDir: listSortDir,
-        includeTotal: false,
-        query: serverListQuery,
-        type: listTypeFilter,
-        qualityStatus: listStatusFilter,
-        examType: listExamTypeFilter,
-      });
-      if (res.success) {
-        const incoming = (res.items as ListItem[]) ?? [];
-        setItems((prev) => {
-          const merged = [...prev];
-          const known = new Set(prev.map((i) => i.id));
-          for (const item of incoming) {
-            if (!known.has(item.id)) merged.push(item);
-          }
-          return merged;
-        });
-        setNextOffset(res.nextOffset ?? (nextOffset + incoming.length));
-        setHasMore(Boolean(res.hasMore));
-        const cursorId = typeof res.nextCursorId === 'number' ? res.nextCursorId : null;
-        const cursorUpdatedAt = typeof res.nextCursorUpdatedAt === 'string' ? res.nextCursorUpdatedAt : null;
-        setNextCursorId(cursorId);
-        setNextCursorUpdatedAt(cursorUpdatedAt);
-      } else {
-        setIsError(true);
-        setMessage(res.error || 'Ошибка подгрузки списка.');
-      }
-    } finally {
-      setLoadingMore(false);
+    if (!listQueryResult.hasNextPage || listQueryResult.isFetchingNextPage) return;
+    const result = await listQueryResult.fetchNextPage();
+    const lastPage = result.data?.pages[result.data.pages.length - 1];
+    if (lastPage && !lastPage.success) {
+      setIsError(true);
+      setMessage(lastPage.error || 'Ошибка подгрузки списка.');
     }
   }
 
@@ -278,11 +350,11 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
   return {
     items,
     setItems,
-    totalItems,
+    totalItems: displayedTotalItems,
     setTotalItems,
-    matchingItems,
+    matchingItems: displayedMatchingItems,
     setMatchingItems,
-    initialListPending,
+    initialListPending: !sortPrefsReady || (items.length === 0 && listQueryResult.isFetching),
     hasActiveListFilter,
     filteredItems,
     groupedItems,
@@ -300,8 +372,8 @@ export function useExerciseList({ initialItems, initialTotalItems, setIsError, s
     listSortDir,
     setListSortDir,
     sortPrefsReady,
-    hasMore,
-    loadingMore,
+    hasMore: Boolean(listQueryResult.hasNextPage),
+    loadingMore: listQueryResult.isFetchingNextPage,
     refreshList,
     loadMore,
   };

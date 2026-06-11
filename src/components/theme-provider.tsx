@@ -21,8 +21,8 @@ const FALLBACK_THEME_CONTEXT: ThemeContextValue = {
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  if (theme === 'dark') root.classList.add('dark');
-  else root.classList.remove('dark');
+  root.classList.toggle('dark', theme === 'dark');
+  root.style.colorScheme = theme;
 }
 
 function readThemeFromStorage(): Theme {
@@ -33,6 +33,11 @@ function readThemeFromStorage(): Theme {
   } catch {
     return 'light';
   }
+}
+
+function readThemeFromDocument(): Theme {
+  if (typeof document === 'undefined') return 'light';
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
 function subscribeTheme(listener: () => void) {
@@ -53,7 +58,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useSyncExternalStore<Theme>(
     subscribeTheme,
     readThemeFromStorage,
-    () => 'light',
+    readThemeFromDocument,
   );
 
   React.useEffect(() => {

@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Node maintenance/import scripts are intentionally CommonJS-heavy.
+    "scripts/**",
+    "fix.js",
+    "local-proxy.js",
   ]),
 ]);
 

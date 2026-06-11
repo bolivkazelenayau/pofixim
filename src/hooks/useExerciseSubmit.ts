@@ -1,8 +1,17 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { Form, ListItem } from '@/components/admin-form/types';
 import { EMPTY } from '@/components/admin-form/defaults';
+import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
+import {
+  decrementAdminExerciseListTotals,
+  patchAdminExerciseLists,
+  restoreAdminExerciseLists,
+  snapshotAdminExerciseLists,
+  upsertAdminExerciseDetail,
+} from '@/components/admin-form/queryCache';
 import { getDraftKey, loadFormState } from '@/components/admin-form/draftStorage';
 import {
   buildTypeChangeMessage,
@@ -48,6 +57,7 @@ interface UseExerciseSubmitOptions {
 }
 
 function updateSavedListItem(item: ListItem, form: Form): ListItem {
+  const updatedAt = new Date().toISOString();
   return {
     ...item,
     type: form.type,
@@ -55,6 +65,8 @@ function updateSavedListItem(item: ListItem, form: Form): ListItem {
     prompt: form.prompt,
     qualityStatus: form.qualityStatus,
     isActive: form.isActive,
+    updatedAt,
+    updatedAtCursor: updatedAt,
     skillTags: form.skillTags
       .split(',')
       .map((tag) => tag.trim())
@@ -108,9 +120,19 @@ export function useExerciseSubmit({
   storeLocalDraft,
   markDatabaseSaveSucceeded,
 }: UseExerciseSubmitOptions) {
+  const queryClient = useQueryClient();
   const [isSeedRegenerateArmed, setIsSeedRegenerateArmed] = useState(false);
   const [showSeedRegenerateModal, setShowSeedRegenerateModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const saveExerciseMutation = useMutation({
+    mutationFn: async (input: { payload: ReturnType<typeof buildPayloadFromForm>; wasEdit: boolean; id?: number }) =>
+      input.wasEdit
+        ? updateExerciseAction({ ...input.payload, id: input.id! })
+        : createExerciseAction(input.payload),
+  });
+  const deleteExerciseMutation = useMutation({
+    mutationFn: deleteExerciseAction,
+  });
 
   function clearExerciseUrlSelection() {
     const url = new URL(window.location.href);
@@ -138,6 +160,12 @@ export function useExerciseSubmit({
     const payload = buildPayloadFromForm(form);
 
     const wasEdit = isEdit;
+    const optimisticListSnapshot =
+      wasEdit && form.id ? snapshotAdminExerciseLists(queryClient) : null;
+    const optimisticDetailSnapshot =
+      wasEdit && form.id
+        ? queryClient.getQueryData(adminExerciseKeys.detail(form.id))
+        : undefined;
     logAdminDebug('submit:start', {
       wasEdit,
       formId: form.id ?? null,
@@ -161,9 +189,37 @@ export function useExerciseSubmit({
       return;
     }
 
-    const res = wasEdit
-      ? await updateExerciseAction({ ...payload, id: form.id! })
-      : await createExerciseAction(payload);
+    if (wasEdit && form.id) {
+      await queryClient.cancelQueries({ queryKey: adminExerciseKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: adminExerciseKeys.detail(form.id) });
+      patchAdminExerciseLists(queryClient, (item) =>
+        item.id === form.id ? updateSavedListItem(item, form) : item,
+      );
+      upsertAdminExerciseDetail(queryClient, form.id, payload as Record<string, unknown>);
+    }
+
+    const rollbackOptimisticSave = () => {
+      if (!wasEdit || !form.id || !optimisticListSnapshot) return;
+      restoreAdminExerciseLists(queryClient, optimisticListSnapshot);
+      queryClient.setQueryData(adminExerciseKeys.detail(form.id), optimisticDetailSnapshot);
+    };
+
+    let res: Awaited<ReturnType<typeof updateExerciseAction | typeof createExerciseAction>>;
+    try {
+      res = await saveExerciseMutation.mutateAsync({ payload, wasEdit, id: form.id });
+    } catch (error) {
+      rollbackOptimisticSave();
+      setSaving(false);
+      setDatabaseSaveState('local');
+      storeLocalDraft(form);
+      setIsError(true);
+      setMessage(
+        `Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ñ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ñ‹ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾, Ð½Ð¾ Ð½Ðµ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ñ‹ Ð² Ð±Ð°Ð·Ñƒ: ${
+          error instanceof Error ? error.message : 'Ð¾ÑˆÐ¸Ð±ÐºÐ° ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ñ'
+        }.`,
+      );
+      return;
+    }
 
     if (res.success) {
       logAdminDebug('submit:success', {
@@ -180,6 +236,9 @@ export function useExerciseSubmit({
       setForm(nextForm);
       if (wasEdit) {
         markDatabaseSaveSucceeded(form, JSON.stringify(form));
+        if (form.id) {
+          await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.detail(form.id) });
+        }
       } else {
         lastPersistedSnapshotRef.current = JSON.stringify(nextForm);
         setDatabaseSaveState('draft');
@@ -210,6 +269,7 @@ export function useExerciseSubmit({
         });
       }
     } else {
+      rollbackOptimisticSave();
       logAdminDebug('submit:error', {
         wasEdit,
         formId: form.id ?? null,
@@ -239,7 +299,29 @@ export function useExerciseSubmit({
 
     const deletedId = form.id!;
     deletedExerciseIdsRef.current.add(deletedId);
-    const res = await deleteExerciseAction(deletedId);
+    await queryClient.cancelQueries({ queryKey: adminExerciseKeys.lists() });
+    await queryClient.cancelQueries({ queryKey: adminExerciseKeys.detail(deletedId) });
+    const optimisticListSnapshot = snapshotAdminExerciseLists(queryClient);
+    const optimisticDetailSnapshot = queryClient.getQueryData(adminExerciseKeys.detail(deletedId));
+    patchAdminExerciseLists(queryClient, (item) => (item.id === deletedId ? null : item));
+    decrementAdminExerciseListTotals(queryClient);
+
+    const rollbackOptimisticDelete = () => {
+      restoreAdminExerciseLists(queryClient, optimisticListSnapshot);
+      queryClient.setQueryData(adminExerciseKeys.detail(deletedId), optimisticDetailSnapshot);
+      deletedExerciseIdsRef.current.delete(deletedId);
+    };
+
+    let res: Awaited<ReturnType<typeof deleteExerciseAction>>;
+    try {
+      res = await deleteExerciseMutation.mutateAsync(deletedId);
+    } catch (error) {
+      rollbackOptimisticDelete();
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : 'ÐžÑˆÐ¸Ð±ÐºÐ° ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ.');
+      setDeleting(false);
+      return;
+    }
     if (res.success) {
       setMessage('Задание удалено.');
       localStorage.removeItem(getDraftKey(form.id));
@@ -257,8 +339,10 @@ export function useExerciseSubmit({
       setMatchingItems((current) =>
         hasActiveListFilter && current !== null ? Math.max(0, current - 1) : current,
       );
+      queryClient.removeQueries({ queryKey: adminExerciseKeys.detail(deletedId) });
       await refreshList({ force: true });
     } else {
+      rollbackOptimisticDelete();
       setIsError(true);
       setMessage(res.error || 'Ошибка удаления.');
     }
