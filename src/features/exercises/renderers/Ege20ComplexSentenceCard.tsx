@@ -41,7 +41,7 @@ export default function Ege20ComplexSentenceCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">
         ЕГЭ-20 · знаки в сложном предложении
       </p>
@@ -57,10 +57,10 @@ export default function Ege20ComplexSentenceCard({
               type="button"
               disabled={disabled}
               onClick={() => toggleIndex(index)}
-              className={`rounded-lg border px-3 py-1 text-sm transition ${
+              className={`rounded-lg border px-3 py-1 text-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                 active
                   ? 'border-primary bg-primary text-white'
-                  : 'border-stroke bg-surface text-foreground hover:border-primary'
+                  : 'border-stroke bg-surface text-foreground hover:border-primary hover:bg-stroke dark:hover:bg-stroke'
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {index}

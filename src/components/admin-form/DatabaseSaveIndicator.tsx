@@ -17,11 +17,11 @@ export default function DatabaseSaveIndicator({
   return (
     <div
       aria-live="polite"
-      className={`${className} inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${indicator.box}`}
+      className={`${className} inline-flex w-fit items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-semibold ${indicator.box}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${indicator.dot}`} />
       <span>{indicator.label}</span>
-      {indicator.detail && <span className="opacity-70">· {indicator.detail}</span>}
+      {indicator.detail && <span className="text-foreground/45">· {indicator.detail}</span>}
     </div>
   );
 }

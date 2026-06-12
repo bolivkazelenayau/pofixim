@@ -45,7 +45,7 @@ export default function RawPreviewAuditPanel({
       </div>
       <button
         type="button"
-        className="mt-2 w-full rounded-lg bg-foreground/5 px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 w-full rounded-lg bg-foreground/5 px-3 py-2 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-foreground/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onRun}
         disabled={loading}
       >

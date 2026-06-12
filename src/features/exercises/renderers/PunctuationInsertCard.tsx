@@ -52,7 +52,7 @@ export default function PunctuationInsertCard({
   );
 
   return (
-    <div className="mt-2 mb-5 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mt-2 mb-5 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
       <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-foreground/50">
         Выбери место для знака препинания
       </p>
@@ -73,10 +73,10 @@ export default function PunctuationInsertCard({
                   type="button"
                   disabled={disabled}
                   onClick={() => toggleMark(idx)}
-                  className={`mx-1 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-sm font-black transition ${
+                  className={`mx-1 inline-flex h-8 min-w-8 items-center justify-center rounded-lg border text-sm font-black transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     hasMark
                       ? 'border-amber-400 bg-amber-100 text-amber-800 shadow-inner'
-                      : 'border-dashed border-stroke bg-surface text-foreground/50 hover:border-amber-300 hover:text-amber-500'
+                      : 'border-dashed border-stroke bg-surface text-foreground/50 hover:border-amber-300 hover:bg-stroke hover:text-amber-500 dark:hover:bg-stroke'
                   } disabled:opacity-60`}
                   aria-label={`Поставить знак после слова ${token}`}
                 >
@@ -105,7 +105,7 @@ export default function PunctuationInsertCard({
           });
           onSubmit({ type: 'punctuation_insert', marks: sortedMarks }, label);
         }}
-        className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+        className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить пунктуацию
       </motion.button>

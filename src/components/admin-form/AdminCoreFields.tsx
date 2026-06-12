@@ -108,7 +108,7 @@ export default function AdminCoreFields({
       <button
        type="button"
        onClick={onGenerateSeedClick}
-       className="shrink-0 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-xs font-semibold text-foreground/80 transition hover:bg-surface"
+       className="shrink-0 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-xs font-semibold text-foreground/80 transition-[background-color,border-color,transform] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
        title="Сгенерировать seed key"
       >
        Сгенерировать

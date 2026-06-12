@@ -54,7 +54,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
          return { ...current, options: newOptions, correctOptionIndex: newCorrect };
         })
        }
-       className="p-1 text-slate-400 transition hover:text-red-500"
+       className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30 dark:hover:bg-red-500/10"
        aria-label={`Remove option ${index + 1}`}
        title="Удалить вариант"
       >
@@ -67,7 +67,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
    ))}
    <button
     type="button"
-    className="rounded-md border border-stroke px-2 py-1 text-xs text-foreground/80 hover:bg-surface"
+    className="rounded-lg border border-stroke bg-surface-strong px-2.5 py-1.5 text-xs font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
     onClick={() => setForm((current) => ({ ...current, options: [...current.options, ''] }))}
    >
     Добавить вариант

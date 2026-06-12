@@ -46,7 +46,7 @@ export default function ThemeToggle() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="relative inline-flex size-10 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground transition hover:bg-surface"
+        className="relative inline-flex size-10 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="theme-menu"
@@ -107,13 +107,13 @@ export default function ThemeToggle() {
         <div
           id="theme-menu"
           role="menu"
-          className="absolute right-0 z-50 mt-2 min-w-36 overflow-hidden rounded-md border border-stroke bg-surface-strong shadow-lg"
+          className="absolute right-0 z-50 mt-2 min-w-36 overflow-hidden rounded-lg border border-stroke bg-surface-strong shadow-sm"
         >
           <button
             type="button"
             role="menuitem"
             onClick={() => applyTheme('light')}
-            className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface"
+            className="block w-full px-3 py-2 text-left text-sm text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:bg-stroke focus:outline-none dark:hover:bg-stroke dark:focus:bg-stroke"
           >
             Светлая
           </button>
@@ -121,7 +121,7 @@ export default function ThemeToggle() {
             type="button"
             role="menuitem"
             onClick={() => applyTheme('dark')}
-            className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface"
+            className="block w-full px-3 py-2 text-left text-sm text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:bg-stroke focus:outline-none dark:hover:bg-stroke dark:focus:bg-stroke"
           >
             Тёмная
           </button>

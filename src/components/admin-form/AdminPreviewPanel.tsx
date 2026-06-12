@@ -31,14 +31,19 @@ export default function AdminPreviewPanel({
  onPreviewDictationTextChange,
 }: AdminPreviewPanelProps) {
  return (
-  <div className="h-fit rounded-xl border border-stroke bg-surface-strong p-4">
-   <div className="mb-2 flex items-center justify-between gap-2">
-    <h3 className="text-sm font-semibold text-foreground ">Превью в чате</h3>
-    <div className="inline-flex rounded-md border border-stroke bg-surface p-0.5 text-xs ">
+  <section className="h-fit rounded-xl border border-stroke bg-surface-strong p-4">
+   <div className="mb-3 flex items-start justify-between gap-3">
+    <div>
+     <h3 className="text-sm font-semibold text-foreground">Превью в чате</h3>
+     <p className="mt-0.5 text-xs leading-5 text-foreground/55">
+      Проверка того, как задание увидит ученик.
+     </p>
+    </div>
+    <div className="inline-flex shrink-0 rounded-lg border border-stroke bg-surface p-0.5 text-xs">
      <button
       type="button"
       onClick={() => onPreviewModeChange('desktop')}
-      className={`rounded px-2 py-1 ${
+      className={`rounded-md px-2 py-1 transition-[background-color,color,transform] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] ${
        previewMode === 'desktop'
         ? 'bg-primary text-white'
         : 'text-foreground/80 hover:bg-stroke'
@@ -49,7 +54,7 @@ export default function AdminPreviewPanel({
      <button
       type="button"
       onClick={() => onPreviewModeChange('mobile')}
-      className={`rounded px-2 py-1 ${
+      className={`rounded-md px-2 py-1 transition-[background-color,color,transform] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] ${
        previewMode === 'mobile'
         ? 'bg-primary text-white'
         : 'text-foreground/80 hover:bg-stroke'
@@ -60,7 +65,10 @@ export default function AdminPreviewPanel({
     </div>
    </div>
    {preview.error ? (
-    <p className="text-sm text-amber-700">Превью недоступно: {preview.error}</p>
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100">
+     <div className="font-semibold">Превью недоступно</div>
+     <p className="mt-0.5 text-pretty text-xs">{preview.error}</p>
+    </div>
    ) : preview.exercise ? (
     <div className={previewMode === 'mobile' ? 'mx-auto w-[320px] max-w-full' : 'w-full'}>
      <div className="mb-2 rounded-xl bg-surface px-4 py-3 text-sm text-foreground shadow-sm [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0">
@@ -78,12 +86,12 @@ export default function AdminPreviewPanel({
         value={previewDictationText}
         onChange={(event) => onPreviewDictationTextChange(event.target.value)}
         placeholder="Введите услышанный текст для проверки..."
-        className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
+        className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
        />
        <button
         type="submit"
         disabled={!previewDictationText.trim()}
-        className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)]"
+        className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-[var(--stroke)] disabled:active:scale-100"
        >
         Проверить диктант
        </button>
@@ -124,8 +132,13 @@ export default function AdminPreviewPanel({
      )}
     </div>
    ) : (
-    <p className="text-sm text-foreground/60">Заполните поля задания для превью.</p>
+    <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4">
+     <div className="text-sm font-semibold text-foreground">Превью появится здесь</div>
+     <p className="mt-1 text-pretty text-xs leading-5 text-foreground/55">
+      Заполните формулировку, ответ и объяснение, чтобы проверить карточку перед сохранением.
+     </p>
+    </div>
    )}
-  </div>
+  </section>
  );
 }

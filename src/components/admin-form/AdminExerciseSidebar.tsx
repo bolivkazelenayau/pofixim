@@ -89,12 +89,12 @@ export default function AdminExerciseSidebar({
   return (
     <aside
       ref={sidebarRef}
-      className="flex h-[60vh] flex-col rounded-2xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
+      className="flex h-[60vh] flex-col rounded-xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold tracking-tight">Задания</h3>
+            <h3 className="text-balance text-xl font-bold">Задания</h3>
             <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-semibold text-primary">
               {stats.hasActiveListFilter && stats.matchingItems !== null
                 ? `${stats.matchingItems} / `
@@ -110,11 +110,11 @@ export default function AdminExerciseSidebar({
                 : `Показано: ${stats.shownCount}`}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             aria-label="Refresh exercise list"
-            className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-foreground"
+            className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
             onClick={list.onRefresh}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -126,7 +126,7 @@ export default function AdminExerciseSidebar({
             <button
               type="button"
               aria-label="Enable exercise selection"
-              className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-stroke hover:text-primary"
+              className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               onClick={selection.onEnable}
             >
               <CheckSquare className="h-4 w-4" aria-hidden="true" />
@@ -138,7 +138,7 @@ export default function AdminExerciseSidebar({
             <button
               type="button"
               aria-label="Clear exercise selection"
-              className="group relative flex size-10 items-center justify-center rounded-full text-foreground/50 transition hover:bg-red-500/10 hover:text-red-500"
+              className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
               onClick={selection.onClear}
             >
               <XSquare className="h-4 w-4" aria-hidden="true" />
@@ -155,7 +155,7 @@ export default function AdminExerciseSidebar({
           type="button"
           onClick={selection.onSelectAllShown}
           disabled={selection.shownItemsCount === 0}
-          className="mb-3 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-medium text-foreground/80 transition hover:bg-stroke disabled:cursor-not-allowed disabled:opacity-60"
+          className="mb-3 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Выбрать все показанные ({selection.shownItemsCount})
         </button>
@@ -195,7 +195,6 @@ export default function AdminExerciseSidebar({
       <AdminExerciseList
         groupedItems={list.groupedItems}
         initialListPending={stats.initialListPending}
-        typeFilter={filters.type}
         selectionMode={selection.enabled}
         selectedId={list.selectedId}
         multiSelectedSet={selection.selectedIds}
@@ -206,6 +205,12 @@ export default function AdminExerciseSidebar({
         onOpenExercise={list.onOpenExercise}
         onLoadMore={list.onLoadMore}
         formatUpdatedAt={list.formatUpdatedAt}
+        onClearFilters={() => {
+          filters.onQueryChange('');
+          filters.onTypeChange('all');
+          filters.onExamTypeChange('all');
+          filters.onStatusChange('all');
+        }}
       />
     </aside>
   );

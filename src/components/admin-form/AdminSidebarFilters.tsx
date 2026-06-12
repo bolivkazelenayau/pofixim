@@ -72,7 +72,7 @@ export default function AdminSidebarFilters({
             key={view.label}
             type="button"
             onClick={view.onClick}
-            className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+            className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-[background-color,border-color,color,transform] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] ${
               view.active
                 ? 'border-foreground/20 bg-foreground text-background'
                 : 'border-stroke bg-surface-strong text-foreground/65 hover:bg-stroke hover:text-foreground'
@@ -86,11 +86,21 @@ export default function AdminSidebarFilters({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" aria-hidden="true" />
         <input
           id="admin-list-search"
-          className={`${inputClass} pl-9`}
+          className={`${inputClass} pl-9 pr-9`}
           placeholder="Поиск: id / seed_key / текст"
           value={listQuery}
           onChange={(event) => onListQueryChange(event.target.value)}
         />
+        {listQuery ? (
+          <button
+            type="button"
+            onClick={() => onListQueryChange('')}
+            aria-label="Очистить поиск"
+            className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-foreground/45 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Select value={listTypeFilter} onValueChange={onListTypeFilterChange}>
@@ -175,7 +185,7 @@ export default function AdminSidebarFilters({
               <button
                 type="button"
                 onClick={() => onListSortDirChange(listSortDir === 'asc' ? 'desc' : 'asc')}
-                className="group relative flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition hover:bg-stroke hover:text-foreground"
+                className="group relative flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
                 <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">

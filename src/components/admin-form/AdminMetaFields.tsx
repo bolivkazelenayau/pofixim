@@ -93,12 +93,12 @@ export default function AdminMetaFields({
     </Field>
    </div>
 
-    <div ref={mainSaveAnchorRef} className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <div ref={mainSaveAnchorRef} className="mt-5 grid gap-2 rounded-xl border border-stroke bg-surface p-2 sm:grid-cols-[minmax(0,1fr)_auto]">
      <button
       type="submit"
       disabled={saving || deleting}
       onPointerDown={onSaveIntent}
-      className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700"
+      className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-slate-400 disabled:active:scale-100 dark:disabled:bg-slate-700"
     >
      {saving
       ? 'Сохранение...'
@@ -111,7 +111,7 @@ export default function AdminMetaFields({
       type="button"
       disabled={saving || deleting}
       onClick={onDeleteClick}
-      className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+      className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition-[background-color,border-color,opacity,transform] duration-150 ease-out hover:border-red-300 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
      >
       {deleting ? 'Удаление...' : 'Удалить'}
      </button>

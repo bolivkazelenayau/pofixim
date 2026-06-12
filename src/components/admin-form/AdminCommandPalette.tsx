@@ -46,6 +46,9 @@ export default function AdminCommandPalette({
   }
 
   const visibleItems = items.slice(0, 24);
+  const selectedItem = selectedId
+    ? items.find((item) => item.id === selectedId)
+    : null;
 
   return (
     <CommandDialog
@@ -57,8 +60,22 @@ export default function AdminCommandPalette({
     >
       <Command>
         <CommandInput placeholder="Search commands or exercises..." />
+        {selectedItem ? (
+          <div className="border-b border-stroke px-3 py-2 text-xs text-foreground/55">
+            <span className="font-semibold text-foreground/75">Current:</span>{' '}
+            <span className="font-mono">#{selectedItem.id}</span>{' '}
+            <span className="truncate">{selectedItem.prompt}</span>
+          </div>
+        ) : null}
         <CommandList>
-          <CommandEmpty>No command found.</CommandEmpty>
+          <CommandEmpty>
+            <div className="py-6 text-center">
+              <div className="text-sm font-semibold text-foreground">Nothing matched</div>
+              <p className="mt-1 text-xs text-foreground/55">
+                Try an exercise id, seed key, status, or action name.
+              </p>
+            </div>
+          </CommandEmpty>
           <CommandGroup heading="Actions">
             <CommandItem value="save current exercise" onSelect={() => run(onSave)}>
               Save current exercise
@@ -107,9 +124,13 @@ export default function AdminCommandPalette({
                     onSelect={() => run(() => onOpenExercise(item.id))}
                     data-checked={selectedId === item.id}
                   >
-                    <span className="font-mono text-xs text-muted-foreground">#{item.id}</span>
-                    <span className="truncate">{item.prompt}</span>
-                    <CommandShortcut>{item.qualityStatus}</CommandShortcut>
+                    <span className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">#{item.id}</span>
+                      <span className="truncate">{item.prompt}</span>
+                    </span>
+                    <CommandShortcut>
+                      {selectedId === item.id ? 'open' : item.qualityStatus}
+                    </CommandShortcut>
                   </CommandItem>
                 ))}
               </CommandGroup>

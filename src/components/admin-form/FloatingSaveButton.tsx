@@ -26,7 +26,7 @@ export default function FloatingSaveButton({
    onPointerDown={onSaveIntent}
    onClick={onClick}
     disabled={!visible || saving || deleting}
-    className={`rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-700 ${
+    className={`rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-slate-400 disabled:active:scale-100 dark:disabled:bg-slate-700 ${
      visible ? 'pointer-events-auto' : 'pointer-events-none'
     }`}
    >

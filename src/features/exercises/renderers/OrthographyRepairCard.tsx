@@ -170,7 +170,7 @@ export default function OrthographyRepairCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
       <div className="rounded-xl border border-stroke bg-surface px-3 py-3 text-lg font-medium leading-9 text-foreground">
         {segments.map((segment) => {
           if (segment.kind === 'target') {
@@ -185,7 +185,7 @@ export default function OrthographyRepairCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => chooseTarget(segment.target)}
-                className={`rounded-md border px-0.5 py-0.5 transition ${
+                className={`rounded-md border px-0.5 py-0.5 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   isCorrect
                     ? 'mx-0.5 border-emerald-400 bg-emerald-50 px-1.5 font-bold text-emerald-900 dark:border-emerald-300/60 dark:bg-emerald-300/12 dark:text-emerald-100'
                     : isWrong
@@ -194,7 +194,7 @@ export default function OrthographyRepairCard({
                         ? 'mx-0.5 border-cyan-300 bg-cyan-50 px-1.5 font-bold text-cyan-950 dark:border-cyan-300/45 dark:bg-cyan-300/12 dark:text-cyan-100'
                         : isSelected
                           ? 'mx-0.5 border-amber-400 bg-amber-100 px-1.5 font-bold text-amber-950 ring-2 ring-amber-200 dark:border-amber-300 dark:bg-amber-300/18 dark:text-amber-100 dark:ring-amber-300/20'
-                          : 'border-transparent bg-transparent text-foreground hover:bg-surface-strong'
+                          : 'border-transparent bg-transparent text-foreground hover:bg-stroke dark:hover:bg-stroke'
                 }`}
               >
                 {repair ?? segment.text}
@@ -212,10 +212,10 @@ export default function OrthographyRepairCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => markWrongClick(key)}
-                className={`rounded px-0.5 transition ${
+                className={`rounded px-0.5 transition-[background-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   wrongClickKey === key
                     ? 'bg-rose-100 text-rose-900 ring-2 ring-rose-200 dark:bg-rose-300/12 dark:text-rose-100 dark:ring-rose-300/20'
-                    : 'hover:bg-surface-strong'
+                    : 'hover:bg-stroke dark:hover:bg-stroke'
                 }`}
                 title="Это не отмеченный фрагмент"
               >
@@ -238,7 +238,7 @@ export default function OrthographyRepairCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => chooseRepair(option)}
-                className="rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-cyan-500 hover:bg-cyan-100 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10"
+                className="rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:border-cyan-500 hover:bg-cyan-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10"
               >
                 {option}
               </button>
@@ -252,7 +252,7 @@ export default function OrthographyRepairCard({
           type="button"
           disabled={disabled || repairedCount === 0}
           onClick={reset}
-          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 disabled:opacity-60"
+          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-[background-color,border-color,opacity,transform] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong disabled:active:scale-100 dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить
         </button>
@@ -260,7 +260,7 @@ export default function OrthographyRepairCard({
           whileTap={!disabled ? { scale: 0.96 } : {}}
           disabled={disabled || !canSubmit}
           onClick={submit}
-          className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+          className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
         >
           Проверить
         </motion.button>

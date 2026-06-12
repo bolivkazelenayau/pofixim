@@ -77,7 +77,7 @@ export default function WordBankClozeCard({
 
   return (
     <div
-      className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm"
+      className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm"
       onClick={() => setActiveSlot(null)}
     >
       <div className="text-[19px] leading-[2.35] text-foreground sm:text-[20px]">
@@ -97,7 +97,7 @@ export default function WordBankClozeCard({
                 event.stopPropagation();
                 setActiveSlot(part.index);
               }}
-              className={`mx-1 inline-flex min-h-[28px] min-w-[78px] items-center justify-center rounded-lg border px-2 py-0.5 align-middle text-[14px] font-semibold transition ${
+              className={`mx-1 inline-flex min-h-[28px] min-w-[78px] items-center justify-center rounded-lg border px-2 py-0.5 align-middle text-[14px] font-semibold transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                 value
                   ? 'border-blue-300 bg-blue-50 text-blue-900'
                   : 'border-stroke bg-surface text-foreground/60'
@@ -120,7 +120,7 @@ export default function WordBankClozeCard({
                 event.stopPropagation();
                 placeWord(word);
               }}
-              className="rounded-full border border-cyan-400 bg-white px-3 py-1.5 text-sm font-semibold text-foreground transition hover:bg-cyan-50 disabled:opacity-50"
+              className="rounded-lg border border-cyan-400 bg-white px-3 py-1.5 text-sm font-semibold text-foreground transition-[background-color,border-color,transform] duration-150 ease-out hover:bg-cyan-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:bg-cyan-300/10"
             >
               {word}
             </button>
@@ -136,7 +136,7 @@ export default function WordBankClozeCard({
             event.stopPropagation();
             if (activeSlot !== null) clearSlot(activeSlot);
           }}
-          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 disabled:opacity-60"
+          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Очистить слот
         </button>
@@ -148,7 +148,7 @@ export default function WordBankClozeCard({
             setValues(Array(slotCount).fill(''));
             setActiveSlot(0);
           }}
-          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 disabled:opacity-60"
+          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить всё
         </button>
@@ -161,7 +161,7 @@ export default function WordBankClozeCard({
           event.stopPropagation();
           submit();
         }}
-        className="mt-4 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+        className="mt-4 w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить
       </motion.button>

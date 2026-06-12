@@ -61,6 +61,16 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
     });
   }
 
+  function moveByIndex(index: number, direction: -1 | 1) {
+    setOrder((prev) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
   function fragmentText(id: string) {
     return exercise.payload.fragments.find((f) => f.id === id)?.text ?? id;
   }
@@ -75,12 +85,12 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
   const answerLabel = order.map(id => fragmentText(id)).join(' ');
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">
-        Drag &amp; Drop · порядок фрагментов
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+      <p className="mb-2 text-xs font-semibold text-foreground/60">
+        Порядок фрагментов
       </p>
-      <p className="mb-3 text-xs text-foreground/60">
-        Перетаскивайте карточки, чтобы собрать правильный порядок.
+      <p className="mb-3 text-pretty text-xs text-foreground/60">
+        Перетаскивайте карточки или используйте кнопки вверх/вниз.
       </p>
       <div className="space-y-2">
         {order.map((id, pos) => (
@@ -94,12 +104,32 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
               move(dragId, id);
               setDragId(null);
             }}
-            className="rounded-xl border border-stroke bg-surface px-3 py-2 text-sm text-foreground"
+            className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-stroke bg-surface px-3 py-2 text-sm text-foreground transition-[background-color,border-color] duration-150 ease-out hover:bg-stroke dark:hover:bg-stroke"
           >
-            <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-foreground/80">
+            <span className="inline-flex size-6 items-center justify-center rounded-md bg-slate-200 font-mono text-xs font-semibold text-foreground/80">
               {pos + 1}
             </span>
-            {fragmentText(id)}
+            <span className="min-w-0 text-pretty leading-5">{fragmentText(id)}</span>
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={disabled || pos === 0}
+                onClick={() => moveByIndex(pos, -1)}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-xs font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label={`Переместить фрагмент ${pos + 1} выше`}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                disabled={disabled || pos === order.length - 1}
+                onClick={() => moveByIndex(pos, 1)}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-xs font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label={`Переместить фрагмент ${pos + 1} ниже`}
+              >
+                ↓
+              </button>
+            </span>
           </div>
         ))}
       </div>
@@ -111,7 +141,7 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
           type="button"
           disabled={disabled}
           onClick={() => setOrder(initialOrder)}
-          className="w-full rounded-xl border border-stroke bg-surface-strong px-4 py-2 text-sm font-medium text-foreground/80 transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-xl border border-stroke bg-surface-strong px-4 py-2 text-sm font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить порядок
         </button>
@@ -124,7 +154,7 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
               answerLabel,
             )
           }
-          className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+          className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
         >
           Проверить
         </motion.button>

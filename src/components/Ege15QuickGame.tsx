@@ -168,7 +168,7 @@ export default function Ege15QuickGame({
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
+          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
           aria-label="Close quick game"
           title="Закрыть"
         >
@@ -193,7 +193,7 @@ export default function Ege15QuickGame({
               type="button"
               onClick={start}
               disabled={localCards.length === 0}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
             >
               <BadgeCheck className="h-5 w-5" />
               Старт
@@ -255,7 +255,7 @@ export default function Ege15QuickGame({
                 <button
                   type="button"
                   onClick={nextCard}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong active:scale-[0.96] sm:text-lg"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] sm:text-lg"
                 >
                   Далее
                   <ArrowRight className="h-5 w-5" />
@@ -311,7 +311,7 @@ export default function Ege15QuickGame({
             <button
               type="button"
               onClick={onClose}
-              className="h-12 w-full rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong"
+              className="h-12 w-full rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98]"
             >
               Готово
             </button>
@@ -357,7 +357,7 @@ function ChoiceButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-14 min-w-0 items-center justify-center gap-2 rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-70 sm:text-lg"
+      className="flex h-14 min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-70 dark:hover:bg-stroke sm:text-lg"
     >
       {icon === 'left' && <Icon className="h-4 w-4 text-foreground/50" aria-hidden="true" />}
       <span className="truncate">{label}</span>

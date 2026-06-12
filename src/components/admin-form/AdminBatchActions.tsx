@@ -31,13 +31,13 @@ export default function AdminBatchActions({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="mb-3 space-y-2 rounded-lg border border-stroke bg-surface p-2">
-      <div className="flex items-center gap-1 text-xs font-semibold text-foreground/80">
+    <div className="mb-3 space-y-2 rounded-xl border border-stroke bg-surface p-2.5">
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground/80">
         <span className="tabular-nums">Выбрано: {selectedCount}</span>
         <span className="relative inline-flex">
           <button
             type="button"
-            className="group inline-flex size-6 items-center justify-center rounded-full border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="group inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             aria-label="Подсказка по массовым действиям"
           >
             i
@@ -53,7 +53,7 @@ export default function AdminBatchActions({
             type="button"
             onClick={onApplyStatus}
             disabled={batchSaving}
-            className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
+            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Применить статус
           </button>
@@ -66,7 +66,7 @@ export default function AdminBatchActions({
             type="button"
             onClick={onApplyActivity}
             disabled={batchSaving}
-            className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
+            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Применить активность
           </button>
@@ -80,7 +80,7 @@ export default function AdminBatchActions({
           <button
             type="button"
             onClick={onToggleMore}
-            className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke disabled:opacity-60"
+            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Параметры
           </button>
@@ -92,7 +92,7 @@ export default function AdminBatchActions({
           <button
             type="button"
             onClick={onClearSelection}
-            className="h-full w-full rounded-md border border-stroke bg-surface-strong px-2 py-1 text-xs font-medium text-foreground/80 hover:bg-stroke"
+            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             Снять выделение
           </button>

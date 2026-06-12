@@ -57,7 +57,7 @@ export default function AdminQualityInspector({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
-          <p className="mt-0.5 text-xs leading-5 text-foreground/55">
+          <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/55">
             Блокеры, предупреждения и разбор quick-слоя.
           </p>
         </div>
@@ -95,7 +95,7 @@ export default function AdminQualityInspector({
           <button
             type="button"
             onClick={normalizeHiddenCharacters}
-            className="mt-2 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-400/10"
+            className="mt-2 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition-[background-color,border-color,transform] duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:border-amber-400/30 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-400/10"
           >
             Normalize hidden chars
           </button>
@@ -171,7 +171,7 @@ function QualityCheckRow({
           : Info;
 
   return (
-    <div className="grid grid-cols-[1rem_minmax(0,1fr)] gap-2 text-xs leading-5">
+    <div className="grid grid-cols-[1rem_minmax(0,1fr)] gap-2 rounded-lg px-1 py-1 text-xs leading-5 transition-colors duration-150 ease-out hover:bg-stroke/70 dark:hover:bg-stroke/70">
       <Icon className={`mt-0.5 h-3.5 w-3.5 ${levelColor(check.level)}`} />
       <div className="min-w-0">
         <div className="flex items-start justify-between gap-2">
@@ -180,13 +180,13 @@ function QualityCheckRow({
             <button
               type="button"
               onClick={() => onOpenTarget(check.targetId!)}
-              className="shrink-0 rounded-md border border-stroke px-1.5 py-0.5 text-[10px] font-semibold text-foreground/55 transition hover:bg-surface hover:text-foreground"
+              className="shrink-0 rounded-md border border-stroke px-1.5 py-0.5 text-[10px] font-semibold text-foreground/55 transition-[background-color,color,transform] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
             >
               Open
             </button>
           ) : null}
         </div>
-        {check.detail ? <div className="text-foreground/50">{check.detail}</div> : null}
+        {check.detail ? <div className="text-pretty text-foreground/50">{check.detail}</div> : null}
       </div>
     </div>
   );

@@ -146,7 +146,7 @@ export default function WordSearchCard({
   };
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
       <div className="mb-3 overflow-auto rounded-lg border border-stroke bg-surface p-2 touch-none select-none">
         <div className="grid w-max gap-1 touch-none select-none" style={{ gridTemplateColumns: `repeat(${cols}, minmax(32px, 1fr))` }}>
           {exercise.payload.grid.flatMap((row, r) =>
@@ -174,12 +174,12 @@ export default function WordSearchCard({
                     }
                   }}
                   disabled={disabled}
-                  className={`flex h-10 w-10 select-none items-center justify-center rounded border text-sm font-semibold transition ${
+                  className={`flex size-10 select-none items-center justify-center rounded border text-sm font-semibold transition-[background-color,border-color,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     inDrag
                       ? 'border-blue-500 bg-blue-100 text-blue-900'
                       : inFound
                         ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                        : 'border-stroke bg-surface-strong text-foreground'
+                        : 'border-stroke bg-surface-strong text-foreground hover:bg-stroke dark:hover:bg-stroke'
                   }`}
                 >
                   {cell}
@@ -217,7 +217,7 @@ export default function WordSearchCard({
             setFoundWords([]);
             setFoundPaths([]);
           }}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-foreground/80 transition hover:bg-surface disabled:opacity-50"
+          className="rounded-xl border border-stroke bg-surface-strong px-4 py-2 text-sm font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить найденное
         </button>
@@ -227,7 +227,7 @@ export default function WordSearchCard({
         whileTap={!disabled && foundWords.length > 0 ? { scale: 0.96 } : {}}
         disabled={disabled || foundWords.length === 0}
         onClick={submit}
-        className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+        className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
       >
         Проверить
       </motion.button>

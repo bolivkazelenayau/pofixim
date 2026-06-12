@@ -206,7 +206,7 @@ export default function DictationCard({ exercise }: Props) {
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-3 shadow-sm">
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-3 shadow-sm">
       <audio
         ref={audioRef}
         src={exercise.payload.audioSrc}
@@ -222,12 +222,12 @@ export default function DictationCard({ exercise }: Props) {
         onEnded={() => setIsPlaying(false)}
       />
 
-      <div className="rounded-2xl border border-stroke bg-surface px-3 py-3 text-foreground shadow-sm">
+      <div className="rounded-xl border border-stroke bg-surface px-3 py-3 text-foreground shadow-sm">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={togglePlayback}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm transition hover:bg-primary-strong"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98]"
             aria-label={isPlaying ? 'Пауза' : 'Слушать'}
             aria-pressed={isPlaying}
             title={isPlaying ? 'Пауза' : 'Слушать'}
@@ -308,7 +308,7 @@ export default function DictationCard({ exercise }: Props) {
                 return (
                   <span
                     key={`${index}-${height}`}
-                    className={`${index % 2 === 1 ? 'hidden md:block' : 'block'} w-px min-w-px flex-1 rounded-full transition ${
+                    className={`${index % 2 === 1 ? 'hidden md:block' : 'block'} w-px min-w-px flex-1 rounded-full transition-colors duration-150 ease-out ${
                       active ? 'bg-primary' : 'bg-foreground/18'
                     }`}
                     style={{ height: waveformBarHeight(height) }}
@@ -327,7 +327,7 @@ export default function DictationCard({ exercise }: Props) {
           <button
             type="button"
             onClick={restart}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stroke bg-surface-strong px-2.5 py-1.5 text-xs font-bold text-foreground/80 transition hover:bg-stroke"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stroke bg-surface-strong px-2.5 py-1.5 text-xs font-bold text-foreground/80 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
             Заново
@@ -344,10 +344,10 @@ export default function DictationCard({ exercise }: Props) {
                 type="button"
                 onClick={() => setRate(item)}
                 aria-pressed={rate === item}
-                className={`rounded-md px-2 py-1 text-xs font-black transition ${
+                className={`rounded-md px-2 py-1 text-xs font-black transition-[background-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   rate === item
                     ? 'bg-primary text-white'
-                    : 'text-foreground/80 hover:bg-stroke'
+                    : 'text-foreground/80 hover:bg-stroke dark:hover:bg-stroke'
                 }`}
               >
                 {item}x

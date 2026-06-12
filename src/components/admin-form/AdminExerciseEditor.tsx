@@ -132,7 +132,7 @@ function AdminExerciseEditorSkeleton() {
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-stroke bg-surface p-4">
+        <aside className="rounded-xl border border-stroke bg-surface p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <EditorSkeletonBlock className="h-5 w-28" />
             <EditorSkeletonBlock className="h-8 w-28 rounded-lg" />
@@ -196,7 +196,7 @@ export default function AdminExerciseEditor({
   return (
     <>
       <div
-        className="relative rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm"
+        className="relative rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm sm:p-5"
         aria-busy={isInitialSelectionLoading}
       >
         {isInitialSelectionLoading ? (

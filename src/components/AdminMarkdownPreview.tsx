@@ -95,7 +95,7 @@ export default function AdminMarkdownPreview() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5">
-      <div className="rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm">
+      <div className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-foreground">Markdown-превью</h2>
@@ -105,7 +105,7 @@ export default function AdminMarkdownPreview() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex cursor-pointer items-center rounded-lg border border-stroke bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-stroke">
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-stroke bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus-within:ring-2 focus-within:ring-primary/30 dark:hover:bg-stroke">
               Выбрать `.md`
               <input
                 ref={fileInputRef}
@@ -118,7 +118,7 @@ export default function AdminMarkdownPreview() {
             <button
               type="button"
               onClick={handleReset}
-              className="rounded-lg border border-stroke bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-stroke"
+              className="rounded-lg border border-stroke bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
             >
               Сбросить
             </button>
@@ -138,7 +138,7 @@ export default function AdminMarkdownPreview() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm">
+        <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Исходный markdown</h3>
             <span className="text-xs uppercase tracking-[0.18em] text-foreground/45">Editor</span>
@@ -149,11 +149,11 @@ export default function AdminMarkdownPreview() {
             onChange={(event) => setMarkdown(event.target.value)}
             onScroll={(event) => syncScroll('editor', event)}
             spellCheck={false}
-            className="min-h-[620px] w-full rounded-xl border border-stroke bg-surface px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary"
+            className="min-h-[620px] w-full rounded-xl border border-stroke bg-surface px-4 py-3 font-mono text-sm text-foreground outline-none transition-colors duration-150 ease-out focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </section>
 
-        <section className="rounded-2xl border border-stroke bg-surface-strong p-5 shadow-sm">
+        <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Превью</h3>
             <span className="text-xs uppercase tracking-[0.18em] text-foreground/45">Rendered</span>

@@ -15,11 +15,10 @@ export default function MultipleChoiceCard({
   onSubmit,
 }: MultipleChoiceCardProps) {
   return (
-    <div className="flex flex-col gap-2 w-full mt-2 mb-5">
+    <div className="mb-5 mt-2 flex w-full flex-col gap-2">
       {exercise.payload.options.map((option, idx) => (
         <motion.button
           key={`${exercise.id}-${idx}`}
-          whileHover={!disabled ? { scale: 1.01 } : {}}
           whileTap={!disabled ? { scale: 0.96 } : {}}
           onClick={() =>
             onSubmit(
@@ -28,7 +27,7 @@ export default function MultipleChoiceCard({
             )
           }
           disabled={disabled}
-          className="w-full text-left px-5 py-3.5 rounded-xl border border-stroke bg-surface-strong hover:bg-surface disabled:opacity-60 disabled:hover:bg-white text-foreground/80 shadow-sm font-medium transition-[background-color,border-color,color,box-shadow]"
+          className="w-full rounded-xl border border-stroke bg-surface-strong px-4 py-3.5 text-left font-medium text-foreground/80 shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong sm:px-5"
         >
           {option}
         </motion.button>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { Timer, Trophy, X, Zap } from 'lucide-react';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
 
 type BlitzDuration = 30 | 60 | 120;
@@ -206,8 +207,24 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [answer, finish, status]);
 
+  const handleDialogOpenChange = (open: boolean) => {
+    if (open) return;
+    if (status === 'running') {
+      finish();
+      return;
+    }
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:px-3 sm:py-4">
+    <DialogPrimitive.Root open onOpenChange={handleDialogOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4">
+          <DialogPrimitive.Title className="sr-only">Блиц</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            Быстрый режим тренировки: выберите длительность, отвечайте стрелками или кнопками, Escape завершает раунд.
+          </DialogPrimitive.Description>
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -215,14 +232,12 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[22px] ${
           status === 'running' ? 'min-h-[68svh] sm:min-h-0' : ''
         }`}
-        role="dialog"
-        aria-modal="true"
         aria-label="Блиц"
       >
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-full border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition hover:text-foreground"
+          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
           aria-label="Close blitz"
           title="Закрыть"
         >
@@ -249,10 +264,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                   key={item}
                   type="button"
                   onClick={() => setDuration(item)}
-                  className={`h-12 rounded-xl border text-sm font-bold transition ${
+                  className={`h-12 rounded-xl border text-sm font-bold transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     duration === item
                       ? 'border-primary bg-primary text-white shadow-sm'
-                      : 'border-[var(--stroke)] bg-[var(--surface)] text-foreground hover:border-primary/60'
+                      : 'border-[var(--stroke)] bg-[var(--surface)] text-foreground hover:border-primary/60 hover:bg-stroke dark:hover:bg-stroke'
                   }`}
                 >
                   {item === 60 ? '1 мин' : item === 120 ? '2 мин' : `${item} сек`}
@@ -264,7 +279,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               type="button"
               onClick={start}
               disabled={cards.length === 0}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
             >
               <Timer className="h-5 w-5" />
               Старт
@@ -290,10 +305,9 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
             </div>
 
             <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[var(--stroke)] sm:mb-4 sm:h-2">
-              <motion.div
-                className="h-full rounded-full bg-primary"
-                animate={{ width: `${Math.max(0, progress) * 100}%` }}
-                transition={{ duration: 0.12 }}
+              <div
+                className="h-full origin-left rounded-full bg-primary transition-transform duration-100 ease-linear"
+                style={{ transform: `scaleX(${Math.max(0, progress)})` }}
               />
             </div>
 
@@ -328,7 +342,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                       {card.contextHint}
                     </div>
                   )}
-                  <div className="mb-auto mt-12 h-[74px] w-full max-w-[286px] rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)]/75 shadow-sm sm:mb-0 sm:mt-6 sm:h-7 sm:max-w-none sm:rounded-full" />
+                  <div className="mb-auto mt-12 h-[74px] w-full max-w-[286px] rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)]/75 shadow-sm sm:mb-0 sm:mt-6 sm:h-7 sm:max-w-none sm:rounded-full" />
                 </motion.div>
               ))}
               <motion.div
@@ -392,7 +406,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                       {currentCard.contextHint}
                     </div>
                   )}
-                  <div className="mb-auto mt-12 flex min-h-[74px] w-full max-w-[286px] flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold leading-5 text-foreground/55 shadow-sm sm:mb-0 sm:mt-6 sm:min-h-0 sm:max-w-none sm:rounded-full sm:px-3 sm:py-1">
+                  <div className="mb-auto mt-12 flex min-h-[74px] w-full max-w-[286px] flex-col items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold leading-5 text-foreground/55 shadow-sm sm:mb-0 sm:mt-6 sm:min-h-0 sm:max-w-none sm:rounded-full sm:px-3 sm:py-1">
                     <span className="sm:hidden">Свайпни карточку</span>
                     <span className="sm:hidden">или выбери</span>
                     <span className="sm:hidden">букву ниже</span>
@@ -405,7 +419,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(0)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96]"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[0]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
@@ -415,7 +429,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(1)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition hover:border-primary/60 hover:bg-primary/5 active:scale-[0.96]"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[1]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
@@ -455,14 +469,16 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
             <button
               type="button"
               onClick={onClose}
-              className="h-12 w-full rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition hover:bg-primary-strong"
+              className="h-12 w-full rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98]"
             >
               Продолжить
             </button>
           </div>
         )}
       </motion.div>
-    </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

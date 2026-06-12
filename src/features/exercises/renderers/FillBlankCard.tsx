@@ -43,7 +43,7 @@ export default function FillBlankCard({
     return (
       <div
         className={cn(
-          'mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm',
+          'mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm',
           beforeLayout.centered && 'text-center',
         )}
       >
@@ -61,12 +61,12 @@ export default function FillBlankCard({
             disabled={disabled}
             onChange={(event) => setAnswerValue(event.target.value)}
             placeholder="Введите цифры: 1467 или 1,4,6,7"
-            className="h-11 w-full rounded-xl border border-stroke bg-surface px-3 text-sm text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-11 w-full rounded-xl border border-stroke bg-surface px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={!canSubmit}
-            className="h-11 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-11 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-sm transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
           >
             Проверить
           </button>
@@ -76,7 +76,7 @@ export default function FillBlankCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-2xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
       <div
         className={cn(
           'flex flex-wrap items-center gap-2 text-xl font-semibold leading-tight text-foreground sm:text-2xl',

@@ -91,11 +91,11 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
       className={`${last ? 'mb-4' : 'mb-1'} flex w-full ${isBot ? 'justify-start' : 'justify-end'}`}
     >
       <div
-        className={`relative max-w-[88%] rounded-2xl px-5 py-3 shadow-sm before:pointer-events-none after:pointer-events-none [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-[14px] leading-[1.78] tracking-[0.025em]' : 'text-[15px] leading-[1.65]'} ${bubbleClasses}`}
+        className={`relative max-w-[92%] rounded-2xl px-4 py-3 shadow-sm before:pointer-events-none after:pointer-events-none sm:max-w-[88%] sm:px-5 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-pretty text-[14px] leading-[1.78]' : 'text-pretty text-[15px] leading-[1.65]'} ${bubbleClasses}`}
       >
         {sections ? (
           <div className="space-y-3">

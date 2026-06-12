@@ -165,6 +165,7 @@ export default function ChatContainer() {
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
+  const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
   const globalInputRef = useRef<HTMLTextAreaElement>(null);
   const blitz = useBlitzGame();
   const ege13Quick = useEge13QuickGame();
@@ -215,6 +216,10 @@ export default function ChatContainer() {
         );
       });
   const showSlashCommands = slashCommandQuery !== null && visibleSlashCommands.length > 0;
+  const activeSlashCommand =
+    showSlashCommands
+      ? visibleSlashCommands[Math.min(activeSlashCommandIndex, visibleSlashCommands.length - 1)]
+      : null;
 
   const supportsGlobalInput =
     activeExerciseMessage &&
@@ -604,7 +609,7 @@ export default function ChatContainer() {
   ]);
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-lg sm:h-[calc(100dvh-2rem)]">
+    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-sm sm:h-[calc(100dvh-2rem)]">
       <AnimatePresence initial={false}>
         {blitz.isOpen && (
           <BlitzGame cards={blitz.cards} onClose={blitz.close} onFinish={blitz.onFinish} />
@@ -617,41 +622,40 @@ export default function ChatContainer() {
         )}
       </AnimatePresence>
 
-      <div className="z-10 flex h-[68px] shrink-0 items-center justify-between border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-base font-bold text-white">
+      <div className="z-10 grid min-h-[68px] shrink-0 grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-base font-bold text-white">
             П
           </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-balance text-lg font-bold leading-tight text-foreground">
               Пофиксим
             </h1>
-            <p className="text-xs font-medium text-primary">Тренируемся вместе</p>
+            <p className="truncate text-xs font-medium text-primary">Тренируемся вместе</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5 shadow-sm">
-          <div className="flex min-w-14 items-center gap-1 text-sm font-semibold tabular-nums text-foreground/80">
-            <span>Очки:</span>
+        <div className="grid grid-cols-[auto_auto_auto] items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1.5 shadow-sm sm:grid-cols-[auto_auto_auto_auto] sm:gap-3 sm:px-3">
+          <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-14">
+            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/45">Очки</span>
             {hasHydrated ? (
-              <span>{score}</span>
+              <span className="text-sm font-bold leading-none text-foreground/85">{score}</span>
             ) : (
-              <span className="h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
+              <span className="ml-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
             )}
           </div>
           <div className="h-4 w-px bg-[var(--stroke)]" />
-          <div className="flex min-w-16 items-center gap-1 text-sm font-semibold tabular-nums text-orange-600">
-            <span>Серия:</span>
+          <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-16">
+            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/45">Серия</span>
             {hasHydrated ? (
-              <span>{streak}</span>
+              <span className="text-sm font-bold leading-none text-orange-600">{streak}</span>
             ) : (
-              <span className="h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
+              <span className="ml-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
             )}
           </div>
-          <div className="h-4 w-px bg-[var(--stroke)]" />
           <button
             onClick={handleResetProgress}
             disabled={!hasHydrated}
-            className="rounded-md px-2 py-1 text-xs font-medium text-foreground/70 transition hover:bg-[var(--stroke)] hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            className="hidden rounded-md px-2 py-1 text-xs font-medium text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:block"
             title="Начать заново"
           >
             Сброс
@@ -659,7 +663,7 @@ export default function ChatContainer() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto chat-pattern-bg p-5">
+      <div className="flex-1 overflow-y-auto chat-pattern-bg px-3 py-4 sm:p-5">
         {hasHydrated ? (
           <AnimatePresence initial={false}>
             {messages.map((msg, index) => {
@@ -712,7 +716,7 @@ export default function ChatContainer() {
         <div ref={bottomRef} className="h-4" />
       </div>
 
-      <div className="shrink-0 border-t border-[var(--stroke)] bg-[var(--surface-strong)] p-4">
+      <div className="shrink-0 border-t border-[var(--stroke)] bg-[var(--surface-strong)] p-3 sm:p-4">
         {!hasHydrated ? (
           <div className="flex h-11 w-full items-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4" aria-hidden="true">
             <div className="h-4 w-64 max-w-full rounded bg-[var(--stroke)]" />
@@ -726,23 +730,29 @@ export default function ChatContainer() {
                   initial={{ opacity: 0, y: 8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
                   role="listbox"
+                  aria-activedescendant={activeSlashCommand ? `slash-command-${activeSlashCommand.command.slice(1)}` : undefined}
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
-                  {visibleSlashCommands.map((item) => {
+                  {visibleSlashCommands.map((item, index) => {
                     const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : item.command === '/ege13_quick' || item.command === '/ege15_quick' || item.command.startsWith('/punctuation') || item.command.startsWith('/orthography') ? PenTool : RotateCcw;
+                    const isActive = index === activeSlashCommandIndex;
                     return (
                       <button
+                        id={`slash-command-${item.command.slice(1)}`}
                         key={item.command}
                         type="button"
                         role="option"
-                        aria-selected="false"
+                        aria-selected={isActive}
+                        onMouseEnter={() => setActiveSlashCommandIndex(index)}
                         onMouseDown={(event) => {
                           event.preventDefault();
                           runSlashCommand(item.command);
                         }}
-                        className="flex w-full items-center gap-3 border-b border-[var(--stroke)] px-3 py-2.5 text-left transition last:border-b-0 hover:bg-[var(--surface)]"
+                        className={`flex w-full items-center gap-3 border-b border-[var(--stroke)] px-3 py-2.5 text-left transition-colors duration-150 ease-out last:border-b-0 focus:outline-none focus-visible:bg-[var(--surface)] ${
+                          isActive ? 'bg-[var(--surface)]' : 'hover:bg-[var(--surface)]'
+                        }`}
                       >
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
                           <Icon className="h-4 w-4" aria-hidden="true" />
@@ -752,7 +762,7 @@ export default function ChatContainer() {
                             <span className="font-mono">{item.command}</span>
                             <span className="ml-2 text-foreground/55">{item.title}</span>
                           </span>
-                          <span className="block truncate text-xs font-medium text-foreground/55">
+                          <span className="block truncate text-pretty text-xs font-medium text-foreground/55">
                             {item.description}
                           </span>
                         </span>
@@ -767,10 +777,11 @@ export default function ChatContainer() {
               <button
                 type="button"
                 onClick={() => {
+                  setActiveSlashCommandIndex(0);
                   setGlobalInputValue(prev => prev.startsWith('/') ? '' : '/');
                   globalInputRef.current?.focus();
                 }}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition hover:bg-[var(--stroke)] hover:text-foreground"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
                 aria-label="Open command menu"
                 aria-expanded={showSlashCommands}
                 aria-controls="slash-command-list"
@@ -782,10 +793,40 @@ export default function ChatContainer() {
                 ref={globalInputRef}
                 rows={1}
                 value={globalInputValue}
-                onChange={(e) => setGlobalInputValue(e.target.value)}
+                onChange={(e) => {
+                  setActiveSlashCommandIndex(0);
+                  setGlobalInputValue(e.target.value);
+                }}
                 onKeyDown={(event) => {
+                  if (showSlashCommands && visibleSlashCommands.length > 0) {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setActiveSlashCommandIndex((current) =>
+                        (current + 1) % visibleSlashCommands.length,
+                      );
+                      return;
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setActiveSlashCommandIndex((current) =>
+                        (current - 1 + visibleSlashCommands.length) % visibleSlashCommands.length,
+                      );
+                      return;
+                    }
+                    if (event.key === 'Tab') {
+                      event.preventDefault();
+                      if (activeSlashCommand) runSlashCommand(activeSlashCommand.command);
+                      return;
+                    }
+                    if (event.key === 'Enter' && !event.shiftKey && activeSlashCommand) {
+                      event.preventDefault();
+                      runSlashCommand(activeSlashCommand.command);
+                      return;
+                    }
+                  }
                   if (event.key === 'ArrowUp' && !globalInputValue.trim()) {
                     event.preventDefault();
+                    setActiveSlashCommandIndex(0);
                     setGlobalInputValue('/');
                     return;
                   }
@@ -795,14 +836,14 @@ export default function ChatContainer() {
                   }
                 }}
                 placeholder={supportsGlobalInput ? 'Ваш ответ...' : 'Написать сообщение...'}
-                className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm leading-5 text-foreground outline-none transition placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
+                className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-pretty text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
                 aria-label={supportsGlobalInput ? 'Exercise answer' : 'Message or command'}
                 autoFocus
               />
               <button
                 type="submit"
                 disabled={!globalInputValue.trim()}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:bg-primary-strong disabled:opacity-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:opacity-50 disabled:active:scale-100"
                 aria-label="Send"
                 title="Отправить"
               >

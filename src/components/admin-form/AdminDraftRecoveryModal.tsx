@@ -16,10 +16,10 @@ export default function AdminDraftRecoveryModal({
   <DialogPrimitive.Root open>
    <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-900/60" />
-    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[2rem] border border-stroke/50 bg-surface-strong text-foreground shadow-xl outline-none">
+    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-stroke/50 bg-surface-strong text-foreground shadow-sm outline-none">
      <div className="border-b border-stroke/50 bg-surface/30 p-6">
       <div className="flex items-center gap-4">
-       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 shadow-sm">
+       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 shadow-sm">
         <History className="h-6 w-6" aria-hidden="true" />
        </div>
        <div>
@@ -39,14 +39,14 @@ export default function AdminDraftRecoveryModal({
       <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
        <button
         type="button"
-        className="rounded-xl border border-stroke/60 bg-surface px-4 py-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-stroke/40 hover:text-foreground"
+        className="rounded-xl border border-stroke/60 bg-surface px-4 py-3 text-sm font-semibold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
         onClick={onUseDatabaseVersion}
        >
         Использовать версию из БД
        </button>
        <button
         type="button"
-        className="rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-md shadow-primary/20 transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong hover:shadow-primary/30 active:scale-[0.96]"
+        className="rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
         onClick={onUseRecoveredDraft}
        >
         Восстановить изменения
