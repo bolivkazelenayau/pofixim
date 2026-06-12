@@ -35,7 +35,7 @@ export default function AdminPreviewPanel({
    <div className="mb-3 flex items-start justify-between gap-3">
     <div>
      <h3 className="text-sm font-semibold text-foreground">Превью в чате</h3>
-     <p className="mt-0.5 text-xs leading-5 text-foreground/55">
+     <p className="mt-0.5 text-xs leading-5 text-foreground/70">
       Проверка того, как задание увидит ученик.
      </p>
     </div>
@@ -86,7 +86,7 @@ export default function AdminPreviewPanel({
         value={previewDictationText}
         onChange={(event) => onPreviewDictationTextChange(event.target.value)}
         placeholder="Введите услышанный текст для проверки..."
-        className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
+        className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/55 focus:border-primary focus:ring-1 focus:ring-primary"
        />
        <button
         type="submit"
@@ -134,7 +134,7 @@ export default function AdminPreviewPanel({
    ) : (
     <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4">
      <div className="text-sm font-semibold text-foreground">Превью появится здесь</div>
-     <p className="mt-1 text-pretty text-xs leading-5 text-foreground/55">
+     <p className="mt-1 text-pretty text-xs leading-5 text-foreground/70">
       Заполните формулировку, ответ и объяснение, чтобы проверить карточку перед сохранением.
      </p>
     </div>

@@ -101,6 +101,8 @@ export type AdminFormProps = {
   initialTotalItems?: number | null;
   initialSelectedId?: number | null;
   initialSelectedExercise?: Record<string, unknown> | null;
+  initialSortBy?: ExerciseListSortBy;
+  initialSortDir?: 'asc' | 'desc';
 };
 
 export type DraftRecoveryState = {

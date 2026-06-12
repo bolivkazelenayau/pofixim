@@ -636,7 +636,7 @@ export default function ChatContainer() {
         </div>
         <div className="grid grid-cols-[auto_auto_auto] items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1.5 shadow-sm sm:grid-cols-[auto_auto_auto_auto] sm:gap-3 sm:px-3">
           <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-14">
-            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/45">Очки</span>
+            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Очки</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-foreground/85">{score}</span>
             ) : (
@@ -645,7 +645,7 @@ export default function ChatContainer() {
           </div>
           <div className="h-4 w-px bg-[var(--stroke)]" />
           <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-16">
-            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/45">Серия</span>
+            <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Серия</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-orange-600">{streak}</span>
             ) : (

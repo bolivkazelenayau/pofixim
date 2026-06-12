@@ -63,7 +63,7 @@ export default function AdminMetaFields({
        }))
       }
      >
-      <SelectTrigger className={inputClass}>
+      <SelectTrigger className={inputClass} aria-label="Quality status">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -82,7 +82,7 @@ export default function AdminMetaFields({
        setForm((current) => ({ ...current, isActive: value === 'active' }))
       }
      >
-      <SelectTrigger className={inputClass}>
+      <SelectTrigger className={inputClass} aria-label="Exercise activity">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>

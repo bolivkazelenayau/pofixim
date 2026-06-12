@@ -23,7 +23,7 @@ export default function AdminEge21Fields({ form, setForm }: AdminEge21FieldsProp
             }))
           }
         >
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger className={inputClass} aria-label="Target punctuation">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

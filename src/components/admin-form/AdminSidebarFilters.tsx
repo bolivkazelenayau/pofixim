@@ -104,7 +104,7 @@ export default function AdminSidebarFilters({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Select value={listTypeFilter} onValueChange={onListTypeFilterChange}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger className={inputClass} aria-label="Filter by exercise type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -116,7 +116,7 @@ export default function AdminSidebarFilters({
           </SelectContent>
         </Select>
         <Select value={listExamTypeFilter} onValueChange={onListExamTypeFilterChange}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger className={inputClass} aria-label="Filter by exam type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -130,7 +130,7 @@ export default function AdminSidebarFilters({
       </div>
       <div className="grid grid-cols-1 gap-2">
         <Select value={listStatusFilter} onValueChange={onListStatusFilterChange}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger className={inputClass} aria-label="Filter by quality status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -144,7 +144,7 @@ export default function AdminSidebarFilters({
         </Select>
       </div>
       <div>
-        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-foreground/50">
+        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-foreground/65">
           <span className="uppercase tracking-wider">Сортировка</span>
           {sortPrefsReady && (listSortBy !== 'id' || listSortDir !== 'asc') && (
             <button
@@ -153,7 +153,7 @@ export default function AdminSidebarFilters({
                 onListSortByChange('id');
                 onListSortDirChange('asc');
               }}
-              className="group relative flex items-center gap-1 hover:text-foreground"
+              className="group relative flex items-center gap-1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               <X className="h-3 w-3" />
               Сбросить
@@ -172,7 +172,7 @@ export default function AdminSidebarFilters({
                   onListSortByChange(value as typeof listSortBy)
                 }
               >
-                <SelectTrigger className={inputClass}>
+                <SelectTrigger className={inputClass} aria-label="Sort exercise list by">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,6 +185,7 @@ export default function AdminSidebarFilters({
               <button
                 type="button"
                 onClick={() => onListSortDirChange(listSortDir === 'asc' ? 'desc' : 'asc')}
+                aria-label="Toggle sort direction"
                 className="group relative flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}

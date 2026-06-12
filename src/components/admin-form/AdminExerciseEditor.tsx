@@ -1,21 +1,9 @@
 'use client';
 
-import type { FormEvent } from 'react';
-import AdminChoiceFields from '@/components/admin-form/AdminChoiceFields';
+import dynamic from 'next/dynamic';
+import { useEffect, useState, type FormEvent } from 'react';
 import AdminCoreFields from '@/components/admin-form/AdminCoreFields';
-import AdminDictationFields from '@/components/admin-form/AdminDictationFields';
-import AdminEge20Fields from '@/components/admin-form/AdminEge20Fields';
-import AdminEge21Fields from '@/components/admin-form/AdminEge21Fields';
-import AdminFillBlankFields from '@/components/admin-form/AdminFillBlankFields';
 import AdminMetaFields from '@/components/admin-form/AdminMetaFields';
-import AdminOrderFragmentsFields from '@/components/admin-form/AdminOrderFragmentsFields';
-import AdminOrthographyRepairFields from '@/components/admin-form/AdminOrthographyRepairFields';
-import AdminPreviewPanel from '@/components/admin-form/AdminPreviewPanel';
-import AdminPunctuationConstructorFields from '@/components/admin-form/AdminPunctuationConstructorFields';
-import AdminPunctuationInsertFields from '@/components/admin-form/AdminPunctuationInsertFields';
-import AdminQualityInspector from '@/components/admin-form/AdminQualityInspector';
-import AdminWordBankClozeFields from '@/components/admin-form/AdminWordBankClozeFields';
-import AdminWordSearchFields from '@/components/admin-form/AdminWordSearchFields';
 import AdminDraftRecoveryModal from '@/components/admin-form/AdminDraftRecoveryModal';
 import AdminEditorHeader from '@/components/admin-form/AdminEditorHeader';
 import AdminMessageToast from '@/components/admin-form/AdminMessageToast';
@@ -87,8 +75,109 @@ type TypeSpecificFieldsProps = {
   setForm: React.Dispatch<React.SetStateAction<Form>>;
 };
 
+const typeFieldLoading = () => <EditorSkeletonBlock className="mt-3 h-32 rounded-lg" />;
+
+const AdminChoiceFields = dynamic(() => import('@/components/admin-form/AdminChoiceFields'), {
+  loading: typeFieldLoading,
+});
+const AdminDictationFields = dynamic(() => import('@/components/admin-form/AdminDictationFields'), {
+  loading: typeFieldLoading,
+});
+const AdminEge20Fields = dynamic(() => import('@/components/admin-form/AdminEge20Fields'), {
+  loading: typeFieldLoading,
+});
+const AdminEge21Fields = dynamic(() => import('@/components/admin-form/AdminEge21Fields'), {
+  loading: typeFieldLoading,
+});
+const AdminFillBlankFields = dynamic(() => import('@/components/admin-form/AdminFillBlankFields'), {
+  loading: typeFieldLoading,
+});
+const AdminOrderFragmentsFields = dynamic(() => import('@/components/admin-form/AdminOrderFragmentsFields'), {
+  loading: typeFieldLoading,
+});
+const AdminOrthographyRepairFields = dynamic(() => import('@/components/admin-form/AdminOrthographyRepairFields'), {
+  loading: typeFieldLoading,
+});
+const AdminPunctuationConstructorFields = dynamic(() => import('@/components/admin-form/AdminPunctuationConstructorFields'), {
+  loading: typeFieldLoading,
+});
+const AdminPunctuationInsertFields = dynamic(() => import('@/components/admin-form/AdminPunctuationInsertFields'), {
+  loading: typeFieldLoading,
+});
+const AdminWordBankClozeFields = dynamic(() => import('@/components/admin-form/AdminWordBankClozeFields'), {
+  loading: typeFieldLoading,
+});
+const AdminWordSearchFields = dynamic(() => import('@/components/admin-form/AdminWordSearchFields'), {
+  loading: typeFieldLoading,
+});
+const AdminPreviewPanel = dynamic(() => import('@/components/admin-form/AdminPreviewPanel'), {
+  loading: () => <PreviewPanelShell />,
+});
+const AdminQualityInspector = dynamic(() => import('@/components/admin-form/AdminQualityInspector'), {
+  loading: () => <QualityInspectorShell />,
+});
+
 function EditorSkeletonBlock({ className = '' }: { className?: string }) {
   return <div className={`rounded-md bg-foreground/10 ${className}`} />;
+}
+
+function useIdleReady() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(() => setReady(true), { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = globalThis.setTimeout(() => setReady(true), 1800);
+    return () => globalThis.clearTimeout(id);
+  }, [ready]);
+
+  return ready;
+}
+
+function PreviewPanelShell() {
+  return (
+    <section className="h-fit rounded-xl border border-stroke bg-surface-strong p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Превью в чате</h3>
+          <p className="mt-0.5 text-xs leading-5 text-foreground/70">
+            Проверка того, как задание увидит ученик.
+          </p>
+        </div>
+        <EditorSkeletonBlock className="h-8 w-28 rounded-lg" />
+      </div>
+      <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4">
+        <div className="text-sm font-semibold text-foreground">Превью появится здесь</div>
+        <p className="mt-1 text-pretty text-xs leading-5 text-foreground/70">
+          Заполните формулировку, ответ и объяснение, чтобы проверить карточку перед сохранением.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function QualityInspectorShell() {
+  return (
+    <section className="rounded-xl border border-stroke bg-surface-strong p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
+          <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/70">
+            Блокеры, предупреждения и разбор quick-слоя.
+          </p>
+        </div>
+        <EditorSkeletonBlock className="h-7 w-16 rounded-md" />
+      </div>
+      <div className="space-y-1.5" aria-hidden="true">
+        <EditorSkeletonBlock className="h-7 rounded-lg" />
+        <EditorSkeletonBlock className="h-7 rounded-lg" />
+        <EditorSkeletonBlock className="h-7 rounded-lg" />
+      </div>
+    </section>
+  );
 }
 
 function AdminExerciseEditorSkeleton() {
@@ -190,6 +279,10 @@ export default function AdminExerciseEditor({
   actions,
 }: AdminExerciseEditorProps) {
   const { form, formRef, mainSaveAnchorRef, setForm, typeOptions } = formState;
+  const idleReady = useIdleReady();
+  const previewHasContent = Boolean(
+    previewState.preview.error || previewState.checkResult || previewState.dictationText.trim(),
+  );
   const isInitialSelectionLoading =
     recovery.initialSelectionPending && !recovery.initialSelectedExercise;
 
@@ -246,22 +339,30 @@ export default function AdminExerciseEditor({
           </form>
 
           <aside className="space-y-3 2xl:sticky 2xl:top-4">
-            <AdminPreviewPanel
-              preview={previewState.preview}
-              previewMode={previewState.mode}
-              previewCheckResult={previewState.checkResult}
-              previewFeedbackSections={previewState.feedbackSections}
-              previewDictationText={previewState.dictationText}
-              onPreviewModeChange={actions.onPreviewModeChange}
-              onPreviewSubmit={actions.onPreviewSubmit}
-              onPreviewDictationSubmit={actions.onPreviewDictationSubmit}
-              onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
-            />
-            <AdminQualityInspector
-              form={form}
-              setForm={setForm}
-              preview={previewState.preview}
-            />
+            {idleReady || previewHasContent ? (
+              <AdminPreviewPanel
+                preview={previewState.preview}
+                previewMode={previewState.mode}
+                previewCheckResult={previewState.checkResult}
+                previewFeedbackSections={previewState.feedbackSections}
+                previewDictationText={previewState.dictationText}
+                onPreviewModeChange={actions.onPreviewModeChange}
+                onPreviewSubmit={actions.onPreviewSubmit}
+                onPreviewDictationSubmit={actions.onPreviewDictationSubmit}
+                onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
+              />
+            ) : (
+              <PreviewPanelShell />
+            )}
+            {idleReady ? (
+              <AdminQualityInspector
+                form={form}
+                setForm={setForm}
+                preview={previewState.preview}
+              />
+            ) : (
+              <QualityInspectorShell />
+            )}
           </aside>
         </div>
           </>

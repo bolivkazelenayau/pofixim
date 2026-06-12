@@ -57,7 +57,7 @@ export default function AdminQualityInspector({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
-          <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/55">
+          <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/70">
             Блокеры, предупреждения и разбор quick-слоя.
           </p>
         </div>
@@ -107,11 +107,11 @@ export default function AdminQualityInspector({
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h4 className="text-xs font-semibold text-foreground">ЕГЭ 15 quick parse</h4>
-              <p className="mt-0.5 text-[11px] text-foreground/50">
+              <p className="mt-0.5 text-[11px] text-foreground/70">
                 {ege15Diagnostics.cards.length} cards · accepted {ege15Diagnostics.accepted || 'empty'}
               </p>
             </div>
-            <span className="font-mono text-[11px] text-foreground/45">
+            <span className="font-mono text-[11px] text-foreground/70">
               {ege15Diagnostics.positions.join(', ') || 'no positions'}
             </span>
           </div>
@@ -122,7 +122,7 @@ export default function AdminQualityInspector({
                   key={card.id}
                   className="grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-start gap-2 border-b border-stroke px-2.5 py-2 last:border-b-0"
                 >
-                  <span className="font-mono text-[11px] text-foreground/45">
+                  <span className="font-mono text-[11px] text-foreground/70">
                     {card.positionIndex ?? '-'}
                   </span>
                   <div className="min-w-0">
@@ -132,7 +132,7 @@ export default function AdminQualityInspector({
                       {card.after}
                     </div>
                     {card.explanationSnippet ? (
-                      <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-foreground/55">
+                      <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-foreground/70">
                         {card.explanationSnippet}
                       </div>
                     ) : null}
@@ -144,7 +144,7 @@ export default function AdminQualityInspector({
               ))}
             </div>
           ) : (
-            <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/55">
+            <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/70">
               Quick-карточки не собираются из текущего preview.
             </p>
           )}
@@ -180,13 +180,13 @@ function QualityCheckRow({
             <button
               type="button"
               onClick={() => onOpenTarget(check.targetId!)}
-              className="shrink-0 rounded-md border border-stroke px-1.5 py-0.5 text-[10px] font-semibold text-foreground/55 transition-[background-color,color,transform] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
+              className="shrink-0 rounded-md border border-stroke px-1.5 py-0.5 text-[10px] font-semibold text-foreground/70 transition-[background-color,color,transform] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
             >
               Open
             </button>
           ) : null}
         </div>
-        {check.detail ? <div className="text-pretty text-foreground/50">{check.detail}</div> : null}
+        {check.detail ? <div className="text-pretty text-foreground/70">{check.detail}</div> : null}
       </div>
     </div>
   );

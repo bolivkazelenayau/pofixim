@@ -107,7 +107,7 @@ export default function AdminBatchActions({
             value={batchStatus}
             onValueChange={(value) => onBatchStatusChange(value as typeof batchStatus)}
           >
-            <SelectTrigger className={inputClass}>
+            <SelectTrigger className={inputClass} aria-label="Batch quality status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -122,7 +122,7 @@ export default function AdminBatchActions({
             value={batchIsActive}
             onValueChange={(value) => onBatchIsActiveChange(value as typeof batchIsActive)}
           >
-            <SelectTrigger className={inputClass}>
+            <SelectTrigger className={inputClass} aria-label="Batch activity">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

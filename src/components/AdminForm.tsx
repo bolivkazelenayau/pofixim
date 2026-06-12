@@ -1,7 +1,7 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
-import AdminCommandPalette from '@/components/admin-form/AdminCommandPalette';
 import AdminEditorContainer from '@/components/admin-form/AdminEditorContainer';
 import AdminSidebarContainer from '@/components/admin-form/AdminSidebarContainer';
 import { EMPTY } from '@/components/admin-form/defaults';
@@ -12,11 +12,18 @@ import { useAdminEditorController } from '@/hooks/useAdminEditorController';
 import { useExerciseList } from '@/hooks/useExerciseList';
 import { EXERCISE_TYPES } from '@/features/exercises/types';
 
+const AdminCommandPalette = dynamic(
+  () => import('@/components/admin-form/AdminCommandPalette'),
+  { loading: () => null },
+);
+
 export default function AdminForm({
   initialItems = [],
   initialTotalItems,
   initialSelectedId = null,
   initialSelectedExercise = null,
+  initialSortBy = 'id',
+  initialSortDir = 'desc',
 }: AdminFormProps) {
   const [form, setForm] = useState<Form>(() => {
     if (initialSelectedId && initialSelectedExercise) {
@@ -59,7 +66,14 @@ export default function AdminForm({
     loadingMore,
     refreshList,
     loadMore,
-  } = useExerciseList({ initialItems, initialTotalItems, setIsError, setMessage });
+  } = useExerciseList({
+    initialItems,
+    initialTotalItems,
+    initialSortBy,
+    initialSortDir,
+    setIsError,
+    setMessage,
+  });
 
   const editor = useAdminEditorController({
     form,
@@ -138,19 +152,21 @@ export default function AdminForm({
 
   return (
     <>
-      <AdminCommandPalette
-        open={commandOpen}
-        selectedId={editor.selectedId}
-        items={flatFilteredItems}
-        onOpenChange={setCommandOpen}
-        onOpenExercise={(id) => void editor.openExerciseWithAutosave(id)}
-        onSave={() => editor.formRef.current?.requestSubmit()}
-        onNewDraft={editor.actions.onNewDraft}
-        onNext={() => openAdjacentExercise(1)}
-        onPrevious={() => openAdjacentExercise(-1)}
-        onFocusSearch={focusListSearch}
-        onSetStatusView={setStatusView}
-      />
+      {commandOpen ? (
+        <AdminCommandPalette
+          open={commandOpen}
+          selectedId={editor.selectedId}
+          items={flatFilteredItems}
+          onOpenChange={setCommandOpen}
+          onOpenExercise={(id) => void editor.openExerciseWithAutosave(id)}
+          onSave={() => editor.formRef.current?.requestSubmit()}
+          onNewDraft={editor.actions.onNewDraft}
+          onNext={() => openAdjacentExercise(1)}
+          onPrevious={() => openAdjacentExercise(-1)}
+          onFocusSearch={focusListSearch}
+          onSetStatusView={setStatusView}
+        />
+      ) : null}
       <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <AdminSidebarContainer
           sidebarRef={editor.sidebarRef}

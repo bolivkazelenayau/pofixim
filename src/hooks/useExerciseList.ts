@@ -6,7 +6,7 @@ import { fetchExerciseList } from '@/components/admin-form/api';
 import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
 import type { ExerciseListResponse, ListItem } from '@/components/admin-form/types';
 
-const EXERCISE_LIST_PAGE_SIZE = 100;
+const EXERCISE_LIST_PAGE_SIZE = 50;
 
 type ExerciseListPageParam = {
   offset: number;
@@ -25,6 +25,8 @@ const ADMIN_LIST_SORT_DIR_COOKIE = 'admin_list_sort_dir';
 type UseExerciseListConfig = {
   initialItems: ListItem[];
   initialTotalItems: number | null | undefined;
+  initialSortBy: 'id' | 'updatedAt' | 'type' | 'status';
+  initialSortDir: 'asc' | 'desc';
   setIsError: (value: boolean) => void;
   setMessage: (value: string) => void;
 };
@@ -55,13 +57,17 @@ function buildInitialData(
   initialTotalItems: number | null | undefined,
 ): InfiniteData<ExerciseListResponse, ExerciseListPageParam> | undefined {
   if (initialItems.length === 0) return undefined;
+  const hasMore =
+    typeof initialTotalItems === 'number'
+      ? initialItems.length < initialTotalItems
+      : initialItems.length >= EXERCISE_LIST_PAGE_SIZE;
   return {
     pages: [
       {
         success: true,
         items: initialItems,
         total: initialTotalItems ?? initialItems.length,
-        hasMore: initialItems.length >= EXERCISE_LIST_PAGE_SIZE,
+        hasMore,
         nextOffset: initialItems.length,
         nextCursorId: initialItems[initialItems.length - 1]?.id ?? null,
         nextCursorUpdatedAt: initialItems[initialItems.length - 1]?.updatedAtCursor ?? null,
@@ -74,6 +80,8 @@ function buildInitialData(
 export function useExerciseList({
   initialItems,
   initialTotalItems,
+  initialSortBy,
+  initialSortDir,
   setIsError,
   setMessage,
 }: UseExerciseListConfig) {
@@ -85,11 +93,10 @@ export function useExerciseList({
   const [listTypeFilter, setListTypeFilter] = useState<string>('all');
   const [listStatusFilter, setListStatusFilter] = useState<string>('all');
   const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
-  const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>('id');
-  const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>('desc');
-  const [sortPrefsReady, setSortPrefsReady] = useState(false);
+  const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>(initialSortBy);
+  const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>(initialSortDir);
+  const [sortPrefsReady] = useState(true);
 
-  const sortPrefsReadyRef = useRef(false);
   const includeTotalOnNextFetchRef = useRef(initialItems.length === 0);
 
   const hasActiveListFilter =
@@ -117,31 +124,10 @@ export function useExerciseList({
     listTypeFilter === 'all' &&
     listStatusFilter === 'all' &&
     listExamTypeFilter === 'all' &&
-    listSortBy === 'id' &&
-    listSortDir === 'desc';
+    listSortBy === initialSortBy &&
+    listSortDir === initialSortDir;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const savedSortBy = localStorage.getItem('admin_list_sort_by');
-        const savedSortDir = localStorage.getItem('admin_list_sort_dir');
-        if (savedSortBy === 'id' || savedSortBy === 'updatedAt' || savedSortBy === 'type' || savedSortBy === 'status') {
-          setListSortBy(savedSortBy);
-          persistAdminListSortCookie(ADMIN_LIST_SORT_BY_COOKIE, savedSortBy);
-        }
-        if (savedSortDir === 'asc' || savedSortDir === 'desc') {
-          setListSortDir(savedSortDir);
-          persistAdminListSortCookie(ADMIN_LIST_SORT_DIR_COOKIE, savedSortDir);
-        }
-      } catch {}
-      sortPrefsReadyRef.current = true;
-      setSortPrefsReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!sortPrefsReadyRef.current) return;
     try {
       localStorage.setItem('admin_list_sort_by', listSortBy);
       localStorage.setItem('admin_list_sort_dir', listSortDir);

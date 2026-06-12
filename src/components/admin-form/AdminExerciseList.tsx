@@ -39,7 +39,7 @@ export default function AdminExerciseList({
         <div key={type} className="space-y-1.5">
           <div className="sticky top-0 z-10 flex items-center justify-between rounded-md border border-stroke bg-surface px-2 py-1 text-xs font-semibold text-foreground/80">
             <span className="truncate">{type}</span>
-            <span className="font-mono text-[10px] text-foreground/45">{typeItems.length}</span>
+            <span className="font-mono text-[10px] text-foreground/65">{typeItems.length}</span>
           </div>
           {typeItems.map((item) => (
             <button
@@ -80,7 +80,7 @@ export default function AdminExerciseList({
             >
               {selectionMode ? (
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-foreground/45">
+                  <span className="text-[10px] font-medium text-foreground/65">
                     multi-select
                   </span>
                   <span
@@ -97,7 +97,7 @@ export default function AdminExerciseList({
               ) : null}
               <div className="mb-1.5 grid min-w-0 grid-cols-[1fr_auto] items-start gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-[11px] font-semibold text-foreground/55">
+                  <span className="font-mono text-[11px] font-semibold text-foreground/70">
                     #{item.id}
                   </span>
                   <ListBadge tone={statusTone(item.qualityStatus)}>
@@ -107,7 +107,7 @@ export default function AdminExerciseList({
                   <ListBadge>{item.type}</ListBadge>
                   {!item.isActive ? <ListBadge tone="muted">inactive</ListBadge> : null}
                 </div>
-                <span className="whitespace-nowrap pt-0.5 text-[10px] text-foreground/40">
+                <span className="whitespace-nowrap pt-0.5 text-[10px] text-foreground/65">
                   {formatUpdatedAt(item.updatedAt)}
                 </span>
               </div>
@@ -146,7 +146,7 @@ export default function AdminExerciseList({
       )}
       {hasMore && (
         <div className="mt-2 text-center">
-          <div className="mb-2 text-[11px] font-medium text-foreground/50">
+          <div className="mb-2 text-[11px] font-medium text-foreground/65">
             Можно загрузить ещё
           </div>
           <button
@@ -171,11 +171,11 @@ function ListBadge({
   tone?: 'default' | 'green' | 'amber' | 'red' | 'muted';
 }) {
   const className = {
-    default: 'border-stroke bg-surface-strong text-foreground/55',
+    default: 'border-stroke bg-surface-strong text-foreground/70',
     green: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200',
     amber: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200',
     red: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200',
-    muted: 'border-stroke bg-foreground/5 text-foreground/45',
+    muted: 'border-stroke bg-foreground/5 text-foreground/65',
   }[tone];
 
   return (

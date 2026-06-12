@@ -316,7 +316,7 @@ export default function DictationCard({ exercise }: Props) {
                 );
               })}
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs font-medium tabular-nums text-foreground/55">
+            <div className="mt-1 flex items-center justify-between text-xs font-semibold tabular-nums text-foreground/70">
               <span>{currentTimeLabel}</span>
               <span>{durationLabel}</span>
             </div>
@@ -357,7 +357,7 @@ export default function DictationCard({ exercise }: Props) {
         </div>
       </div>
 
-      <p className="mt-3 px-1 text-xs font-medium text-foreground/55">
+      <p className="mt-3 px-1 text-xs font-medium text-foreground/70">
         Ответ отправьте обычным сообщением внизу.
       </p>
     </div>

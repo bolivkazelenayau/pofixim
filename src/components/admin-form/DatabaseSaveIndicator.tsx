@@ -21,7 +21,7 @@ export default function DatabaseSaveIndicator({
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${indicator.dot}`} />
       <span>{indicator.label}</span>
-      {indicator.detail && <span className="text-foreground/45">· {indicator.detail}</span>}
+      {indicator.detail && <span className="text-foreground/70">· {indicator.detail}</span>}
     </div>
   );
 }

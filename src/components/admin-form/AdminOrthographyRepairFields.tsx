@@ -38,7 +38,7 @@ export default function AdminOrthographyRepairFields({
       }))
      }
     >
-     <SelectTrigger className={inputClass}>
+     <SelectTrigger className={inputClass} aria-label="Orthography repair mode">
       <SelectValue />
      </SelectTrigger>
      <SelectContent>

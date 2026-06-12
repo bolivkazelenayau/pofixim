@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, type ReactElement } from 'react';
 import { commands, type ICommand } from '@uiw/react-md-editor';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
@@ -215,6 +215,7 @@ export default function AdminMarkdownEditor({
   height = 205,
   id,
 }: AdminMarkdownEditorProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const markdownCommands = useMemo<ICommand[]>(
     () => [
       makeToggleCommand('bold', 'bold', <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>, 'Жирный', { kind: 'markdown', prefix: '**' }, false),
@@ -236,8 +237,27 @@ export default function AdminMarkdownEditor({
     [],
   );
 
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const hideToolbarIcons = () => {
+      root
+        .querySelectorAll('.w-md-editor-toolbar svg[role="img"]')
+        .forEach((icon) => {
+          icon.setAttribute('aria-hidden', 'true');
+          icon.removeAttribute('role');
+        });
+    };
+
+    hideToolbarIcons();
+    const observer = new MutationObserver(hideToolbarIcons);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div id={id} className="mt-3">
+    <div id={id} ref={rootRef} className="mt-3">
       <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
       <MDEditor
         value={value}
@@ -247,6 +267,9 @@ export default function AdminMarkdownEditor({
         height={height}
         commands={markdownCommands}
         extraCommands={markdownExtraCommands}
+        textareaProps={{
+          'aria-label': label,
+        }}
       />
     </div>
   );

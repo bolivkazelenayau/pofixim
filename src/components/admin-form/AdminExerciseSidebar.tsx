@@ -95,14 +95,14 @@ export default function AdminExerciseSidebar({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-balance text-xl font-bold">Задания</h3>
-            <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-semibold text-primary">
+            <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/15 px-2 text-[11px] font-semibold text-primary">
               {stats.hasActiveListFilter && stats.matchingItems !== null
                 ? `${stats.matchingItems} / `
                 : ''}
               {stats.totalItems ?? '...'}
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] font-medium tabular-nums text-foreground/50">
+          <p className="mt-0.5 text-[11px] font-medium tabular-nums text-foreground/65">
             {stats.initialListPending
               ? 'Загрузка списка...'
               : selection.enabled

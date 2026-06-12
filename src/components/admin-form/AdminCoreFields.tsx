@@ -1,7 +1,13 @@
 'use client';
 
-import { useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import AdminMarkdownEditor from '@/components/admin-form/markdown/AdminMarkdownEditor';
+import dynamic from 'next/dynamic';
+import {
+ useState,
+ useSyncExternalStore,
+ type Dispatch,
+ type ReactNode,
+ type SetStateAction,
+} from 'react';
 import { categories, inputClass } from '@/components/admin-form/constants';
 import type { Form } from '@/components/admin-form/types';
 import { useTheme } from '@/components/theme-provider';
@@ -16,6 +22,61 @@ type AdminCoreFieldsProps = {
  onGenerateSeedClick: () => void;
  onSeedManualChange: () => void;
 };
+
+const AdminMarkdownEditor = dynamic(
+ () => import('@/components/admin-form/markdown/AdminMarkdownEditor'),
+ {
+  loading: () => (
+   <div className="mt-3 rounded-xl border border-stroke bg-surface-strong p-3">
+    <div className="mb-2 h-4 w-32 rounded bg-foreground/10" />
+    <div className="h-44 rounded-lg bg-foreground/10" />
+   </div>
+  ),
+ },
+);
+
+type DeferredMarkdownEditorProps = {
+ id: string;
+ label: string;
+ value: string;
+ onChange: (value: string) => void;
+ colorMode: 'dark' | 'light';
+};
+
+function DeferredMarkdownEditor({
+ id,
+ label,
+ value,
+ onChange,
+ colorMode,
+}: DeferredMarkdownEditorProps) {
+ const [enhanced, setEnhanced] = useState(false);
+
+ if (enhanced) {
+  return (
+   <AdminMarkdownEditor
+    id={id}
+    label={label}
+    value={value}
+    onChange={onChange}
+    colorMode={colorMode}
+   />
+  );
+ }
+
+ return (
+  <div id={id} className="mt-3">
+   <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
+   <textarea
+    className={`${inputClass} min-h-44 resize-y leading-6`}
+    value={value}
+    onChange={(event) => onChange(event.target.value)}
+    onFocus={() => setEnhanced(true)}
+    aria-label={label}
+   />
+  </div>
+ );
+}
 
 export default function AdminCoreFields({
  form,
@@ -41,7 +102,7 @@ export default function AdminCoreFields({
       value={form.type}
       onValueChange={(value) => onTypeChange(value as Form['type'])}
      >
-      <SelectTrigger className={inputClass}>
+      <SelectTrigger className={inputClass} aria-label="Exercise type">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -63,7 +124,7 @@ export default function AdminCoreFields({
        }))
       }
      >
-      <SelectTrigger className={inputClass}>
+      <SelectTrigger className={inputClass} aria-label="Exercise category">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -82,7 +143,7 @@ export default function AdminCoreFields({
        setForm((current) => ({ ...current, difficulty: Number(value) as 1 | 2 }))
       }
      >
-      <SelectTrigger className={inputClass}>
+      <SelectTrigger className={inputClass} aria-label="Exercise difficulty">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -124,14 +185,14 @@ export default function AdminCoreFields({
     </Field>
    </div>
 
-   <AdminMarkdownEditor
+   <DeferredMarkdownEditor
     id="admin-field-prompt"
     label="Формулировка"
     value={form.prompt}
     onChange={(prompt) => setForm((current) => ({ ...current, prompt }))}
     colorMode={editorColorMode}
    />
-   <AdminMarkdownEditor
+   <DeferredMarkdownEditor
     id="admin-field-explanation"
     label="Объяснение"
     value={form.explanation}

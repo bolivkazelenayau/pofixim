@@ -9,7 +9,7 @@ import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/a
 import type { ExerciseListResponse } from '@/components/admin-form/types';
 import { requireAdminPageSession } from '@/lib/admin-auth';
 
-const ADMIN_INITIAL_LIST_LIMIT = 100;
+const ADMIN_INITIAL_LIST_LIMIT = 30;
 
 type AdminExerciseListPageParam = {
   offset: number;
@@ -75,7 +75,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : null;
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-8">
+    <main className="min-h-dvh bg-background px-4 py-8">
       <div className="mx-auto mb-5 flex w-full max-w-[1400px] items-center justify-between rounded-2xl border border-stroke bg-surface-strong px-5 py-4 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Панель администратора</h1>
@@ -87,14 +87,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <ThemeToggle />
           <Link
             href="/"
-            className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition hover:bg-stroke"
+            className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             Назад к боту
           </Link>
           <form action={logoutAdminAction}>
             <button
               type="submit"
-              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition hover:bg-stroke"
+              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               Выйти
             </button>
@@ -106,9 +106,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <AdminFormClient
           initialSelectedId={initialSelectedId}
           initialSelectedExercise={initialSelectedExercise}
+          initialSortBy={initialListFilters.sortBy}
+          initialSortDir={initialListFilters.sortDir}
         />
       </HydrationBoundary>
-    </div>
+    </main>
   );
 }
 
