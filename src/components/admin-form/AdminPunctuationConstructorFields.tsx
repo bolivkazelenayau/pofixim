@@ -75,7 +75,7 @@ export default function AdminPunctuationConstructorFields({
     />
    </Field>
    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-    <div className="mb-1 text-xs font-bold uppercase tracking-[0.08em] text-emerald-700">
+    <div className="mb-1 text-xs font-bold uppercase text-emerald-700">
      Правильный ответ
     </div>
     <div className="text-base font-semibold leading-7 text-emerald-950">

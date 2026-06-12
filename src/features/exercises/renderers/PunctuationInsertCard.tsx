@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { PunctuationInsertExercise, SubmittedAnswer } from '../schemas';
 import type { PunctuationMark } from '../types';
 
@@ -22,6 +23,7 @@ export default function PunctuationInsertCard({
   onSubmit,
 }: PunctuationInsertCardProps) {
   const [marks, setMarks] = useState<PlacedMark[]>([]);
+  const shouldReduceMotion = useReducedMotion();
   const primaryMark = exercise.payload.allowedMarks[0] ?? ',';
 
   const toggleMark = (afterTokenIndex: number) => {
@@ -53,7 +55,7 @@ export default function PunctuationInsertCard({
 
   return (
     <div className="mt-2 mb-5 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-foreground/50">
+      <p className="mb-2 text-[11px] font-bold uppercase text-foreground/50">
         Выбери место для знака препинания
       </p>
 
@@ -89,7 +91,7 @@ export default function PunctuationInsertCard({
       </div>
 
       <motion.button
-        whileTap={!disabled ? { scale: 0.96 } : {}}
+        whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
         disabled={disabled}
         onClick={() => {
           let label = '';

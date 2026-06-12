@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useChatStore } from '../../../store/chatStore';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type {
   PunctuationConstructorExercise,
   SubmittedAnswer,
@@ -250,6 +251,7 @@ export default function PunctuationConstructorCard({
   const [unlockedGuidedMode, setUnlockedGuidedMode] = useState(false);
   const [showBuyHint, setShowBuyHint] = useState(false);
   const [timerStarted, setTimerStarted] = useState(!previewMode);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (disabled || !timerStarted) return;
@@ -704,7 +706,7 @@ export default function PunctuationConstructorCard({
           Сбросить
         </button>
         <motion.button
-          whileTap={!disabled ? { scale: 0.96 } : {}}
+          whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           disabled={disabled}
           onClick={submit}
           className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"

@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { OrderFragmentsExercise, SubmittedAnswer } from '../schemas';
 
 type Props = {
@@ -31,6 +32,7 @@ function shuffledDeterministic(ids: string[], seed: string) {
 }
 
 export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Props) {
+  const shouldReduceMotion = useReducedMotion();
   const initialOrder = useMemo(() => {
     const ids = exercise.payload.fragments.map((f) => f.id);
     if (ids.length <= 1) return ids;
@@ -146,7 +148,7 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
           Сбросить порядок
         </button>
         <motion.button
-          whileTap={!disabled ? { scale: 0.96 } : {}}
+          whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           disabled={disabled}
           onClick={() =>
             onSubmit(

@@ -101,13 +101,13 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
           <div className="space-y-3">
             {sections.lead ? <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.lead)}</ReactMarkdown> : null}
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-600/30 dark:bg-emerald-950/40 px-3 py-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+              <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-200">
                 Правильный ответ
               </div>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.correctAnswer)}</ReactMarkdown>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 dark:border-[var(--stroke)] dark:bg-[var(--surface)] px-3 py-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-foreground/80">
+              <div className="mb-1 text-xs font-semibold uppercase text-slate-700 dark:text-foreground/80">
                 Объяснение
               </div>
               <FormattedFeedbackExplanation text={sections.explanation} />

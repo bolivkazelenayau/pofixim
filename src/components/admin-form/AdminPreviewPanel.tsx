@@ -82,10 +82,12 @@ export default function AdminPreviewPanel({
      {preview.exercise.type === 'dictation' ? (
       <form onSubmit={onPreviewDictationSubmit} className="mt-3 space-y-2">
        <textarea
+        id="admin-preview-dictation-text"
         rows={3}
         value={previewDictationText}
         onChange={(event) => onPreviewDictationTextChange(event.target.value)}
         placeholder="Введите услышанный текст для проверки..."
+        aria-label="Текст диктанта для проверки"
         className="w-full resize-y rounded-xl border border-stroke bg-surface px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/55 focus:border-primary focus:ring-1 focus:ring-primary"
        />
        <button
@@ -113,13 +115,13 @@ export default function AdminPreviewPanel({
           <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.lead)}</ReactMarkdown>
          ) : null}
          <div className="rounded-xl border border-emerald-200 bg-emerald-100/60 px-3 py-2 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/30 dark:text-emerald-200">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
+          <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300">
            Правильный ответ
           </div>
           <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.correctAnswer)}</ReactMarkdown>
          </div>
          <div className="rounded-xl border border-stroke bg-surface-strong/70 px-3 py-2 text-foreground">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/80 ">
+          <div className="mb-1 text-xs font-semibold uppercase text-foreground/80 ">
            Объяснение
           </div>
           <FormattedFeedbackExplanation text={previewFeedbackSections.explanation} />

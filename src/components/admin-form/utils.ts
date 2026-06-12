@@ -58,7 +58,7 @@ export function buildDatabaseIndicator(
         label: 'Сохранение...',
         detail: 'запись в БД',
         box: 'border-sky-200 bg-sky-50/80 text-sky-800 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200',
-        dot: 'animate-pulse bg-sky-500',
+        dot: 'bg-sky-500 motion-safe:animate-pulse',
       };
     case 'local':
       return {

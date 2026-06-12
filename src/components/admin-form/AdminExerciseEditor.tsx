@@ -118,7 +118,7 @@ const AdminQualityInspector = dynamic(() => import('@/components/admin-form/Admi
 });
 
 function EditorSkeletonBlock({ className = '' }: { className?: string }) {
-  return <div className={`rounded-md bg-foreground/10 ${className}`} />;
+  return <div className={`rounded-md bg-foreground/10 motion-safe:animate-pulse ${className}`} />;
 }
 
 function useIdleReady() {
@@ -182,7 +182,7 @@ function QualityInspectorShell() {
 
 function AdminExerciseEditorSkeleton() {
   return (
-    <div className="animate-pulse">
+    <div>
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <EditorSkeletonBlock className="h-7 w-56" />
@@ -314,7 +314,20 @@ export default function AdminExerciseEditor({
         <AdminMessageToast message={status.message} isError={status.isError} />
 
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
-          <form ref={formRef} onSubmit={actions.onSubmit}>
+          <form
+            ref={formRef}
+            onSubmit={actions.onSubmit}
+            aria-describedby={status.isError && status.message ? 'admin-form-error' : undefined}
+          >
+            {status.isError && status.message ? (
+              <div
+                id="admin-form-error"
+                role="alert"
+                className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100"
+              >
+                {status.message}
+              </div>
+            ) : null}
             <AdminCoreFields
               form={form}
               typeOptions={typeOptions}

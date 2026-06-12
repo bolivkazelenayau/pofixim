@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { OrthographyRepairExercise, SubmittedAnswer } from '../schemas';
 
 type Props = {
@@ -113,6 +114,7 @@ export default function OrthographyRepairCard({
   const [repairs, setRepairs] = useState<Record<string, string>>({});
   const [wrongClickKey, setWrongClickKey] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const selectedTarget = exercise.payload.targets.find(
     (target) => target.id === selectedTargetId,
@@ -257,7 +259,7 @@ export default function OrthographyRepairCard({
           Сбросить
         </button>
         <motion.button
-          whileTap={!disabled ? { scale: 0.96 } : {}}
+          whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           disabled={disabled || !canSubmit}
           onClick={submit}
           className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"

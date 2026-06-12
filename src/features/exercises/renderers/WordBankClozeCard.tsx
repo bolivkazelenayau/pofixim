@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { SubmittedAnswer, WordBankClozeExercise } from '../schemas';
 
 type WordBankClozeCardProps = {
@@ -18,6 +19,7 @@ export default function WordBankClozeCard({
   const slotCount = exercise.payload.slotCount;
   const [activeSlot, setActiveSlot] = useState<number | null>(0);
   const [values, setValues] = useState<string[]>(() => Array(slotCount).fill(''));
+  const shouldReduceMotion = useReducedMotion();
 
   const parts = useMemo(() => {
     const slotRe = /\[\[(\d+)\]\]/g;
@@ -155,7 +157,7 @@ export default function WordBankClozeCard({
       </div>
 
       <motion.button
-        whileTap={!disabled && canSubmit ? { scale: 0.96 } : {}}
+        whileTap={whenMotion(!disabled && canSubmit && !shouldReduceMotion, PRESS_TAP)}
         disabled={disabled || !canSubmit}
         onClick={(event) => {
           event.stopPropagation();

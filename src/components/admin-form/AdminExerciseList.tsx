@@ -37,7 +37,7 @@ export default function AdminExerciseList({
     <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
       {groupedItems.map(([type, typeItems]) => (
         <div key={type} className="space-y-1.5">
-          <div className="sticky top-0 z-10 flex items-center justify-between rounded-md border border-stroke bg-surface px-2 py-1 text-xs font-semibold text-foreground/80">
+          <div className="sticky top-0 z-sticky flex items-center justify-between rounded-md border border-stroke bg-surface px-2 py-1 text-xs font-semibold text-foreground/80">
             <span className="truncate">{type}</span>
             <span className="font-mono text-[10px] text-foreground/65">{typeItems.length}</span>
           </div>
@@ -120,12 +120,12 @@ export default function AdminExerciseList({
       ))}
       {initialListPending ? (
         <div className="space-y-2" aria-hidden="true">
-          <div className="h-[26px] animate-pulse rounded-md border border-stroke bg-surface" />
-          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
-          <div className="h-[114px] animate-pulse rounded-xl border border-stroke bg-surface" />
+          <div className="h-[26px] rounded-md border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
         </div>
       ) : groupedItems.length === 0 && (
         <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4 text-sm text-foreground/70">

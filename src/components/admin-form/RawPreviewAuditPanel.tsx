@@ -22,7 +22,7 @@ export default function RawPreviewAuditPanel({
 }: RawPreviewAuditPanelProps) {
   return (
     <div className="mt-4 rounded-xl border border-dashed border-stroke/70 bg-surface/30 p-3">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground/50">
+      <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/50">
         Raw HTML Preview
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">

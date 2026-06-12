@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { SubmittedAnswer, WordSearchExercise } from '../schemas';
 
 type WordSearchCardProps = {
@@ -34,6 +35,7 @@ export default function WordSearchCard({
   const [foundPaths, setFoundPaths] = useState<FoundPath[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPath, setDragPath] = useState<Cell[]>([]);
+  const shouldReduceMotion = useReducedMotion();
 
   const cols = exercise.payload.grid[0]?.length ?? 1;
   const foundSet = useMemo(() => new Set(foundWords), [foundWords]);
@@ -224,7 +226,7 @@ export default function WordSearchCard({
       </div>
 
       <motion.button
-        whileTap={!disabled && foundWords.length > 0 ? { scale: 0.96 } : {}}
+        whileTap={whenMotion(!disabled && foundWords.length > 0 && !shouldReduceMotion, PRESS_TAP)}
         disabled={disabled || foundWords.length === 0}
         onClick={submit}
         className="w-full rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"

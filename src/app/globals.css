@@ -67,6 +67,26 @@ html.theme-switching *::after {
   animation: none !important;
 }
 
+.z-sticky {
+  z-index: 10;
+}
+
+.z-popover {
+  z-index: 40;
+}
+
+.z-floating {
+  z-index: 50;
+}
+
+.z-modal {
+  z-index: 60;
+}
+
+.z-toast {
+  z-index: 70;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -261,7 +281,6 @@ ins.du {
   padding: 12px;
   font-size: 14px;
   line-height: 2;
-  letter-spacing: 0.012em;
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
@@ -270,7 +289,6 @@ ins.du {
   color: color-mix(in srgb, var(--foreground) 62%, var(--primary));
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -362,7 +380,10 @@ ins.du {
   *,
   *::before,
   *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 
   .admin-md-skeleton-bar,

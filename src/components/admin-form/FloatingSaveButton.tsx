@@ -17,7 +17,7 @@ export default function FloatingSaveButton({
 }: FloatingSaveButtonProps) {
   return (
   <div
-   className={`fixed right-6 bottom-6 z-40 hidden xl:block transition-[opacity,transform] duration-200 ease-out ${
+   className={`fixed right-6 bottom-6 z-floating hidden xl:block transition-[opacity,transform] duration-200 ease-out ${
     visible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
    }`}
   >

@@ -6,6 +6,7 @@ import AdminSidebarFilters from './AdminSidebarFilters';
 import DatabaseSaveIndicator, { type DatabaseIndicator } from './DatabaseSaveIndicator';
 import { qualityStatuses } from './constants';
 import type { ListItem, RawPreviewItem } from './types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type AdminExerciseSidebarProps = {
   sidebarRef: RefObject<HTMLElement | null>;
@@ -110,44 +111,52 @@ export default function AdminExerciseSidebar({
                 : `Показано: ${stats.shownCount}`}
           </p>
         </div>
+        <TooltipProvider>
         <div className="flex shrink-0 items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
           <button
             type="button"
             aria-label="Refresh exercise list"
-            className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
+            className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
             onClick={list.onRefresh}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-              Обновить список
-            </span>
           </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Обновить список</TooltipContent>
+          </Tooltip>
           {!selection.enabled ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
             <button
               type="button"
               aria-label="Enable exercise selection"
-              className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
+              className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               onClick={selection.onEnable}
             >
               <CheckSquare className="h-4 w-4" aria-hidden="true" />
-              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                Выбрать задания
-              </span>
             </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Выбрать задания</TooltipContent>
+            </Tooltip>
           ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
             <button
               type="button"
               aria-label="Clear exercise selection"
-              className="group relative flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
+              className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
               onClick={selection.onClear}
             >
               <XSquare className="h-4 w-4" aria-hidden="true" />
-              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                Отмена выбора
-              </span>
             </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Отмена выбора</TooltipContent>
+            </Tooltip>
           )}
         </div>
+        </TooltipProvider>
       </div>
       <DatabaseSaveIndicator indicator={databaseIndicator} className="mb-4" />
       {selection.enabled && (

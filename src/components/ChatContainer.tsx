@@ -440,8 +440,8 @@ export default function ChatContainer() {
 
     const tableHtml = `<div class="w-full max-h-[280px] overflow-y-auto overflow-x-auto mt-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)]">
       <table class="w-full text-sm text-left relative">
-        <thead class="bg-[var(--surface)] sticky top-0 z-10 shadow-sm">
-          <tr class="border-b border-[var(--stroke)] text-foreground/60 text-[11px] uppercase tracking-wider">
+        <thead class="bg-[var(--surface)] sticky top-0 z-sticky shadow-sm">
+          <tr class="border-b border-[var(--stroke)] text-foreground/60 text-[11px] uppercase">
             <th class="py-1.5 px-3 font-semibold text-center w-10 bg-[var(--surface)]">#</th>
             <th class="py-1.5 px-3 font-semibold bg-[var(--surface)]">Имя</th>
             <th class="py-1.5 px-3 font-semibold text-right bg-[var(--surface)]">Очки</th>
@@ -622,7 +622,7 @@ export default function ChatContainer() {
         )}
       </AnimatePresence>
 
-      <div className="z-10 grid min-h-[68px] shrink-0 grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 sm:px-5">
+      <div className="z-sticky grid min-h-[68px] shrink-0 grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-base font-bold text-white">
             П
@@ -733,7 +733,7 @@ export default function ChatContainer() {
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   role="listbox"
                   aria-activedescendant={activeSlashCommand ? `slash-command-${activeSlashCommand.command.slice(1)}` : undefined}
-                  className="absolute bottom-[calc(100%+0.5rem)] left-0 z-20 w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
+                  className="absolute bottom-[calc(100%+0.5rem)] left-0 z-popover w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
                   {visibleSlashCommands.map((item, index) => {
                     const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : item.command === '/ege13_quick' || item.command === '/ege15_quick' || item.command.startsWith('/punctuation') || item.command.startsWith('/orthography') ? PenTool : RotateCcw;

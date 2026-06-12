@@ -42,7 +42,7 @@ export default function Ege20ComplexSentenceCard({
 
   return (
     <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/60">
+      <p className="mb-2 text-xs font-semibold uppercase text-foreground/60">
         ЕГЭ-20 · знаки в сложном предложении
       </p>
       <p className="text-sm leading-6 text-foreground">{exercise.payload.textWithSlots}</p>

@@ -219,8 +219,8 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   return (
     <DialogPrimitive.Root open onOpenChange={handleDialogOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-black/50" />
+        <DialogPrimitive.Content className="fixed inset-0 z-modal flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4">
           <DialogPrimitive.Title className="sr-only">Блиц</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             Быстрый режим тренировки: выберите длительность, отвечайте стрелками или кнопками, Escape завершает раунд.
@@ -237,7 +237,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-10 flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
+          className="absolute right-3 top-3 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
           aria-label="Close blitz"
           title="Закрыть"
         >
@@ -381,7 +381,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                     damping: 27,
                     mass: 0.78,
                   }}
-                  className={`relative z-10 flex min-h-[336px] cursor-grab select-none flex-col items-center overflow-hidden rounded-[20px] border-2 px-4 pb-8 pt-7 text-center shadow-sm active:cursor-grabbing sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7 ${
+                  className={`relative z-sticky flex min-h-[336px] cursor-grab select-none flex-col items-center overflow-hidden rounded-[20px] border-2 px-4 pb-8 pt-7 text-center shadow-sm active:cursor-grabbing sm:min-h-[254px] sm:justify-center sm:rounded-[22px] sm:px-8 sm:py-7 ${
                     lastAnswerCorrect === true
                       ? 'border-emerald-400 bg-emerald-50 shadow-[0_0_28px_rgba(16,185,129,0.3)] dark:bg-emerald-950/40'
                       : lastAnswerCorrect === false

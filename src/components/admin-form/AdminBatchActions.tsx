@@ -1,5 +1,11 @@
 import { inputClass, qualityStatuses } from './constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type AdminBatchActionsProps = {
   selectedCount: number;
@@ -31,24 +37,28 @@ export default function AdminBatchActions({
   if (selectedCount === 0) return null;
 
   return (
+    <TooltipProvider>
     <div className="mb-3 space-y-2 rounded-xl border border-stroke bg-surface p-2.5">
       <div className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground/80">
         <span className="tabular-nums">Выбрано: {selectedCount}</span>
-        <span className="relative inline-flex">
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             type="button"
-            className="group inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             aria-label="Подсказка по массовым действиям"
           >
             i
-            <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-52 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block group-focus-visible:block">
-              Действия применяются к выделенным заданиям.
-            </span>
           </button>
-        </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            Действия применяются к выделенным заданиям.
+          </TooltipContent>
+        </Tooltip>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <span className="group relative block h-full w-full">
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             type="button"
             onClick={onApplyStatus}
@@ -57,11 +67,13 @@ export default function AdminBatchActions({
           >
             Применить статус
           </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-center text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal group-hover:block">
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-center">
             Изменить статус у выделенных.
-          </span>
-        </span>
-        <span className="group relative block h-full w-full">
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             type="button"
             onClick={onApplyActivity}
@@ -70,13 +82,15 @@ export default function AdminBatchActions({
           >
             Применить активность
           </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-center text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal group-hover:block">
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-center">
             Вкл/выкл выделенные задания.
-          </span>
-        </span>
+          </TooltipContent>
+        </Tooltip>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <span className="group relative block h-full w-full">
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             type="button"
             onClick={onToggleMore}
@@ -84,11 +98,13 @@ export default function AdminBatchActions({
           >
             Параметры
           </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-center text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal group-hover:block">
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-center">
             Показать/скрыть расширенные параметры.
-          </span>
-        </span>
-        <span className="group relative block h-full w-full">
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             type="button"
             onClick={onClearSelection}
@@ -96,10 +112,11 @@ export default function AdminBatchActions({
           >
             Снять выделение
           </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-48 -translate-x-1/2 rounded-md border border-stroke bg-surface-strong px-2.5 py-1.5 text-center text-[11px] font-normal leading-snug text-foreground/80 shadow-md whitespace-normal group-hover:block">
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-center">
             Снять текущее выделение.
-          </span>
-        </span>
+          </TooltipContent>
+        </Tooltip>
       </div>
       {showMoreBatchActions ? (
         <div className="grid grid-cols-1 gap-2">
@@ -133,5 +150,6 @@ export default function AdminBatchActions({
         </div>
       ) : null}
     </div>
+    </TooltipProvider>
   );
 }

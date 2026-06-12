@@ -141,7 +141,7 @@ export default function AdminMarkdownPreview() {
         <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Исходный markdown</h3>
-            <span className="text-xs uppercase tracking-[0.18em] text-foreground/45">Editor</span>
+            <span className="text-xs uppercase text-foreground/45">Editor</span>
           </div>
           <textarea
             ref={editorScrollRef}
@@ -156,7 +156,7 @@ export default function AdminMarkdownPreview() {
         <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Превью</h3>
-            <span className="text-xs uppercase tracking-[0.18em] text-foreground/45">Rendered</span>
+            <span className="text-xs uppercase text-foreground/45">Rendered</span>
           </div>
           <div className="wmde-markdown-var rounded-xl border border-stroke bg-surface p-5">
             <div

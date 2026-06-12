@@ -1,6 +1,7 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { MultipleChoiceExercise, SubmittedAnswer } from '../schemas';
 
 type MultipleChoiceCardProps = {
@@ -14,12 +15,14 @@ export default function MultipleChoiceCard({
   disabled,
   onSubmit,
 }: MultipleChoiceCardProps) {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <div className="mb-5 mt-2 flex w-full flex-col gap-2">
       {exercise.payload.options.map((option, idx) => (
         <motion.button
           key={`${exercise.id}-${idx}`}
-          whileTap={!disabled ? { scale: 0.96 } : {}}
+          whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           onClick={() =>
             onSubmit(
               { type: 'multiple_choice', selectedOptionIndex: idx },

@@ -15,18 +15,18 @@ export default function AdminDraftRecoveryModal({
  return (
   <DialogPrimitive.Root open>
    <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-900/60" />
-    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-stroke/50 bg-surface-strong text-foreground shadow-sm outline-none">
+    <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-slate-900/60" />
+    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-stroke/50 bg-surface-strong text-foreground shadow-sm outline-none">
      <div className="border-b border-stroke/50 bg-surface/30 p-6">
       <div className="flex items-center gap-4">
        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 shadow-sm">
         <History className="h-6 w-6" aria-hidden="true" />
        </div>
        <div>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-amber-500">
+        <p className="text-[11px] font-bold uppercase text-amber-500">
          Локальная страховочная копия
         </p>
-        <DialogPrimitive.Title className="mt-1 text-lg font-bold tracking-tight">
+        <DialogPrimitive.Title className="mt-1 text-lg font-bold">
          Восстановление задания #{exerciseId}
         </DialogPrimitive.Title>
        </div>

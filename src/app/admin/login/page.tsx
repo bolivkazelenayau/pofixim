@@ -12,7 +12,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-10">
-      <div className="absolute right-5 top-5 z-50">
+      <div className="absolute right-5 top-5 z-floating">
         <ThemeToggle />
       </div>
 
@@ -22,10 +22,10 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
             <Database className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+            <p className="text-[11px] font-bold uppercase text-primary">
               Secure Gateway
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Панель управления</h1>
+            <h1 className="mt-1 text-2xl font-bold text-foreground">Панель управления</h1>
           </div>
         </div>
 
@@ -35,7 +35,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
 
         <form action={loginAdminAction} className="space-y-5">
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground/60">
+            <span className="mb-2 block text-xs font-semibold uppercase text-foreground/60">
               Мастер-пароль
             </span>
             <div className="relative group">

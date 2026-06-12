@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { inputClass, qualityStatuses } from './constants';
 
 type AdminSidebarFiltersProps = {
@@ -65,6 +66,7 @@ export default function AdminSidebarFilters({
   ];
 
   return (
+    <TooltipProvider>
     <div className="mb-4 space-y-3">
       <div className="flex flex-wrap gap-1.5">
         {savedViews.map((view) => (
@@ -145,22 +147,24 @@ export default function AdminSidebarFilters({
       </div>
       <div>
         <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-foreground/65">
-          <span className="uppercase tracking-wider">Сортировка</span>
+          <span className="uppercase">Сортировка</span>
           {sortPrefsReady && (listSortBy !== 'id' || listSortDir !== 'asc') && (
+            <Tooltip>
+              <TooltipTrigger asChild>
             <button
               type="button"
               onClick={() => {
                 onListSortByChange('id');
                 onListSortDirChange('asc');
               }}
-              className="group relative flex items-center gap-1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="flex items-center gap-1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3 w-3" aria-hidden="true" />
               Сбросить
-              <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                Сбросить сортировку
-              </span>
             </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Сбросить сортировку</TooltipContent>
+            </Tooltip>
           )}
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -182,26 +186,31 @@ export default function AdminSidebarFilters({
                   <SelectItem value="status">По статусу</SelectItem>
                 </SelectContent>
               </Select>
+              <Tooltip>
+                <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={() => onListSortDirChange(listSortDir === 'asc' ? 'desc' : 'asc')}
                 aria-label="Toggle sort direction"
-                className="group relative flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
-                <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-stroke bg-surface-strong px-2 py-1 text-[11px] font-normal text-foreground/80 shadow-md group-hover:block">
-                  {listSortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}
-                </span>
               </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {listSortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}
+                </TooltipContent>
+              </Tooltip>
             </>
           ) : (
             <>
-              <div className="h-8 w-full animate-pulse rounded-lg border border-stroke bg-surface" />
-              <div className="h-8 w-8 animate-pulse rounded-lg border border-stroke bg-surface" />
+              <div className="h-8 w-full rounded-lg border border-stroke bg-surface motion-safe:animate-pulse" />
+              <div className="h-8 w-8 rounded-lg border border-stroke bg-surface motion-safe:animate-pulse" />
             </>
           )}
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

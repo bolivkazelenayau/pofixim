@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { PRESS_TAP, whenMotion } from '@/lib/motion';
 import type { EgeMultiSelectExercise, SubmittedAnswer } from '../schemas';
 
 type EgeMultiSelectCardProps = {
@@ -16,6 +17,7 @@ export default function EgeMultiSelectCard({
   onSubmit,
 }: EgeMultiSelectCardProps) {
   const [selected, setSelected] = useState<number[]>([]);
+  const shouldReduceMotion = useReducedMotion();
   const canSubmit = selected.length > 0;
   const answerLabel = useMemo(
     () => [...selected].sort((a, b) => a - b).join(''),
@@ -61,7 +63,7 @@ export default function EgeMultiSelectCard({
         })}
       </div>
       <motion.button
-        whileTap={!disabled && canSubmit ? { scale: 0.96 } : {}}
+        whileTap={whenMotion(!disabled && canSubmit && !shouldReduceMotion, PRESS_TAP)}
         disabled={disabled || !canSubmit}
         onClick={() =>
           onSubmit(
