@@ -43,8 +43,20 @@ export async function getExerciseTypeOptions() {
 
 export async function listExercises(params: ListExercisesParams = {}) {
   const startedAt = Date.now();
+  const debugStartedAt = performance.now();
+  const debugTiming = params.debugTiming
+    ? {
+        authMs: 0,
+        rowsMs: 0,
+        countMs: 0,
+        totalMs: 0,
+      }
+    : undefined;
   try {
     await assertAdminAuthorized();
+    if (debugTiming) {
+      debugTiming.authMs = Number((performance.now() - debugStartedAt).toFixed(2));
+    }
 
     const normalizedLimit = Math.max(1, Math.min(params.limit ?? 100, 500));
     const normalizedOffset = Math.max(0, params.offset ?? 0);
@@ -147,6 +159,7 @@ export async function listExercises(params: ListExercisesParams = {}) {
     }
 
     const whereExpr = and(...whereParts);
+    const rowsStartedAt = performance.now();
     const rows = await fetchExerciseListRows({
       whereExpr,
       sortBy,
@@ -155,13 +168,32 @@ export async function listExercises(params: ListExercisesParams = {}) {
       normalizedOffset,
       useOffset: !hasCursor,
     });
+    if (debugTiming) {
+      debugTiming.rowsMs = Number((performance.now() - rowsStartedAt).toFixed(2));
+    }
 
-    return buildExerciseListResult({
+    let total: number | undefined;
+    if (includeTotal) {
+      const countStartedAt = performance.now();
+      total = await countExercises(whereExpr);
+      if (debugTiming) {
+        debugTiming.countMs = Number((performance.now() - countStartedAt).toFixed(2));
+      }
+    }
+
+    const result = buildExerciseListResult({
       rows,
       normalizedLimit,
       normalizedOffset,
-      total: includeTotal ? await countExercises(whereExpr) : undefined,
+      total,
     });
+    if (!debugTiming) return result;
+
+    debugTiming.totalMs = Number((performance.now() - debugStartedAt).toFixed(2));
+    return {
+      ...result,
+      _debugTiming: debugTiming,
+    };
   } catch (error) {
     console.error('Failed to list exercises:', error);
     return {

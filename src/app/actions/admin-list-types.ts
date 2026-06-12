@@ -12,6 +12,7 @@ export type ListExercisesParams = {
   sortBy?: ExerciseListSortBy;
   sortDir?: 'asc' | 'desc';
   includeTotal?: boolean;
+  debugTiming?: boolean;
 };
 
 export type ExerciseListItem = {

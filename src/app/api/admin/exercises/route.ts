@@ -11,7 +11,9 @@ function optionalInteger(params: URLSearchParams, name: string) {
 }
 
 export async function GET(request: Request) {
+  const routeStartedAt = performance.now();
   const params = new URL(request.url).searchParams;
+  const debugTiming = params.get('debugTiming') === 'true';
   const result = await listExercisesAction({
     limit: optionalInteger(params, 'limit'),
     offset: optionalInteger(params, 'offset'),
@@ -24,10 +26,22 @@ export async function GET(request: Request) {
     sortBy: parseSortBy(params.get('sortBy')),
     sortDir: params.get('sortDir') === 'asc' ? 'asc' : 'desc',
     includeTotal: params.get('includeTotal') === 'true',
+    debugTiming,
   });
 
   const error = 'error' in result ? result.error : undefined;
   const status = result.success ? 200 : error === 'Unauthorized' ? 401 : 500;
+  if (debugTiming && typeof result === 'object' && result !== null) {
+    const actionTiming = '_debugTiming' in result && typeof result._debugTiming === 'object'
+      ? result._debugTiming
+      : {};
+    Object.assign(result, {
+      _debugTiming: {
+        ...actionTiming,
+        routeTotalBeforeResponseMs: Number((performance.now() - routeStartedAt).toFixed(2)),
+      },
+    });
+  }
   return Response.json(result, { status });
 }
 
