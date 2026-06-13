@@ -39,7 +39,7 @@ import TypingIndicator from './TypingIndicator';
 
 const TAIL_HANDOFF_RATIO = 0.25;
 const TAIL_HANDOFF_MS = Math.round(MESSAGE_ENTER_DURATION_MS * TAIL_HANDOFF_RATIO);
-const RENDERED_EXERCISE_REFRESH_POLL_MS = 1500;
+const RENDERED_EXERCISE_REFRESH_POLL_MS = 5000;
 
 type ExerciseMessage = Message & {
   type: 'exercise';
@@ -1059,8 +1059,8 @@ export default function ChatContainer() {
             <p className="truncate text-xs font-medium text-primary">Тренируемся вместе</p>
           </div>
         </div>
-        <div className="grid min-w-[236px] grid-cols-[1fr_auto_1fr_auto] items-center justify-items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5 shadow-sm sm:min-w-[252px] sm:gap-3 sm:px-4">
-          <div className="grid min-w-12 gap-0.5 text-center tabular-nums sm:min-w-14">
+        <div className="grid min-w-[212px] grid-cols-[52px_1px_52px_28px] items-center justify-items-center gap-x-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] py-1.5 pl-3 pr-2.5 shadow-sm sm:min-w-[224px] sm:grid-cols-[56px_1px_56px_28px] sm:gap-x-4 sm:pl-3.5 sm:pr-3">
+          <div className="grid w-full gap-0.5 text-center tabular-nums">
             <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Очки</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-foreground/85">{score}</span>
@@ -1068,8 +1068,8 @@ export default function ChatContainer() {
               <span className="mx-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
             )}
           </div>
-          <div className="h-4 w-px bg-[var(--stroke)]" />
-          <div className="grid min-w-12 gap-0.5 text-center tabular-nums sm:min-w-16">
+          <div className="h-4 w-px -translate-x-2 bg-[var(--stroke)]" />
+          <div className="grid w-full -translate-x-[10px] gap-0.5 text-center tabular-nums">
             <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Серия</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-orange-600">{streak}</span>
@@ -1080,7 +1080,7 @@ export default function ChatContainer() {
           <button
             onClick={handleResetProgress}
             disabled={!hasHydrated}
-            className="hidden size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:inline-flex"
+            className="hidden size-7 items-center justify-center rounded-lg text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:inline-flex"
             aria-label="Сбросить прогресс"
             title="Начать заново"
           >
