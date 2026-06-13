@@ -87,14 +87,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <ThemeToggle />
           <Link
             href="/"
-            className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="inline-flex h-10 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             Назад к боту
           </Link>
           <form action={logoutAdminAction}>
             <button
               type="submit"
-              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="inline-flex h-10 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               Выйти
             </button>

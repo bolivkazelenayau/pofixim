@@ -831,22 +831,22 @@ export default function ChatContainer() {
             <p className="truncate text-xs font-medium text-primary">Тренируемся вместе</p>
           </div>
         </div>
-        <div className="grid grid-cols-[auto_auto_auto] items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1.5 shadow-sm sm:grid-cols-[auto_auto_auto_auto] sm:gap-3 sm:px-3">
-          <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-14">
+        <div className="grid min-w-[236px] grid-cols-[1fr_auto_1fr_auto] items-center justify-items-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5 shadow-sm sm:min-w-[252px] sm:gap-3 sm:px-4">
+          <div className="grid min-w-12 gap-0.5 text-center tabular-nums sm:min-w-14">
             <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Очки</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-foreground/85">{score}</span>
             ) : (
-              <span className="ml-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
+              <span className="mx-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
             )}
           </div>
           <div className="h-4 w-px bg-[var(--stroke)]" />
-          <div className="grid min-w-12 gap-0.5 text-right tabular-nums sm:min-w-16">
+          <div className="grid min-w-12 gap-0.5 text-center tabular-nums sm:min-w-16">
             <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Серия</span>
             {hasHydrated ? (
               <span className="text-sm font-bold leading-none text-orange-600">{streak}</span>
             ) : (
-              <span className="ml-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
+              <span className="mx-auto h-4 w-5 rounded bg-[var(--stroke)]" aria-hidden="true" />
             )}
           </div>
           <button
