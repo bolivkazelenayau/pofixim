@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   BarChart3,
   BookOpenCheck,
+  Hash,
   ListChecks,
   RotateCcw,
   Wrench,
@@ -14,17 +15,22 @@ import {
 } from 'lucide-react';
 import type { ExerciseType } from '@/features/exercises/types';
 import {
+  getExerciseBySeedKeyAction,
+  getExerciseVersionsByIdsAction,
+  getExercisesByIdsAction,
   getNextExerciseAction,
   submitExerciseAnswerAction,
 } from '@/app/actions/exercises';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
+import { checkExerciseAnswer } from '@/features/exercises/checkers';
 import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedback';
 import { useChatStore, type Message } from '@/store/chatStore';
 import { useBlitzGame } from '@/hooks/useBlitzGame';
 import { useEge13QuickGame } from '@/hooks/useEge13QuickGame';
 import { useEge15QuickGame } from '@/hooks/useEge15QuickGame';
 import { createMessageId } from '@/lib/message-id';
+import { subscribeToExerciseUpdates } from '@/lib/exercise-update-events';
 import BlitzGame from './BlitzGame';
 import Ege13QuickGame from './Ege13QuickGame';
 import Ege15QuickGame from './Ege15QuickGame';
@@ -33,6 +39,7 @@ import TypingIndicator from './TypingIndicator';
 
 const TAIL_HANDOFF_RATIO = 0.25;
 const TAIL_HANDOFF_MS = Math.round(MESSAGE_ENTER_DURATION_MS * TAIL_HANDOFF_RATIO);
+const RENDERED_EXERCISE_REFRESH_POLL_MS = 1500;
 
 type ExerciseMessage = Message & {
   type: 'exercise';
@@ -79,6 +86,11 @@ const SLASH_COMMANDS = [
     description: 'Одна Н или НН',
   },
   {
+    command: '/seed',
+    title: 'Seed key',
+    description: 'Открыть конкретное задание',
+  },
+  {
     command: '/stats',
     title: 'Рейтинг',
     description: 'Посмотреть таблицу лидеров',
@@ -106,6 +118,8 @@ function getSlashCommandIcon(command: SlashCommand) {
       return BookOpenCheck;
     case '/ege15_quick':
       return BadgeCheck;
+    case '/seed':
+      return Hash;
     case '/stats':
       return BarChart3;
     case '/start':
@@ -158,7 +172,7 @@ function isFullTextFillBlankExercise(exercise: Exercise) {
 }
 
 function buildFeedbackText(
-  result: Awaited<ReturnType<typeof submitExerciseAnswerAction>>['result'],
+  result: ReturnType<typeof checkExerciseAnswer> | undefined,
   exerciseType?: Exercise['type'],
 ) {
   if (!result) return '';
@@ -183,7 +197,7 @@ function buildFeedbackText(
 }
 
 function buildStepFeedbackText(
-  result: Awaited<ReturnType<typeof submitExerciseAnswerAction>>['result'],
+  result: ReturnType<typeof checkExerciseAnswer> | undefined,
   exerciseType?: Exercise['type'],
 ) {
   if (
@@ -200,7 +214,30 @@ function buildStepFeedbackText(
     (step, index) => `${index + 1}. ${step.message}`,
   );
 
-  return `\n\nРазбор по шагам:\n${lines.join('\n')}\n\nДальше: ${result.nextRecommendation.reason}`;
+  return `\n\nРазбор по шагам:\n${lines.join('\n')}`;
+}
+
+function submittedAnswerFromText(exercise: Exercise, text: string): SubmittedAnswer | null {
+  const value = text.trim();
+  if (!value) return null;
+
+  if (exercise.type === 'fill_blank') {
+    return { type: 'fill_blank', value };
+  }
+
+  if (exercise.type === 'dictation') {
+    return { type: 'dictation', text: value };
+  }
+
+  if (exercise.type === 'ege21_punctuation_analysis') {
+    return { type: 'ege21_punctuation_analysis', value: value.replace(/[^0-9]/g, '') };
+  }
+
+  if (exercise.type === 'ege20_complex_sentence_punctuation') {
+    return { type: 'ege20_complex_sentence_punctuation', value: value.replace(/[^0-9]/g, '') };
+  }
+
+  return null;
 }
 
 export default function ChatContainer() {
@@ -209,6 +246,8 @@ export default function ChatContainer() {
     isTyping,
     addMessage,
     markExercisePresented,
+    updateExerciseMessages,
+    updateFeedbackMessages,
     setTyping,
     setSessionId,
     recordExerciseResult,
@@ -225,6 +264,8 @@ export default function ChatContainer() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
   const isFetchingExercise = useRef(false);
+  const isPollingExerciseVersionsRef = useRef(false);
+  const exerciseVersionByIdRef = useRef<Map<number, string>>(new Map());
   const previousMessagesRef = useRef<Message[]>([]);
   const hasInitializedTailTrackingRef = useRef(false);
   const tailHandoffsRef = useRef(new Map<TailHandoffAuthor, TailHandoff>());
@@ -509,6 +550,176 @@ export default function ChatContainer() {
     [addMessage, cooldownExerciseIds, markExercisePresented, sessionId, setSessionId],
   );
 
+  const fetchExerciseBySeedKey = useCallback(
+    async (seedKey: string) => {
+      if (isFetchingExercise.current) return;
+
+      isFetchingExercise.current = true;
+      setTyping(true);
+      let res: Awaited<ReturnType<typeof getExerciseBySeedKeyAction>>;
+      try {
+        res = await getExerciseBySeedKeyAction({ sessionId, seedKey });
+      } finally {
+        isFetchingExercise.current = false;
+        setTyping(false);
+      }
+
+      if (!res.success || !('exercise' in res) || !res.exercise?.id) {
+        addMessage({
+          id: createMessageId('seed-error'),
+          isBot: true,
+          content: `Не нашёл задание с seed key: \`${seedKey}\`. Проверьте написание или статус записи в админке.`,
+          type: 'text',
+        });
+        return;
+      }
+
+      if (res.sessionId) {
+        setSessionId(res.sessionId);
+      }
+
+      markExercisePresented(res.exercise.id);
+      addMessage({
+        id: createMessageId('exercise'),
+        isBot: true,
+        content: res.exercise.prompt,
+        type: 'exercise',
+        exercise: res.exercise,
+      });
+    },
+    [addMessage, markExercisePresented, sessionId, setSessionId, setTyping],
+  );
+
+  const refreshRenderedExercises = useCallback(async (targetExerciseIds?: number[]) => {
+    const targetExerciseIdSet = targetExerciseIds?.length ? new Set(targetExerciseIds) : null;
+    const exerciseIds = messages
+      .filter(isExerciseMessage)
+      .map((message) => message.exercise.id)
+      .filter((exerciseId) => !targetExerciseIdSet || targetExerciseIdSet.has(exerciseId));
+    if (exerciseIds.length === 0) return;
+
+    const res = await getExercisesByIdsAction({ exerciseIds });
+    if (!res.success) return;
+
+    const freshExercises = (res.exercises ?? []).filter(
+      (exercise): exercise is Exercise & { id: number } =>
+        typeof exercise.id === 'number',
+    );
+    updateExerciseMessages(freshExercises);
+
+    const freshById = new Map(freshExercises.map((exercise) => [exercise.id, exercise]));
+    const feedbacks: Array<{ messageId?: string; exerciseId?: number; content: string }> = [];
+    let currentExercise: (Exercise & { id: number }) | null = null;
+    let latestSubmittedAnswer:
+      | { exercise: Exercise & { id: number }; submittedAnswer: SubmittedAnswer }
+      | null = null;
+
+    for (const message of messages) {
+      if (isExerciseMessage(message)) {
+        currentExercise = freshById.get(message.exercise.id) ?? message.exercise;
+        latestSubmittedAnswer = null;
+        continue;
+      }
+
+      if (!message.isBot && message.type === 'text' && currentExercise) {
+        const submittedAnswer = submittedAnswerFromText(currentExercise, message.content);
+        latestSubmittedAnswer = submittedAnswer
+          ? { exercise: currentExercise, submittedAnswer }
+          : null;
+        continue;
+      }
+
+      if (message.isBot && message.type === 'text') {
+        const explicitExercise = message.feedbackForExerciseId
+          ? freshById.get(message.feedbackForExerciseId)
+          : undefined;
+        const explicitAnswer = message.submittedAnswer;
+        const inferred = latestSubmittedAnswer;
+        const exercise = explicitExercise ?? inferred?.exercise;
+        const submittedAnswer = explicitAnswer ?? inferred?.submittedAnswer;
+
+        if (exercise && submittedAnswer) {
+          const result = checkExerciseAnswer(exercise, submittedAnswer, { streak: 0 });
+          feedbacks.push({
+            messageId: message.id,
+            exerciseId: exercise.id,
+            content: buildFeedbackText(result, exercise.type),
+          });
+        }
+
+        latestSubmittedAnswer = null;
+      }
+    }
+    updateFeedbackMessages(feedbacks);
+  }, [messages, updateExerciseMessages, updateFeedbackMessages]);
+
+  const pollRenderedExerciseVersions = useCallback(async () => {
+    if (isPollingExerciseVersionsRef.current) return;
+
+    const exerciseIds = [
+      ...new Set(messages.filter(isExerciseMessage).map((message) => message.exercise.id)),
+    ];
+    if (exerciseIds.length === 0) return;
+
+    isPollingExerciseVersionsRef.current = true;
+    try {
+      const res = await getExerciseVersionsByIdsAction({ exerciseIds });
+      if (!res.success) return;
+
+      const changedExerciseIds: number[] = [];
+      const nextVersions = new Map(exerciseVersionByIdRef.current);
+
+      for (const version of res.versions ?? []) {
+        const previousVersion = exerciseVersionByIdRef.current.get(version.id);
+        nextVersions.set(version.id, version.updatedAt);
+
+        if (previousVersion && previousVersion !== version.updatedAt) {
+          changedExerciseIds.push(version.id);
+        }
+      }
+
+      exerciseVersionByIdRef.current = nextVersions;
+
+      if (changedExerciseIds.length > 0) {
+        void refreshRenderedExercises(changedExerciseIds);
+      }
+    } finally {
+      isPollingExerciseVersionsRef.current = false;
+    }
+  }, [messages, refreshRenderedExercises]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    void refreshRenderedExercises();
+    void pollRenderedExerciseVersions();
+
+    const unsubscribeFromExerciseUpdates = subscribeToExerciseUpdates((exerciseId) => {
+      void refreshRenderedExercises([exerciseId]);
+    });
+    const pollTimer = window.setInterval(
+      () => void pollRenderedExerciseVersions(),
+      RENDERED_EXERCISE_REFRESH_POLL_MS,
+    );
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') {
+        void refreshRenderedExercises();
+        void pollRenderedExerciseVersions();
+      }
+    }
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      unsubscribeFromExerciseUpdates();
+      window.clearInterval(pollTimer);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [hasHydrated, pollRenderedExerciseVersions, refreshRenderedExercises]);
+
   useEffect(() => {
     if (!hasHydrated) {
       return;
@@ -574,6 +785,8 @@ export default function ChatContainer() {
       isBot: true,
       content: buildFeedbackText(res.result, exercise.type),
       type: 'text',
+      feedbackForExerciseId: exercise.id,
+      submittedAnswer,
     });
 
     setTyping(true);
@@ -657,6 +870,12 @@ export default function ChatContainer() {
   }
 
   function runSlashCommand(command: SlashCommand) {
+    if (command === '/seed') {
+      setGlobalInputValue('/seed ');
+      requestAnimationFrame(() => globalInputRef.current?.focus());
+      return;
+    }
+
     setGlobalInputValue('');
 
     if (command === '/start') {
@@ -700,12 +919,21 @@ export default function ChatContainer() {
     if (!text) return;
 
     const command = text.toLowerCase();
+    const seedMatch = text.match(/^\/(?:seed|exercise)\s+(.+)$/i);
+    if (seedMatch) {
+      const seedKey = seedMatch[1].trim();
+      setGlobalInputValue('');
+      void fetchExerciseBySeedKey(seedKey);
+      return;
+    }
+
     if (
       command === '/start' ||
       command === '/blitz' ||
       command === '/ege13_quick' ||
       command === '/ege15_quick' ||
       command === '/stats' ||
+      command === '/seed' ||
       command === '/dictation' ||
       command === '/punctuation_constructor' ||
       command === '/orthography_repair'
@@ -718,7 +946,7 @@ export default function ChatContainer() {
       addMessage({
         id: createMessageId('unsupported-input'),
         isBot: true,
-        content: 'Сейчас это поле принимает команды: /dictation, /blitz, /ege13_quick, /ege15_quick, /stats, /start, /punctuation_constructor, /orthography_repair.',
+        content: 'Сейчас это поле принимает команды: /seed <seed_key>, /dictation, /blitz, /ege13_quick, /ege15_quick, /stats, /start, /punctuation_constructor, /orthography_repair.',
         type: 'text',
       });
       setGlobalInputValue('');

@@ -27,7 +27,7 @@ function buildStepFeedbackText(
     return '';
   }
   const lines = result.stepFeedback.map((step, index) => `${index + 1}. ${step.message}`);
-  return `\n\nРазбор по шагам:\n${lines.join('\n')}\n\nДальше: ${result.nextRecommendation.reason}`;
+  return `\n\nРазбор по шагам:\n${lines.join('\n')}`;
 }
 
 export function useExercisePreview(form: Form) {

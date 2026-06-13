@@ -19,6 +19,7 @@ import {
   seedPrefixForType,
 } from '@/components/admin-form/formTypeConversion';
 import { buildPayloadFromForm } from '@/components/admin-form/formMapping';
+import { publishExerciseUpdated } from '@/lib/exercise-update-events';
 import {
   createExerciseAction,
   deleteExerciseAction,
@@ -232,6 +233,10 @@ export function useExerciseSubmit({
       setMessage(wasEdit ? 'Изменения сохранены.' : 'Задание создано.');
       localStorage.removeItem(getDraftKey(form.id));
       if (form.id) clearPendingDraftMarker(form.id);
+      const savedExerciseId = wasEdit ? form.id : 'id' in res ? res.id : undefined;
+      if (savedExerciseId) {
+        publishExerciseUpdated(savedExerciseId);
+      }
       const nextForm = wasEdit ? form : loadFormState(null, EMPTY);
       setForm(nextForm);
       if (wasEdit) {

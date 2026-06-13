@@ -39,6 +39,19 @@ type GetNextExerciseInput = {
   forceType?: ExerciseType;
 };
 
+type GetExerciseBySeedKeyInput = {
+  sessionId?: string;
+  seedKey: string;
+};
+
+type GetExercisesByIdsInput = {
+  exerciseIds: number[];
+};
+
+type GetExerciseVersionsByIdsInput = {
+  exerciseIds: number[];
+};
+
 type SubmitExerciseAnswerInput = {
   sessionId: string;
   exerciseId: number;
@@ -137,6 +150,110 @@ export async function getNextExerciseAction(input: GetNextExerciseInput = {}) {
       hasSessionId: Boolean(input.sessionId),
       seenExerciseIds: input.seenExerciseIds?.length ?? 0,
       category: input.category ?? 'all',
+    });
+  }
+}
+
+export async function getExerciseBySeedKeyAction(input: GetExerciseBySeedKeyInput) {
+  const startedAt = Date.now();
+  try {
+    const seedKey = input.seedKey.trim();
+    if (!seedKey) {
+      return { success: false, error: 'Seed key is required' };
+    }
+
+    const session = await getOrCreateLearningSession(input.sessionId);
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(eq(exercises.seedKey, seedKey))
+      .limit(1);
+    const exercise = dbExerciseToDomainExercise(rows[0]);
+
+    if (!exercise) {
+      return { success: false, sessionId: session.id, error: 'Exercise not found' };
+    }
+
+    return {
+      success: true,
+      sessionId: session.id,
+      exercise,
+    };
+  } catch (error) {
+    console.error('Failed to fetch exercise by seed key:', error);
+    return { success: false, error: 'Exercise seed lookup failed' };
+  } finally {
+    logSlowServerAction('getExerciseBySeedKeyAction', startedAt, {
+      hasSessionId: Boolean(input.sessionId),
+      hasSeedKey: Boolean(input.seedKey.trim()),
+    });
+  }
+}
+
+export async function getExercisesByIdsAction(input: GetExercisesByIdsInput) {
+  const startedAt = Date.now();
+  try {
+    const ids = [...new Set(input.exerciseIds)]
+      .filter((id) => Number.isInteger(id) && id > 0)
+      .slice(0, 80);
+
+    if (ids.length === 0) {
+      return { success: true, exercises: [] as Exercise[] };
+    }
+
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(inArray(exercises.id, ids))
+      .limit(ids.length);
+    const freshExercises = rows
+      .map(dbExerciseToDomainExercise)
+      .filter((exercise): exercise is Exercise => Boolean(exercise));
+
+    return { success: true, exercises: freshExercises };
+  } catch (error) {
+    console.error('Failed to refresh exercises by ids:', error);
+    return { success: false, error: 'Exercise refresh failed' };
+  } finally {
+    logSlowServerAction('getExercisesByIdsAction', startedAt, {
+      exerciseIds: input.exerciseIds.length,
+    });
+  }
+}
+
+export async function getExerciseVersionsByIdsAction(input: GetExerciseVersionsByIdsInput) {
+  const startedAt = Date.now();
+  try {
+    const ids = [...new Set(input.exerciseIds)]
+      .filter((id) => Number.isInteger(id) && id > 0)
+      .slice(0, 80);
+
+    if (ids.length === 0) {
+      return { success: true, versions: [] as Array<{ id: number; updatedAt: string }> };
+    }
+
+    const rows = await db
+      .select({
+        id: exercises.id,
+        updatedAt: exercises.updatedAt,
+      })
+      .from(exercises)
+      .where(inArray(exercises.id, ids))
+      .limit(ids.length);
+
+    return {
+      success: true,
+      versions: rows.map((row) => ({
+        id: row.id,
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    console.error('Failed to refresh exercise versions by ids:', error);
+    return { success: false, error: 'Exercise version refresh failed' };
+  } finally {
+    logSlowServerAction('getExerciseVersionsByIdsAction', startedAt, {
+      exerciseIds: input.exerciseIds.length,
     });
   }
 }

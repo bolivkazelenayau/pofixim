@@ -5,6 +5,7 @@ import { buildPayloadFromForm } from '@/components/admin-form/formMapping';
 import { updateExerciseAction } from '@/app/actions/admin';
 import { writeStoredDraft, getDraftKey } from '@/components/admin-form/draftStorage';
 import type { Form } from '@/components/admin-form/types';
+import { publishExerciseUpdated } from '@/lib/exercise-update-events';
 
 type FormPersistenceConfig = {
   form: Form;
@@ -122,6 +123,7 @@ export function useFormPersistence({
       }
       if (res.success) {
         markSaveSucceeded(targetForm, snapshot);
+        publishExerciseUpdated(id);
         return true;
       }
       setDatabaseSaveState('local');

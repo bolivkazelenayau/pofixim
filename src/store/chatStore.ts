@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Exercise } from '@/features/exercises/schemas';
+import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 import { createMessageId } from '@/lib/message-id';
 
 export type Message = {
@@ -13,6 +13,8 @@ export type Message = {
   correctOptionIndex?: number;
   explanation?: string;
   exercise?: Exercise;
+  feedbackForExerciseId?: number;
+  submittedAnswer?: SubmittedAnswer;
   createdAt?: number;
 };
 
@@ -28,6 +30,12 @@ type ChatState = {
   streak: number;
   isTyping: boolean;
   addMessage: (msg: Message) => void;
+  updateExerciseMessages: (exercises: Array<Exercise & { id: number }>) => void;
+  updateFeedbackMessages: (feedbacks: Array<{
+    messageId?: string;
+    exerciseId?: number;
+    content: string;
+  }>) => void;
   markExercisePresented: (exerciseId: number) => void;
   setTyping: (typing: boolean) => void;
   setSessionId: (sessionId: string) => void;
@@ -118,6 +126,11 @@ function normalizePersistedChatState(
   };
 }
 
+function isSameExerciseSnapshot(current: Exercise | undefined, next: Exercise) {
+  if (!current) return false;
+  return JSON.stringify(current) === JSON.stringify(next);
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set) => ({
@@ -135,21 +148,82 @@ export const useChatStore = create<ChatState>()(
       isTyping: false,
       addMessage: (msg) =>
         set((state) => {
+          const incomingExercise = msg.type === 'exercise' ? msg.exercise : undefined;
           if (
             msg.type === 'exercise' &&
-            msg.exercise?.id &&
+            incomingExercise?.id &&
             state.messages.some(
               (message) =>
                 message.type === 'exercise' &&
-                message.exercise?.id === msg.exercise?.id,
+                message.exercise?.id === incomingExercise.id,
             )
           ) {
-            return state;
+            return {
+              messages: state.messages.map((message) =>
+                message.type === 'exercise' && message.exercise?.id === incomingExercise.id
+                  ? isSameExerciseSnapshot(message.exercise, incomingExercise)
+                    ? message
+                    : {
+                        ...message,
+                        content: incomingExercise.prompt,
+                        exercise: incomingExercise,
+                      }
+                  : message,
+              ),
+            };
           }
 
           const messageWithTimestamp = msg.createdAt ? msg : { ...msg, createdAt: Date.now() };
 
           return { messages: [...state.messages, messageWithTimestamp] };
+        }),
+      updateExerciseMessages: (freshExercises) =>
+        set((state) => {
+          if (freshExercises.length === 0) return state;
+          const freshById = new Map(freshExercises.map((exercise) => [exercise.id, exercise]));
+          let didUpdate = false;
+          const messages = state.messages.map((message) => {
+            if (message.type !== 'exercise' || !message.exercise?.id) return message;
+            const freshExercise = freshById.get(message.exercise.id);
+            if (!freshExercise) return message;
+            if (isSameExerciseSnapshot(message.exercise, freshExercise)) return message;
+
+            didUpdate = true;
+            return {
+              ...message,
+              content: freshExercise.prompt,
+              exercise: freshExercise,
+            };
+          });
+
+          return didUpdate ? { messages } : state;
+        }),
+      updateFeedbackMessages: (feedbacks) =>
+        set((state) => {
+          if (feedbacks.length === 0) return state;
+          const contentByExerciseId = new Map(
+            feedbacks
+              .filter((feedback) => typeof feedback.exerciseId === 'number')
+              .map((feedback) => [feedback.exerciseId!, feedback.content]),
+          );
+          const contentByMessageId = new Map(
+            feedbacks
+              .filter((feedback) => typeof feedback.messageId === 'string')
+              .map((feedback) => [feedback.messageId!, feedback.content]),
+          );
+          let didUpdate = false;
+          const messages = state.messages.map((message) => {
+            const content =
+              contentByMessageId.get(message.id) ??
+              (message.feedbackForExerciseId
+                ? contentByExerciseId.get(message.feedbackForExerciseId)
+                : undefined);
+            if (!content || content === message.content) return message;
+            didUpdate = true;
+            return { ...message, content };
+          });
+
+          return didUpdate ? { messages } : state;
         }),
       markExercisePresented: (exerciseId) =>
         set((state) => ({
