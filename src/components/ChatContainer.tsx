@@ -958,6 +958,7 @@ export default function ChatContainer() {
               </button>
               <textarea
                 ref={globalInputRef}
+                name="chat-message"
                 rows={1}
                 value={globalInputValue}
                 onChange={(e) => {

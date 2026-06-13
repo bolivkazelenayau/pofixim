@@ -14,6 +14,7 @@ export default function AdminWordBankClozeFields({ form, setForm }: AdminWordBan
     <div className="mt-3 space-y-3">
       <Field label="Текст со слотами ([[1]], [[2]], ...)">
         <textarea
+          name="wordBankTextWithSlots"
           className={inputClass}
           rows={4}
           value={form.wordBankTextWithSlots}
@@ -23,6 +24,7 @@ export default function AdminWordBankClozeFields({ form, setForm }: AdminWordBan
       </Field>
       <Field label="Банк слов (по одному на строку)">
         <textarea
+          name="wordBankWords"
           className={inputClass}
           rows={4}
           value={form.wordBankWords}
@@ -32,6 +34,7 @@ export default function AdminWordBankClozeFields({ form, setForm }: AdminWordBan
       </Field>
       <Field label="Правильные слова по слотам (по одному на строку)">
         <textarea
+          name="wordBankCorrectBySlot"
           className={inputClass}
           rows={3}
           value={form.wordBankCorrectBySlot}

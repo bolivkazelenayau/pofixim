@@ -18,6 +18,7 @@ export default function AdminPunctuationConstructorFields({
   <div className="mt-3 space-y-3">
    <Field label="Токены предложения (через |)">
     <textarea
+     name="punctuationConstructorTokens"
      className={inputClass}
      rows={2}
      value={form.punctuationConstructorTokens}
@@ -29,6 +30,7 @@ export default function AdminPunctuationConstructorFields({
    </Field>
    <Field label="Банк знаков: period, comma, semicolon, colon, question, exclamation, quote_open, quote_close, paren_open, paren_close, dash, ellipsis">
     <input
+     name="punctuationConstructorMarkBank"
      className={inputClass}
      value={form.punctuationConstructorMarkBank}
      onChange={(event) =>
@@ -38,6 +40,7 @@ export default function AdminPunctuationConstructorFields({
    </Field>
    <Field label="Подсказки (по одной на строку)">
     <textarea
+     name="punctuationConstructorHints"
      className={inputClass}
      rows={3}
      value={form.punctuationConstructorHints}
@@ -49,6 +52,7 @@ export default function AdminPunctuationConstructorFields({
    </Field>
    <Field label="Пошаговый режим (id | title | slot | marks)">
     <textarea
+     name="punctuationConstructorGuidedSteps"
      className={inputClass}
      rows={4}
      value={form.punctuationConstructorGuidedSteps}
@@ -63,6 +67,7 @@ export default function AdminPunctuationConstructorFields({
    </Field>
    <Field label="Правильные слоты (slot:mark)">
     <input
+     name="punctuationConstructorPlacements"
      className={inputClass}
      value={form.punctuationConstructorPlacements}
      onChange={(event) =>
@@ -87,6 +92,7 @@ export default function AdminPunctuationConstructorFields({
    </div>
    <Field label="Разбор слотов (slot | marks | text)">
     <textarea
+     name="punctuationConstructorSlotExplanations"
      className={inputClass}
      rows={3}
      value={form.punctuationConstructorSlotExplanations}
@@ -101,6 +107,7 @@ export default function AdminPunctuationConstructorFields({
    </Field>
    <Field label="Структура (label | tokenStart | tokenEnd | kind)">
     <textarea
+     name="punctuationConstructorSegments"
      className={inputClass}
      rows={2}
      value={form.punctuationConstructorSegments}

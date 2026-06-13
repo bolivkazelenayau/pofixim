@@ -110,6 +110,7 @@ export default function AdminMarkdownPreview() {
               <input
                 ref={fileInputRef}
                 type="file"
+                name="markdown-file"
                 accept=".md,.markdown,text/markdown,text/plain"
                 className="sr-only"
                 onChange={handleFileChange}
@@ -145,6 +146,7 @@ export default function AdminMarkdownPreview() {
           </div>
           <textarea
             ref={editorScrollRef}
+            name="markdown-source"
             value={markdown}
             onChange={(event) => setMarkdown(event.target.value)}
             onScroll={(event) => syncScroll('editor', event)}

@@ -15,6 +15,7 @@ export default function AdminEge21Fields({ form, setForm }: AdminEge21FieldsProp
     <div className="mt-3 space-y-3">
       <Field label="Целевой знак">
         <Select
+          name="ege21TargetPunctuation"
           value={form.ege21TargetPunctuation}
           onValueChange={(value) =>
             setForm((f) => ({
@@ -36,6 +37,7 @@ export default function AdminEge21Fields({ form, setForm }: AdminEge21FieldsProp
       </Field>
       <Field label="Предложения (каждая строка: index. text)">
         <textarea
+          name="ege21Sentences"
           className={inputClass}
           rows={5}
           value={form.ege21Sentences}
@@ -45,6 +47,7 @@ export default function AdminEge21Fields({ form, setForm }: AdminEge21FieldsProp
       </Field>
       <Field label="Правильные номера (через запятую)">
         <input
+          name="ege21TargetSet"
           className={inputClass}
           value={form.ege21TargetSet}
           onChange={(e) => setForm((f) => ({ ...f, ege21TargetSet: e.target.value }))}

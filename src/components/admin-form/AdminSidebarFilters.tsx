@@ -88,6 +88,7 @@ export default function AdminSidebarFilters({
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" aria-hidden="true" />
         <input
           id="admin-list-search"
+          name="adminListSearch"
           className={`${inputClass} pl-9 pr-9`}
           placeholder="Поиск: id / seed_key / текст"
           value={listQuery}
@@ -105,7 +106,7 @@ export default function AdminSidebarFilters({
         ) : null}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Select value={listTypeFilter} onValueChange={onListTypeFilterChange}>
+        <Select name="listTypeFilter" value={listTypeFilter} onValueChange={onListTypeFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by exercise type">
             <SelectValue />
           </SelectTrigger>
@@ -117,7 +118,7 @@ export default function AdminSidebarFilters({
             ))}
           </SelectContent>
         </Select>
-        <Select value={listExamTypeFilter} onValueChange={onListExamTypeFilterChange}>
+        <Select name="listExamTypeFilter" value={listExamTypeFilter} onValueChange={onListExamTypeFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by exam type">
             <SelectValue />
           </SelectTrigger>
@@ -131,7 +132,7 @@ export default function AdminSidebarFilters({
         </Select>
       </div>
       <div className="grid grid-cols-1 gap-2">
-        <Select value={listStatusFilter} onValueChange={onListStatusFilterChange}>
+        <Select name="listStatusFilter" value={listStatusFilter} onValueChange={onListStatusFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by quality status">
             <SelectValue />
           </SelectTrigger>
@@ -171,6 +172,7 @@ export default function AdminSidebarFilters({
           {sortPrefsReady ? (
             <>
               <Select
+                name="listSortBy"
                 value={listSortBy}
                 onValueChange={(value) =>
                   onListSortByChange(value as typeof listSortBy)

@@ -20,6 +20,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
      {form.type === 'multiple_choice' ? (
       <input
        type="radio"
+       name="correctOptionIndex"
        aria-label={`Mark option ${index + 1} as correct`}
        checked={form.correctOptionIndex === index}
        onChange={() => setForm((current) => ({ ...current, correctOptionIndex: index }))}
@@ -30,6 +31,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
       </span>
      )}
      <input
+      name={`option-${index + 1}`}
       className={inputClass}
       aria-label={`Option ${index + 1}`}
       value={option}
@@ -76,6 +78,7 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
     <label className="mt-2 block">
      <div className="mb-1 text-sm font-medium text-foreground/80 ">Правильные номера (через запятую)</div>
      <input
+      name="multiCorrectOptionIndexes"
       className={inputClass}
       value={form.multiCorrectOptionIndexes}
       onChange={(event) =>

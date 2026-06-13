@@ -268,6 +268,7 @@ export default function AdminMarkdownEditor({
         commands={markdownCommands}
         extraCommands={markdownExtraCommands}
         textareaProps={{
+          name: id,
           'aria-label': label,
         }}
       />

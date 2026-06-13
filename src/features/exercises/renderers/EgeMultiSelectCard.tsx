@@ -49,6 +49,7 @@ export default function EgeMultiSelectCard({
             >
               <input
                 type="checkbox"
+                name={`ege-multi-select-${exercise.id}`}
                 checked={checked}
                 disabled={disabled}
                 onChange={() => toggleOption(optionIndex)}

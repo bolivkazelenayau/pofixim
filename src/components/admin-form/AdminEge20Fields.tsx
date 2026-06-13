@@ -14,6 +14,7 @@ export default function AdminEge20Fields({ form, setForm }: AdminEge20FieldsProp
     <div className="mt-3 space-y-3">
       <Field label="Текст со слотами (например: ... (1) ... (2) ...)">
         <textarea
+          name="ege20TextWithSlots"
           className={inputClass}
           rows={4}
           value={form.ege20TextWithSlots}
@@ -22,6 +23,7 @@ export default function AdminEge20Fields({ form, setForm }: AdminEge20FieldsProp
       </Field>
       <Field label="Слоты (через запятую)">
         <input
+          name="ege20Slots"
           className={inputClass}
           value={form.ege20Slots}
           onChange={(e) => setForm((f) => ({ ...f, ege20Slots: e.target.value }))}
@@ -30,6 +32,7 @@ export default function AdminEge20Fields({ form, setForm }: AdminEge20FieldsProp
       </Field>
       <Field label="Правильные номера (через запятую)">
         <input
+          name="ege20TargetSet"
           className={inputClass}
           value={form.ege20TargetSet}
           onChange={(e) => setForm((f) => ({ ...f, ege20TargetSet: e.target.value }))}

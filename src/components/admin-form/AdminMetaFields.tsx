@@ -29,6 +29,7 @@ export default function AdminMetaFields({
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
     <Field id="admin-field-source-alignment" label="Source alignment">
      <input
+      name="sourceAlignment"
       className={inputClass}
       value={form.sourceAlignment}
       onChange={(event) => setForm((current) => ({ ...current, sourceAlignment: event.target.value }))}
@@ -36,6 +37,7 @@ export default function AdminMetaFields({
     </Field>
     <Field id="admin-field-typical-mistake" label="Типичная ошибка">
      <input
+      name="typicalMistake"
       className={inputClass}
       value={form.typicalMistake}
       onChange={(event) => setForm((current) => ({ ...current, typicalMistake: event.target.value }))}
@@ -45,6 +47,7 @@ export default function AdminMetaFields({
 
    <Field id="admin-field-algorithm-steps" label="Algorithm steps (по строкам)" className="mt-3">
     <textarea
+     name="algorithmSteps"
      className={inputClass}
      rows={3}
      value={form.algorithmSteps}
@@ -55,6 +58,7 @@ export default function AdminMetaFields({
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
     <Field label="Статус качества">
      <Select
+      name="qualityStatus"
       value={form.qualityStatus}
       onValueChange={(value) =>
        setForm((current) => ({
@@ -77,6 +81,7 @@ export default function AdminMetaFields({
     </Field>
     <Field label="Активность">
      <Select
+      name="isActive"
       value={form.isActive ? 'active' : 'inactive'}
       onValueChange={(value) =>
        setForm((current) => ({ ...current, isActive: value === 'active' }))

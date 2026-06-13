@@ -121,6 +121,7 @@ export default function AdminBatchActions({
       {showMoreBatchActions ? (
         <div className="grid grid-cols-1 gap-2">
           <Select
+            name="batchQualityStatus"
             value={batchStatus}
             onValueChange={(value) => onBatchStatusChange(value as typeof batchStatus)}
           >
@@ -136,6 +137,7 @@ export default function AdminBatchActions({
             </SelectContent>
           </Select>
           <Select
+            name="batchIsActive"
             value={batchIsActive}
             onValueChange={(value) => onBatchIsActiveChange(value as typeof batchIsActive)}
           >

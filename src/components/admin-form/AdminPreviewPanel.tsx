@@ -83,6 +83,7 @@ export default function AdminPreviewPanel({
       <form onSubmit={onPreviewDictationSubmit} className="mt-3 space-y-2">
        <textarea
         id="admin-preview-dictation-text"
+        name="previewDictationText"
         rows={3}
         value={previewDictationText}
         onChange={(event) => onPreviewDictationTextChange(event.target.value)}

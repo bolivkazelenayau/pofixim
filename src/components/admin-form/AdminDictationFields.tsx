@@ -14,6 +14,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
   <div className="mt-3 space-y-3">
    <Field label="Название диктанта">
     <input
+     name="dictationTitle"
      className={inputClass}
      value={form.dictationTitle}
      onChange={(event) =>
@@ -24,6 +25,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
    </Field>
    <Field label="Путь к аудио">
     <input
+     name="dictationAudioSrc"
      className={inputClass}
      value={form.dictationAudioSrc}
      onChange={(event) =>
@@ -34,6 +36,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
    </Field>
    <Field label="Скорости воспроизведения">
     <input
+     name="dictationPlaybackRates"
      className={inputClass}
      value={form.dictationPlaybackRates}
      onChange={(event) =>
@@ -44,6 +47,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
    </Field>
    <Field label="Эталонная расшифровка">
     <textarea
+     name="dictationText"
      className={inputClass}
      rows={6}
      value={form.dictationText}
@@ -57,6 +61,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
     <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
      <input
       type="checkbox"
+      name="dictationCaseSensitive"
       checked={form.dictationCaseSensitive}
       onChange={(event) =>
        setForm((current) => ({ ...current, dictationCaseSensitive: event.target.checked }))
@@ -67,6 +72,7 @@ export default function AdminDictationFields({ form, setForm }: AdminDictationFi
     <label className="flex items-center gap-2 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80">
      <input
       type="checkbox"
+      name="dictationIgnorePunctuation"
       checked={form.dictationIgnorePunctuation}
       onChange={(event) =>
        setForm((current) => ({ ...current, dictationIgnorePunctuation: event.target.checked }))

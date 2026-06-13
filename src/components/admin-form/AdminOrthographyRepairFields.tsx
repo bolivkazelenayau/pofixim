@@ -18,6 +18,7 @@ export default function AdminOrthographyRepairFields({
   <div className="mt-3 space-y-3">
    <Field label="Текст с ошибкой">
     <textarea
+     name="orthographyRepairText"
      className={inputClass}
      rows={4}
      value={form.orthographyRepairText}
@@ -29,6 +30,7 @@ export default function AdminOrthographyRepairFields({
    </Field>
    <Field label="Режим">
     <Select
+     name="orthographyRepairMode"
      value={form.orthographyRepairMode}
      onValueChange={(value) =>
       setForm((current) => ({
@@ -49,6 +51,7 @@ export default function AdminOrthographyRepairFields({
    </Field>
    <Field label="Targets (id | surface | replacement | type | options | occurrence)">
     <textarea
+     name="orthographyRepairTargets"
      className={inputClass}
      rows={5}
      value={form.orthographyRepairTargets}
@@ -60,6 +63,7 @@ export default function AdminOrthographyRepairFields({
    </Field>
    <Field label="Repairs (targetId | correct)">
     <textarea
+     name="orthographyRepairRepairs"
      className={inputClass}
      rows={3}
      value={form.orthographyRepairRepairs}
@@ -71,6 +75,7 @@ export default function AdminOrthographyRepairFields({
    </Field>
    <Field label="Подсказки (по одной на строку)">
     <textarea
+     name="orthographyRepairHints"
      className={inputClass}
      rows={3}
      value={form.orthographyRepairHints}
@@ -82,6 +87,7 @@ export default function AdminOrthographyRepairFields({
    </Field>
    <Field label="Правильный текст целиком (optional)">
     <textarea
+     name="orthographyRepairCorrectText"
      className={inputClass}
      rows={3}
      value={form.orthographyRepairCorrectText}

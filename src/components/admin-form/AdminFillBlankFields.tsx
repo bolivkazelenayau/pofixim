@@ -14,6 +14,7 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <Field id="admin-field-fill-before" label="Текст до пропуска">
         <input
+          name="fillBefore"
           className={inputClass}
           value={form.fillBefore}
           onChange={(e) => setForm((f) => ({ ...f, fillBefore: e.target.value }))}
@@ -21,6 +22,7 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
       </Field>
       <Field id="admin-field-fill-after" label="Текст после пропуска">
         <input
+          name="fillAfter"
           className={inputClass}
           value={form.fillAfter}
           onChange={(e) => setForm((f) => ({ ...f, fillAfter: e.target.value }))}
@@ -32,6 +34,7 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
         className="sm:col-span-2"
       >
         <input
+          name="fillAccepted"
           className={inputClass}
           value={form.fillAccepted}
           onChange={(e) => setForm((f) => ({ ...f, fillAccepted: e.target.value }))}

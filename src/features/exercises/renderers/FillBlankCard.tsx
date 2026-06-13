@@ -57,6 +57,7 @@ export default function FillBlankCard({
         >
           <input
             type="text"
+            name={`fill-blank-answer-${exercise.id}`}
             value={answerValue}
             disabled={disabled}
             onChange={(event) => setAnswerValue(event.target.value)}

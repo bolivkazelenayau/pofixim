@@ -68,6 +68,7 @@ function DeferredMarkdownEditor({
   <div id={id} className="mt-3">
    <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
    <textarea
+    name={id}
     className={`${inputClass} min-h-44 resize-y leading-6`}
     value={value}
     onChange={(event) => onChange(event.target.value)}
@@ -99,6 +100,7 @@ export default function AdminCoreFields({
    <div className="grid gap-3 sm:grid-cols-3">
     <Field label="Тип">
      <Select
+      name="type"
       value={form.type}
       onValueChange={(value) => onTypeChange(value as Form['type'])}
      >
@@ -116,6 +118,7 @@ export default function AdminCoreFields({
     </Field>
     <Field label="Категория">
      <Select
+      name="category"
       value={form.category}
       onValueChange={(value) =>
        setForm((current) => ({
@@ -138,6 +141,7 @@ export default function AdminCoreFields({
     </Field>
     <Field label="Сложность">
      <Select
+      name="difficulty"
       value={String(form.difficulty)}
       onValueChange={(value) =>
        setForm((current) => ({ ...current, difficulty: Number(value) as 1 | 2 }))
@@ -158,6 +162,7 @@ export default function AdminCoreFields({
     <Field id="admin-field-seed-key" label="Seed key">
      <div className="flex gap-2">
       <input
+       name="seedKey"
        className={inputClass}
        value={form.seedKey}
        onChange={(event) => {
@@ -178,6 +183,7 @@ export default function AdminCoreFields({
     </Field>
     <Field id="admin-field-skill-tags" label="Skill tags">
      <input
+      name="skillTags"
       className={inputClass}
       value={form.skillTags}
       onChange={(event) => setForm((current) => ({ ...current, skillTags: event.target.value }))}

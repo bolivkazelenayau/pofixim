@@ -14,6 +14,7 @@ export default function AdminOrderFragmentsFields({ form, setForm }: AdminOrderF
     <div className="mt-3 space-y-3">
       <Field label="Фрагменты (каждая строка: id | text)">
         <textarea
+          name="orderFragments"
           className={inputClass}
           rows={5}
           value={form.orderFragments}
@@ -23,6 +24,7 @@ export default function AdminOrderFragmentsFields({ form, setForm }: AdminOrderF
       </Field>
       <Field label="Правильный порядок id (через запятую)">
         <input
+          name="orderCorrectOrder"
           className={inputClass}
           value={form.orderCorrectOrder}
           onChange={(e) => setForm((f) => ({ ...f, orderCorrectOrder: e.target.value }))}

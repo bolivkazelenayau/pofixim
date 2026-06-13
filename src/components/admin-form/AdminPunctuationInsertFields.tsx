@@ -14,6 +14,7 @@ export default function AdminPunctuationInsertFields({ form, setForm }: AdminPun
     <div className="mt-3 space-y-3">
       <Field label="Токены предложения (через |)">
         <textarea
+          name="punctuationTokens"
           className={inputClass}
           rows={2}
           value={form.punctuationTokens}
@@ -22,6 +23,7 @@ export default function AdminPunctuationInsertFields({ form, setForm }: AdminPun
       </Field>
       <Field label="Допустимые знаки (через запятую)">
         <input
+          name="punctuationAllowedMarks"
           className={inputClass}
           value={form.punctuationAllowedMarks}
           onChange={(e) => setForm((f) => ({ ...f, punctuationAllowedMarks: e.target.value }))}
@@ -29,6 +31,7 @@ export default function AdminPunctuationInsertFields({ form, setForm }: AdminPun
       </Field>
       <Field label="Правильные позиции (индекс:знак)">
         <input
+          name="punctuationMarks"
           className={inputClass}
           value={form.punctuationMarks}
           onChange={(e) => setForm((f) => ({ ...f, punctuationMarks: e.target.value }))}

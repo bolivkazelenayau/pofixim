@@ -14,6 +14,7 @@ export default function AdminWordSearchFields({ form, setForm }: AdminWordSearch
     <div className="mt-3 space-y-3">
       <Field label="Сетка (каждая строка — строка букв)">
         <textarea
+          name="wordSearchGridRows"
           className={inputClass}
           rows={6}
           value={form.wordSearchGridRows}
@@ -23,6 +24,7 @@ export default function AdminWordSearchFields({ form, setForm }: AdminWordSearch
       </Field>
       <Field label="Скрытые слова (по одному на строку)">
         <textarea
+          name="wordSearchWords"
           className={inputClass}
           rows={4}
           value={form.wordSearchWords}

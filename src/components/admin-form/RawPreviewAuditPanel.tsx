@@ -27,12 +27,14 @@ export default function RawPreviewAuditPanel({
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
         <input
+          name="rawPreviewFilter"
           className={`${inputClass} bg-surface-strong`}
           placeholder="Файл (напр. 56151015)"
           value={filter}
           onChange={(event) => onFilterChange(event.target.value)}
         />
         <input
+          name="rawPreviewLimit"
           className={`${inputClass} bg-surface-strong`}
           type="number"
           min={1}
