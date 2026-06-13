@@ -54,7 +54,7 @@ export default function PunctuationInsertCard({
   );
 
   return (
-    <div className="mt-2 mb-5 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mt-2 mb-5 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <p className="mb-2 text-[11px] font-bold uppercase text-foreground/50">
         Выбери место для знака препинания
       </p>

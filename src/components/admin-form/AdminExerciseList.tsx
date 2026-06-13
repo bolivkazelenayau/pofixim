@@ -70,7 +70,7 @@ export default function AdminExerciseList({
                   onOpenExercise(item.id);
                 }
               }}
-              className={`w-full rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                 multiSelectedSet.has(item.id)
                   ? 'border-primary/50 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_18%,transparent)]'
                   : selectedId === item.id
@@ -121,14 +121,14 @@ export default function AdminExerciseList({
       {initialListPending ? (
         <div className="space-y-2" aria-hidden="true">
           <div className="h-[26px] rounded-md border border-stroke bg-surface motion-safe:animate-pulse" />
-          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
-          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
-          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
-          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
-          <div className="h-[114px] rounded-xl border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
+          <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
         </div>
       ) : groupedItems.length === 0 && (
-        <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4 text-sm text-foreground/70">
+        <div className="rounded-[20px] border border-dashed border-stroke bg-surface px-3 py-4 text-sm text-foreground/70">
           <div className="font-semibold text-foreground">Ничего не найдено</div>
           <p className="mt-1 text-pretty text-xs leading-5 text-foreground/55">
             Попробуйте изменить запрос, тип задания или статус.

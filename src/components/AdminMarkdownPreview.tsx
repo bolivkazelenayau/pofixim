@@ -95,7 +95,7 @@ export default function AdminMarkdownPreview() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5">
-      <div className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
+      <div className="rounded-[28px] border border-stroke bg-surface-strong p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-foreground">Markdown-превью</h2>
@@ -139,7 +139,7 @@ export default function AdminMarkdownPreview() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
+        <section className="rounded-[28px] border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Исходный markdown</h3>
             <span className="text-xs uppercase text-foreground/45">Editor</span>
@@ -151,16 +151,16 @@ export default function AdminMarkdownPreview() {
             onChange={(event) => setMarkdown(event.target.value)}
             onScroll={(event) => syncScroll('editor', event)}
             spellCheck={false}
-            className="min-h-[620px] w-full rounded-xl border border-stroke bg-surface px-4 py-3 font-mono text-sm text-foreground outline-none transition-colors duration-150 ease-out focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="min-h-[620px] w-full rounded-3xl border border-stroke bg-surface px-4 py-3 font-mono text-sm text-foreground outline-none transition-colors duration-150 ease-out focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </section>
 
-        <section className="rounded-xl border border-stroke bg-surface-strong p-5 shadow-sm">
+        <section className="rounded-[28px] border border-stroke bg-surface-strong p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">Превью</h3>
             <span className="text-xs uppercase text-foreground/45">Rendered</span>
           </div>
-          <div className="wmde-markdown-var rounded-xl border border-stroke bg-surface p-5">
+          <div className="wmde-markdown-var rounded-[28px] border border-stroke bg-surface p-5">
             <div
               ref={previewScrollRef}
               onScroll={(event) => syncScroll('preview', event)}

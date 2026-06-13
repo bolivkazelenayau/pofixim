@@ -236,7 +236,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
-        className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[22px] ${
+        className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[32px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[40px] ${
           status === 'running' ? 'min-h-[68svh] sm:min-h-0' : ''
         }`}
         aria-label="Блиц"
@@ -244,7 +244,9 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
+          className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
+            status === 'running' ? 'top-3' : 'top-[22px] sm:top-[26px]'
+          }`}
           aria-label="Close blitz"
           title="Закрыть"
         >
@@ -259,8 +261,8 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               </div>
               <div>
                 <h2 className="text-xl font-black leading-tight text-foreground">Блиц на орфограммы</h2>
-                <p className="mt-1 text-sm leading-5 text-foreground/65">
-                  За короткое время выбери пропущенную букву свайпом или стрелками.
+                <p className="mt-1 max-w-[38ch] text-pretty text-sm leading-5 text-foreground/65">
+                  За&nbsp;короткое время выбери пропущенную букву свайпом или стрелками.
                 </p>
               </div>
             </div>
@@ -271,7 +273,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
                   key={item}
                   type="button"
                   onClick={() => setDuration(item)}
-                  className={`h-12 rounded-xl border text-sm font-bold transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  className={`h-12 rounded-2xl border text-sm font-bold transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     duration === item
                       ? 'border-primary bg-primary text-white shadow-sm'
                       : 'border-[var(--stroke)] bg-[var(--surface)] text-foreground hover:border-primary/60 hover:bg-stroke dark:hover:bg-stroke'
@@ -286,7 +288,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               type="button"
               onClick={start}
               disabled={cards.length === 0}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
             >
               <Timer className="h-5 w-5" />
               Старт
@@ -296,19 +298,21 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
         {status === 'running' && currentCard && (
           <div className="flex flex-1 flex-col p-3 sm:block sm:p-5">
-            <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pr-9 sm:mb-3 sm:pr-10">
-              <div className="justify-self-start rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black tabular-nums text-foreground shadow-sm sm:px-3 sm:text-sm">
+            <div className="relative mb-2 flex min-h-8 items-center justify-between gap-2 sm:mb-3">
+              <div className="rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black tabular-nums text-foreground shadow-sm sm:px-3 sm:text-sm">
                 {timeLeftSeconds} c
               </div>
-              {combo > 0 && (
-                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black tabular-nums text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:gap-1.5 sm:px-3 sm:text-sm">
+              <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
+                {scoreDelta}
+              </div>
+              {combo > 0 ? (
+                <div className="mr-10 flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black tabular-nums text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:mr-11 sm:gap-1.5 sm:px-3 sm:text-sm">
                   <Zap className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
                   {combo}
                 </div>
+              ) : (
+                <div className="mr-10 sm:mr-11" />
               )}
-              <div className="justify-self-end rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
-                {scoreDelta}
-              </div>
             </div>
 
             <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[var(--stroke)] sm:mb-4 sm:h-2">
@@ -426,7 +430,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(0)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-[20px] rounded-bl-[24px] border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[0]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">
@@ -436,7 +440,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               <button
                 type="button"
                 onClick={() => answer(1)}
-                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
+                className="flex h-14 min-w-0 flex-col items-center justify-center rounded-[20px] rounded-br-[24px] border border-[var(--stroke)] bg-[var(--surface)] px-3 text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               >
                 <span className="text-xl font-black leading-tight">{currentCard.choices[1]}</span>
                 <span className="max-w-full truncate text-[11px] font-bold text-foreground/45">

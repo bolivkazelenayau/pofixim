@@ -27,7 +27,7 @@ const AdminMarkdownEditor = dynamic(
  () => import('@/components/admin-form/markdown/AdminMarkdownEditor'),
  {
   loading: () => (
-   <div className="mt-3 rounded-xl border border-stroke bg-surface-strong p-3">
+   <div className="mt-3 rounded-[20px] border border-stroke bg-surface-strong p-3">
     <div className="mb-2 h-4 w-32 rounded bg-foreground/10 motion-safe:animate-pulse" />
     <div className="h-44 rounded-lg bg-foreground/10 motion-safe:animate-pulse" />
    </div>

@@ -79,7 +79,7 @@ export default function AdminPunctuationConstructorFields({
      placeholder="2:colon, 2:quote_open, 3:comma, 6:quote_close, 6:period"
     />
    </Field>
-   <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-3 py-2">
     <div className="mb-1 text-xs font-bold uppercase text-emerald-700">
      Правильный ответ
     </div>

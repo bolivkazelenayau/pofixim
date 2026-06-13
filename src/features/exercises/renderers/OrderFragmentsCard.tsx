@@ -87,7 +87,7 @@ export default function OrderFragmentsCard({ exercise, disabled, onSubmit }: Pro
   const answerLabel = order.map(id => fragmentText(id)).join(' ');
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <p className="mb-2 text-xs font-semibold text-foreground/60">
         Порядок фрагментов
       </p>

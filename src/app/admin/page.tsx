@@ -76,7 +76,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <main className="min-h-dvh bg-background px-4 py-8">
-      <div className="mx-auto mb-5 flex w-full max-w-[1400px] items-center justify-between rounded-2xl border border-stroke bg-surface-strong px-5 py-4 shadow-sm">
+      <div className="mx-auto mb-5 flex w-full max-w-[1400px] items-center justify-between rounded-[28px] border border-stroke bg-surface-strong px-5 py-4 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Панель администратора</h1>
           <p className="mt-1 text-sm text-foreground/70">

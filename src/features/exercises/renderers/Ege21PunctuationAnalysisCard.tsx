@@ -45,7 +45,7 @@ export default function Ege21PunctuationAnalysisCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <p className="mb-2 text-xs font-semibold uppercase text-foreground/60">
         ЕГЭ-21 · {PUNCTUATION_LABEL[exercise.payload.targetPunctuation]}
       </p>

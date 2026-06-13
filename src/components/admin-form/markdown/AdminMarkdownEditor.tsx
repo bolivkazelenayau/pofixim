@@ -9,7 +9,7 @@ import '@uiw/react-markdown-preview/markdown.css';
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
   ssr: false,
   loading: () => (
-    <div className="admin-md-skeleton h-[205px] rounded-lg border border-stroke bg-surface-strong p-3">
+    <div className="admin-md-skeleton h-[205px] rounded-[20px] border border-stroke bg-surface-strong p-3">
       <div className="admin-md-skeleton-bar mb-3 h-8 w-full rounded-md bg-slate-100 dark:bg-slate-800" />
       <div className="admin-md-skeleton-panel h-[147px] w-full rounded-md bg-surface dark:bg-slate-800/70" />
     </div>

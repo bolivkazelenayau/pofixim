@@ -148,7 +148,7 @@ export default function WordSearchCard({
   };
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <div className="mb-3 overflow-auto rounded-lg border border-stroke bg-surface p-2 touch-none select-none">
         <div className="grid w-max gap-1 touch-none select-none" style={{ gridTemplateColumns: `repeat(${cols}, minmax(32px, 1fr))` }}>
           {exercise.payload.grid.flatMap((row, r) =>

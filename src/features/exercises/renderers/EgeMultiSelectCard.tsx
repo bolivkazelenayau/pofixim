@@ -33,7 +33,7 @@ export default function EgeMultiSelectCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-3 shadow-sm sm:p-4">
+    <div className="mb-5 mt-2 rounded-3xl border border-stroke bg-surface-strong p-3 shadow-sm sm:rounded-[28px] sm:p-4">
       <div className="mb-3 grid grid-cols-1 gap-2">
         {exercise.payload.options.map((option, idx) => {
           const optionIndex = idx + 1;

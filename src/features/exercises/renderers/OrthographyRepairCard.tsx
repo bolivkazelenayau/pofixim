@@ -172,7 +172,7 @@ export default function OrthographyRepairCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <div className="rounded-xl border border-stroke bg-surface px-3 py-3 text-lg font-medium leading-9 text-foreground">
         {segments.map((segment) => {
           if (segment.kind === 'target') {
@@ -254,7 +254,7 @@ export default function OrthographyRepairCard({
           type="button"
           disabled={disabled || repairedCount === 0}
           onClick={reset}
-          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-[background-color,border-color,opacity,transform] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong disabled:active:scale-100 dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
+          className="rounded-lg rounded-bl-2xl border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-[background-color,border-color,opacity,transform] duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong disabled:active:scale-100 dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить
         </button>
@@ -262,7 +262,7 @@ export default function OrthographyRepairCard({
           whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           disabled={disabled || !canSubmit}
           onClick={submit}
-          className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+          className="min-w-0 flex-1 rounded-xl rounded-br-2xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
         >
           Проверить
         </motion.button>

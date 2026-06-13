@@ -98,7 +98,7 @@ export default function AdminMetaFields({
     </Field>
    </div>
 
-    <div ref={mainSaveAnchorRef} className="mt-5 grid gap-2 rounded-xl border border-stroke bg-surface p-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <div ref={mainSaveAnchorRef} className="mt-5 grid gap-2 rounded-2xl border border-stroke bg-surface p-2 sm:grid-cols-[minmax(0,1fr)_auto]">
      <button
       type="submit"
       disabled={saving || deleting}

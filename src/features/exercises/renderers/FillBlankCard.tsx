@@ -43,7 +43,7 @@ export default function FillBlankCard({
     return (
       <div
         className={cn(
-          'mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm',
+          'mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm',
           beforeLayout.centered && 'text-center',
         )}
       >
@@ -77,7 +77,7 @@ export default function FillBlankCard({
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm">
+    <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
       <div
         className={cn(
           'flex flex-wrap items-center gap-2 text-xl font-semibold leading-tight text-foreground sm:text-2xl',

@@ -206,7 +206,7 @@ export default function DictationCard({ exercise }: Props) {
   }
 
   return (
-    <div className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-3 shadow-sm">
+    <div className="mb-5 mt-2 rounded-3xl border border-stroke bg-surface-strong p-3 shadow-sm">
       <audio
         ref={audioRef}
         src={exercise.payload.audioSrc}

@@ -16,7 +16,7 @@ export default function AdminDraftRecoveryModal({
   <DialogPrimitive.Root open>
    <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-slate-900/60" />
-    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-stroke/50 bg-surface-strong text-foreground shadow-sm outline-none">
+    <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[28px] border border-stroke/50 bg-surface-strong text-foreground shadow-sm outline-none">
      <div className="border-b border-stroke/50 bg-surface/30 p-6">
       <div className="flex items-center gap-4">
        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 shadow-sm">

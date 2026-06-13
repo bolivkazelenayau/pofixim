@@ -38,7 +38,7 @@ export default function AdminBatchActions({
 
   return (
     <TooltipProvider>
-    <div className="mb-3 space-y-2 rounded-xl border border-stroke bg-surface p-2.5">
+    <div className="mb-3 space-y-2 rounded-[18px] border border-stroke bg-surface p-2.5">
       <div className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground/80">
         <span className="tabular-nums">Выбрано: {selectedCount}</span>
         <Tooltip>

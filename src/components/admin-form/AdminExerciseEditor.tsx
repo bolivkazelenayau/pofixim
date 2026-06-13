@@ -139,7 +139,7 @@ function useIdleReady() {
 
 function PreviewPanelShell() {
   return (
-    <section className="h-fit rounded-xl border border-stroke bg-surface-strong p-4">
+    <section className="h-fit rounded-3xl border border-stroke bg-surface-strong p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Превью в чате</h3>
@@ -149,7 +149,7 @@ function PreviewPanelShell() {
         </div>
         <EditorSkeletonBlock className="h-8 w-28 rounded-lg" />
       </div>
-      <div className="rounded-xl border border-dashed border-stroke bg-surface px-3 py-4">
+      <div className="rounded-[20px] border border-dashed border-stroke bg-surface px-3 py-4">
         <div className="text-sm font-semibold text-foreground">Превью появится здесь</div>
         <p className="mt-1 text-pretty text-xs leading-5 text-foreground/70">
           Заполните формулировку, ответ и объяснение, чтобы проверить карточку перед сохранением.
@@ -161,7 +161,7 @@ function PreviewPanelShell() {
 
 function QualityInspectorShell() {
   return (
-    <section className="rounded-xl border border-stroke bg-surface-strong p-4">
+    <section className="rounded-3xl border border-stroke bg-surface-strong p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
@@ -221,7 +221,7 @@ function AdminExerciseEditorSkeleton() {
           </div>
         </div>
 
-        <aside className="rounded-xl border border-stroke bg-surface p-4">
+        <aside className="rounded-3xl border border-stroke bg-surface p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <EditorSkeletonBlock className="h-5 w-28" />
             <EditorSkeletonBlock className="h-8 w-28 rounded-lg" />
@@ -289,7 +289,7 @@ export default function AdminExerciseEditor({
   return (
     <>
       <div
-        className="relative rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm sm:p-5"
+        className="relative rounded-3xl border border-stroke bg-surface-strong p-4 shadow-sm sm:rounded-[28px] sm:p-5"
         aria-busy={isInitialSelectionLoading}
       >
         {isInitialSelectionLoading ? (

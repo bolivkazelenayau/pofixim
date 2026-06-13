@@ -79,7 +79,7 @@ export default function WordBankClozeCard({
 
   return (
     <div
-      className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm"
+      className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm"
       onClick={() => setActiveSlot(null)}
     >
       <div className="text-[19px] leading-[2.35] text-foreground sm:text-[20px]">

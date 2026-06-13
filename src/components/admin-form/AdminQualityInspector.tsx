@@ -53,7 +53,7 @@ export default function AdminQualityInspector({
   }
 
   return (
-    <section className="rounded-xl border border-stroke bg-surface-strong p-4">
+    <section className="rounded-3xl border border-stroke bg-surface-strong p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
@@ -85,7 +85,7 @@ export default function AdminQualityInspector({
       </div>
 
       {hasInvisibleText ? (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-500/25 dark:bg-amber-500/10">
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-500/25 dark:bg-amber-500/10">
           <div className="text-xs font-semibold text-amber-800 dark:text-amber-200">
             Есть скрытые символы в тексте
           </div>

@@ -23,6 +23,16 @@ function scoreForAnswer(combo: number) {
   return 8 + (combo > 0 && combo % 8 === 0 ? 20 : 0);
 }
 
+const RUSSIAN_SHORT_WORD_PATTERN =
+  /(^|[\s([{«„"'])((?:в|во|к|ко|с|со|о|об|от|до|по|за|из|у|и|а|но|не|ни|без|для|над|под|при|про|или))\s+/giu;
+
+function keepRussianShortWords(text: string) {
+  return text.replace(
+    RUSSIAN_SHORT_WORD_PATTERN,
+    (_match, prefix: string, word: string) => `${prefix}${word}\u00A0`,
+  );
+}
+
 export default function Ege15QuickGame({
   cards,
   onClose,
@@ -160,7 +170,7 @@ export default function Ege15QuickGame({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
-        className="relative flex max-h-[94svh] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[22px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[22px]"
+        className="relative flex max-h-[94svh] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[32px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[40px]"
         role="dialog"
         aria-modal="true"
         aria-label="Быстрый тип 15"
@@ -168,7 +178,9 @@ export default function Ege15QuickGame({
         <button
           type="button"
           onClick={status === 'running' ? finish : onClose}
-          className="absolute right-3 top-3 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
+          className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
+            status === 'running' ? 'top-3' : 'top-[22px] sm:top-[26px]'
+          }`}
           aria-label="Close quick game"
           title="Закрыть"
         >
@@ -183,8 +195,8 @@ export default function Ege15QuickGame({
               </div>
               <div>
                 <h2 className="text-xl font-black leading-tight text-foreground">Тип 15 быстро</h2>
-                <p className="mt-1 text-sm leading-5 text-foreground/65">
-                  Выбери, сколько Н пишется в отмеченной позиции.
+                <p className="mt-1 max-w-[38ch] text-pretty text-sm leading-5 text-foreground/65">
+                  Выбери, сколько Н пишется в&nbsp;отмеченной позиции.
                 </p>
               </div>
             </div>
@@ -193,7 +205,7 @@ export default function Ege15QuickGame({
               type="button"
               onClick={start}
               disabled={localCards.length === 0}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
             >
               <BadgeCheck className="h-5 w-5" />
               Старт
@@ -203,14 +215,13 @@ export default function Ege15QuickGame({
 
         {status === 'running' && currentCard && (
           <div className="flex flex-1 flex-col p-3 sm:p-5">
-            <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-2 pr-9 sm:mb-4 sm:pr-10">
+            <div className="relative mb-3 flex min-h-8 items-center sm:mb-4">
               {combo > 0 && (
                 <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                   x{combo}
                 </div>
               )}
-              {!combo && <div />}
-              <div className="justify-self-end rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
+              <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
             </div>
@@ -244,7 +255,7 @@ export default function Ege15QuickGame({
                 </p>
                 {currentCard.explanationSnippet && lastAnswerCorrect !== null && (
                   <p className="mx-auto mt-5 max-w-[440px] rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] px-3 py-2 text-left text-xs font-semibold leading-5 text-foreground/65">
-                    {currentCard.explanationSnippet}
+                    {keepRussianShortWords(currentCard.explanationSnippet)}
                   </p>
                 )}
               </motion.div>
@@ -255,7 +266,7 @@ export default function Ege15QuickGame({
                 <button
                   type="button"
                   onClick={nextCard}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] sm:text-lg"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-[20px] rounded-b-[24px] bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] sm:text-lg"
                 >
                   Далее
                   <ArrowRight className="h-5 w-5" />
@@ -357,7 +368,9 @@ function ChoiceButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-14 min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-70 dark:hover:bg-stroke sm:text-lg"
+      className={`flex h-14 min-w-0 items-center justify-center gap-2 rounded-[20px] border border-[var(--stroke)] bg-[var(--surface)] px-3 text-base font-black text-foreground shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:border-primary/60 hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-70 dark:hover:bg-stroke sm:text-lg ${
+        icon === 'left' ? 'rounded-bl-[24px]' : 'rounded-br-[24px]'
+      }`}
     >
       {icon === 'left' && <Icon className="h-4 w-4 text-foreground/50" aria-hidden="true" />}
       <span className="truncate">{label}</span>

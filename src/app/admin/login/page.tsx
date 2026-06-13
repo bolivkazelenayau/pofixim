@@ -16,7 +16,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
         <ThemeToggle />
       </div>
 
-      <section className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-stroke/60 bg-surface-strong p-8 shadow-xl dark:border-stroke/30">
+      <section className="relative w-full max-w-md overflow-hidden rounded-[44px] border border-stroke/60 bg-surface-strong p-8 shadow-xl dark:border-stroke/30">
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-md shadow-primary/20">
             <Database className="h-6 w-6" aria-hidden="true" />

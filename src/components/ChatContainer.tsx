@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { BarChart3, RotateCcw, Zap, PenTool } from 'lucide-react';
+import {
+  AudioWaveform,
+  BadgeCheck,
+  BarChart3,
+  BookOpenCheck,
+  ListChecks,
+  RotateCcw,
+  Wrench,
+  Zap,
+} from 'lucide-react';
 import type { ExerciseType } from '@/features/exercises/types';
 import {
   getNextExerciseAction,
@@ -82,6 +91,27 @@ const SLASH_COMMANDS = [
 ] as const;
 
 type SlashCommand = (typeof SLASH_COMMANDS)[number]['command'];
+
+function getSlashCommandIcon(command: SlashCommand) {
+  switch (command) {
+    case '/dictation':
+      return AudioWaveform;
+    case '/punctuation_constructor':
+      return ListChecks;
+    case '/orthography_repair':
+      return Wrench;
+    case '/blitz':
+      return Zap;
+    case '/ege13_quick':
+      return BookOpenCheck;
+    case '/ege15_quick':
+      return BadgeCheck;
+    case '/stats':
+      return BarChart3;
+    case '/start':
+      return RotateCcw;
+  }
+}
 
 function isExerciseMessage(message: Message): message is ExerciseMessage {
   return (
@@ -791,7 +821,7 @@ export default function ChatContainer() {
 
       <div className="z-sticky grid min-h-[68px] shrink-0 grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-base font-bold text-white">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-base font-bold text-white">
             П
           </div>
           <div className="min-w-0">
@@ -903,7 +933,7 @@ export default function ChatContainer() {
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-popover w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
                   {visibleSlashCommands.map((item, index) => {
-                    const Icon = item.command === '/blitz' ? Zap : item.command === '/stats' ? BarChart3 : item.command === '/ege13_quick' || item.command === '/ege15_quick' || item.command.startsWith('/punctuation') || item.command.startsWith('/orthography') ? PenTool : RotateCcw;
+                    const Icon = getSlashCommandIcon(item.command);
                     const isActive = index === activeSlashCommandIndex;
                     return (
                       <button

@@ -21,7 +21,7 @@ export default function RawPreviewAuditPanel({
   onRun,
 }: RawPreviewAuditPanelProps) {
   return (
-    <div className="mt-4 rounded-xl border border-dashed border-stroke/70 bg-surface/30 p-3">
+    <div className="mt-4 rounded-[20px] border border-dashed border-stroke/70 bg-surface/30 p-3">
       <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/50">
         Raw HTML Preview
       </div>
@@ -56,7 +56,7 @@ export default function RawPreviewAuditPanel({
       {items.length > 0 ? (
         <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
           {items.map((item) => (
-            <div key={item.file} className="rounded-md border border-stroke bg-surface-strong p-2 text-xs">
+            <div key={item.file} className="rounded-2xl border border-stroke bg-surface-strong p-2 text-xs">
               <div className="font-semibold text-foreground/80">{item.file}</div>
               <div className="mt-1 text-foreground/70">
                 пробелы-перед-пунктуацией: {item.beforeIssues.spacesBeforePunct} →{' '}

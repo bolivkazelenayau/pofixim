@@ -90,7 +90,7 @@ export default function AdminExerciseSidebar({
   return (
     <aside
       ref={sidebarRef}
-      className="flex h-[60vh] flex-col rounded-xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
+      className="flex h-[60vh] flex-col rounded-3xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>

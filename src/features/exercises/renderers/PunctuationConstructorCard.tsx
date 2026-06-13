@@ -368,7 +368,7 @@ export default function PunctuationConstructorCard({
 
   return (
     <div
-      className="mb-5 mt-2 rounded-xl border border-stroke bg-surface-strong p-4 shadow-sm"
+      className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           setSelectedMark(null);
@@ -701,7 +701,7 @@ export default function PunctuationConstructorCard({
             setPlacements([]);
             setChecked(false);
           }}
-          className="rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
+          className="rounded-lg rounded-bl-2xl border border-stroke bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
         >
           Сбросить
         </button>
@@ -709,7 +709,7 @@ export default function PunctuationConstructorCard({
           whileTap={whenMotion(!disabled && !shouldReduceMotion, PRESS_TAP)}
           disabled={disabled}
           onClick={submit}
-          className="min-w-0 flex-1 rounded-xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
+          className="min-w-0 flex-1 rounded-xl rounded-br-2xl bg-primary px-5 py-3 font-bold text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:bg-[var(--stroke)] dark:disabled:bg-[var(--stroke)]"
         >
           Проверить
         </motion.button>
