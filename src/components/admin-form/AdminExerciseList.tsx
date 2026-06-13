@@ -70,7 +70,7 @@ export default function AdminExerciseList({
                   onOpenExercise(item.id);
                 }
               }}
-              className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out [contain-intrinsic-size:114px] [content-visibility:auto] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                 multiSelectedSet.has(item.id)
                   ? 'border-primary/50 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_18%,transparent)]'
                   : selectedId === item.id

@@ -137,6 +137,24 @@ function useIdleReady() {
   return ready;
 }
 
+function useAfterFirstPaint() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => setReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [ready]);
+
+  return ready;
+}
+
 function PreviewPanelShell() {
   return (
     <section className="h-fit rounded-3xl border border-stroke bg-surface-strong p-4">
@@ -279,6 +297,7 @@ export default function AdminExerciseEditor({
   actions,
 }: AdminExerciseEditorProps) {
   const { form, formRef, mainSaveAnchorRef, setForm, typeOptions } = formState;
+  const afterFirstPaint = useAfterFirstPaint();
   const idleReady = useIdleReady();
   const previewHasContent = Boolean(
     previewState.preview.error || previewState.checkResult || previewState.dictationText.trim(),
@@ -337,7 +356,11 @@ export default function AdminExerciseEditor({
               onSeedManualChange={actions.onSeedManualChange}
             />
 
-            <TypeSpecificFields form={form} setForm={setForm} />
+            {afterFirstPaint ? (
+              <TypeSpecificFields form={form} setForm={setForm} />
+            ) : (
+              typeFieldLoading()
+            )}
 
             <AdminMetaFields
               form={form}

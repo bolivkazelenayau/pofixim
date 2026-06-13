@@ -9,7 +9,7 @@ import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/a
 import type { ExerciseListResponse } from '@/components/admin-form/types';
 import { requireAdminPageSession } from '@/lib/admin-auth';
 
-const ADMIN_INITIAL_LIST_LIMIT = 30;
+const ADMIN_INITIAL_LIST_LIMIT = 15;
 
 type AdminExerciseListPageParam = {
   offset: number;
