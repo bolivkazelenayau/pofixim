@@ -18,6 +18,7 @@ import {
   getExerciseBySeedKeyAction,
   getExerciseVersionsByIdsAction,
   getExercisesByIdsAction,
+  getQuickCardsBySeedAction,
   getNextExerciseAction,
   submitExerciseAnswerAction,
 } from '@/app/actions/exercises';
@@ -36,6 +37,9 @@ import Ege13QuickGame from './Ege13QuickGame';
 import Ege15QuickGame from './Ege15QuickGame';
 import MessageBubble, { MESSAGE_ENTER_DURATION_MS } from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
+import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
+import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
+import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
 
 const TAIL_HANDOFF_RATIO = 0.25;
 const TAIL_HANDOFF_MS = Math.round(MESSAGE_ENTER_DURATION_MS * TAIL_HANDOFF_RATIO);
@@ -91,6 +95,11 @@ const SLASH_COMMANDS = [
     description: 'Открыть конкретное задание',
   },
   {
+    command: '/qseed',
+    title: 'Quick seed',
+    description: 'Открыть quick-карточку',
+  },
+  {
     command: '/stats',
     title: 'Рейтинг',
     description: 'Посмотреть таблицу лидеров',
@@ -119,6 +128,7 @@ function getSlashCommandIcon(command: SlashCommand) {
     case '/ege15_quick':
       return BadgeCheck;
     case '/seed':
+    case '/qseed':
       return Hash;
     case '/stats':
       return BarChart3;
@@ -238,6 +248,54 @@ function submittedAnswerFromText(exercise: Exercise, text: string): SubmittedAns
   }
 
   return null;
+}
+
+type QuickSeedMode = 'blitz' | 'ege13' | 'ege15';
+
+function parsePositiveInt(value: string | undefined) {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseQuickSeedCommand(text: string) {
+  const parts = text.trim().split(/\s+/u);
+  if (parts[0]?.toLowerCase() !== '/qseed' || parts.length < 3) return null;
+
+  const modeAlias = parts[1].toLowerCase();
+  const mode: QuickSeedMode | null =
+    modeAlias === 'blitz' || modeAlias === 'ege9'
+      ? 'blitz'
+      : modeAlias === 'ege13' || modeAlias === '13'
+        ? 'ege13'
+        : modeAlias === 'ege15' || modeAlias === '15'
+          ? 'ege15'
+          : null;
+  if (!mode) return null;
+
+  const seedKey = parts[2];
+  const options = new Map<string, string>();
+  for (const part of parts.slice(3)) {
+    const [rawKey, ...rawValue] = part.split('=');
+    const key = rawKey?.toLowerCase();
+    const value = rawValue.join('=');
+    if (key && value) options.set(key, value);
+  }
+
+  const positionalSelector = parts[3]?.includes('=') ? undefined : parts[3];
+
+  return {
+    mode,
+    seedKey,
+    rowIndex: parsePositiveInt(
+      options.get('row') ?? options.get('r') ?? (mode === 'ege13' ? positionalSelector : undefined),
+    ),
+    positionIndex: parsePositiveInt(
+      options.get('pos') ?? options.get('position') ?? (mode === 'ege15' ? positionalSelector : undefined),
+    ),
+    wordIndex: parsePositiveInt(options.get('word') ?? options.get('w')),
+    cardId: options.get('card') ?? options.get('id'),
+  };
 }
 
 export default function ChatContainer() {
@@ -590,6 +648,47 @@ export default function ChatContainer() {
     [addMessage, markExercisePresented, sessionId, setSessionId, setTyping],
   );
 
+  const fetchQuickCardsBySeed = useCallback(
+    async (quickSeed: NonNullable<ReturnType<typeof parseQuickSeedCommand>>) => {
+      if (isFetchingExercise.current) return;
+
+      isFetchingExercise.current = true;
+      setTyping(true);
+      let res: Awaited<ReturnType<typeof getQuickCardsBySeedAction>>;
+      try {
+        res = await getQuickCardsBySeedAction(quickSeed);
+      } finally {
+        isFetchingExercise.current = false;
+        setTyping(false);
+      }
+
+      if (!res.success || !res.cards?.length) {
+        addMessage({
+          id: createMessageId('qseed-error'),
+          isBot: true,
+          content:
+            `Не нашёл quick-карточку для команды. Проверь seed и селектор: ` +
+            '`/qseed ege13 <seed> row=5`, `/qseed ege15 <seed> pos=1`, `/qseed blitz <seed> row=2 word=1`.',
+          type: 'text',
+        });
+        return;
+      }
+
+      if (quickSeed.mode === 'ege13') {
+        ege13Quick.openWithCards(res.cards as Ege13QuickCard[]);
+        return;
+      }
+
+      if (quickSeed.mode === 'ege15') {
+        ege15Quick.openWithCards(res.cards as Ege15QuickCard[]);
+        return;
+      }
+
+      blitz.openWithCards(res.cards as Ege9BlitzCard[]);
+    },
+    [addMessage, blitz, ege13Quick, ege15Quick, setTyping],
+  );
+
   const refreshRenderedExercises = useCallback(async (targetExerciseIds?: number[]) => {
     const targetExerciseIdSet = targetExerciseIds?.length ? new Set(targetExerciseIds) : null;
     const exerciseIds = messages
@@ -870,8 +969,8 @@ export default function ChatContainer() {
   }
 
   function runSlashCommand(command: SlashCommand) {
-    if (command === '/seed') {
-      setGlobalInputValue('/seed ');
+    if (command === '/seed' || command === '/qseed') {
+      setGlobalInputValue(command === '/seed' ? '/seed ' : '/qseed ');
       requestAnimationFrame(() => globalInputRef.current?.focus());
       return;
     }
@@ -919,6 +1018,13 @@ export default function ChatContainer() {
     if (!text) return;
 
     const command = text.toLowerCase();
+    const quickSeed = parseQuickSeedCommand(text);
+    if (quickSeed) {
+      setGlobalInputValue('');
+      void fetchQuickCardsBySeed(quickSeed);
+      return;
+    }
+
     const seedMatch = text.match(/^\/(?:seed|exercise)\s+(.+)$/i);
     if (seedMatch) {
       const seedKey = seedMatch[1].trim();
@@ -934,6 +1040,7 @@ export default function ChatContainer() {
       command === '/ege15_quick' ||
       command === '/stats' ||
       command === '/seed' ||
+      command === '/qseed' ||
       command === '/dictation' ||
       command === '/punctuation_constructor' ||
       command === '/orthography_repair'
@@ -946,7 +1053,7 @@ export default function ChatContainer() {
       addMessage({
         id: createMessageId('unsupported-input'),
         isBot: true,
-        content: 'Сейчас это поле принимает команды: /seed <seed_key>, /dictation, /blitz, /ege13_quick, /ege15_quick, /stats, /start, /punctuation_constructor, /orthography_repair.',
+        content: 'Сейчас это поле принимает команды: /seed <seed_key>, /qseed <mode> <seed_key> <selector>, /dictation, /blitz, /ege13_quick, /ege15_quick, /stats, /start, /punctuation_constructor, /orthography_repair.',
         type: 'text',
       });
       setGlobalInputValue('');

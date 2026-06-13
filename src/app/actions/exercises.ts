@@ -52,6 +52,15 @@ type GetExerciseVersionsByIdsInput = {
   exerciseIds: number[];
 };
 
+type GetQuickCardsBySeedInput = {
+  mode: 'blitz' | 'ege13' | 'ege15';
+  seedKey: string;
+  rowIndex?: number;
+  positionIndex?: number;
+  wordIndex?: number;
+  cardId?: string;
+};
+
 type SubmitExerciseAnswerInput = {
   sessionId: string;
   exerciseId: number;
@@ -254,6 +263,68 @@ export async function getExerciseVersionsByIdsAction(input: GetExerciseVersionsB
   } finally {
     logSlowServerAction('getExerciseVersionsByIdsAction', startedAt, {
       exerciseIds: input.exerciseIds.length,
+    });
+  }
+}
+
+export async function getQuickCardsBySeedAction(input: GetQuickCardsBySeedInput) {
+  const startedAt = Date.now();
+  try {
+    const seedKey = input.seedKey.trim();
+    if (!seedKey) {
+      return { success: false, error: 'Seed key is required', cards: [] };
+    }
+
+    const rows = await db
+      .select()
+      .from(exercises)
+      .where(eq(exercises.seedKey, seedKey))
+      .limit(1);
+    const exercise = dbExerciseToDomainExercise(rows[0]);
+
+    if (!exercise) {
+      return { success: false, error: 'Exercise not found', cards: [] };
+    }
+
+    if (input.mode === 'ege13') {
+      if (exercise.type !== 'ege_multi_select') {
+        return { success: false, error: 'Quick type 13 expects an EGE multi-select exercise', cards: [] };
+      }
+      const cards = buildEge13QuickCards(exercise).filter((card) => {
+        if (input.cardId) return card.id === input.cardId;
+        return !input.rowIndex || card.rowIndex === input.rowIndex;
+      });
+      return { success: true, cards };
+    }
+
+    if (input.mode === 'ege15') {
+      if (exercise.type !== 'fill_blank') {
+        return { success: false, error: 'Quick type 15 expects a fill-blank exercise', cards: [] };
+      }
+      const cards = buildEge15QuickCards(exercise).filter((card) => {
+        if (input.cardId) return card.id === input.cardId;
+        return !input.positionIndex || card.positionIndex === input.positionIndex;
+      });
+      return { success: true, cards };
+    }
+
+    if (exercise.type !== 'ege_multi_select') {
+      return { success: false, error: 'Blitz expects an EGE multi-select exercise', cards: [] };
+    }
+    const cards = buildEge9BlitzCards(exercise).filter((card) => {
+      if (input.cardId) return card.id === input.cardId;
+      const rowMatches = !input.rowIndex || card.rowIndex === input.rowIndex;
+      const wordMatches = !input.wordIndex || card.wordIndex === input.wordIndex;
+      return rowMatches && wordMatches;
+    });
+    return { success: true, cards };
+  } catch (error) {
+    console.error('Failed to fetch quick cards by seed:', error);
+    return { success: false, error: 'Quick seed lookup failed', cards: [] };
+  } finally {
+    logSlowServerAction('getQuickCardsBySeedAction', startedAt, {
+      mode: input.mode,
+      hasSeedKey: Boolean(input.seedKey.trim()),
     });
   }
 }

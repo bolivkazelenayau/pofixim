@@ -6,6 +6,7 @@ import { CheckCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import FormattedFeedbackExplanation from './FormattedFeedbackExplanation';
+import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 
 type MessageBubbleProps = {
   content: string;
@@ -153,12 +154,6 @@ function splitFeedbackSections(content: string): FeedbackSections | null {
   }
 
   return null;
-}
-
-function renderEditorMarkdown(value: string) {
-  return value
-    .replace(/==([\s\S]+?)==/g, '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>')
-    .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
 }
 
 function getFeedbackTone(content: string) {

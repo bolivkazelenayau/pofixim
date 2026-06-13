@@ -53,6 +53,11 @@ export default function Ege15QuickGame({
   const answerLockedRef = useRef(false);
 
   const currentCard = localCards[index % Math.max(localCards.length, 1)];
+  const quickSeedCommand = currentCard?.seedKey
+    ? currentCard.positionIndex
+      ? `/qseed ege15 ${currentCard.seedKey} pos=${currentCard.positionIndex}`
+      : `/qseed ege15 ${currentCard.seedKey} card=${currentCard.id}`
+    : null;
   const wordLength = currentCard ? currentCard.before.length + 1 + currentCard.after.length : 0;
   const tokenFontClass = wordLength > 18
     ? 'text-[clamp(1.25rem,5.7vw,2rem)] sm:text-[2rem]'
@@ -85,6 +90,11 @@ export default function Ege15QuickGame({
     setScoreDelta(0);
     setLastAnswerCorrect(null);
     setStatus('running');
+  }
+
+  function copyQuickSeedCommand() {
+    if (!quickSeedCommand) return;
+    void navigator.clipboard?.writeText(quickSeedCommand);
   }
 
   const answer = useCallback((choiceIndex: 0 | 1) => {
@@ -290,12 +300,15 @@ export default function Ege15QuickGame({
             )}
 
             <div className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
-              <p>
-                seed:{' '}
-                <span className="font-mono select-all">
-                  {currentCard.seedKey ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
-                </span>
-              </p>
+              <button
+                type="button"
+                onClick={copyQuickSeedCommand}
+                disabled={!quickSeedCommand}
+                className="text-left font-mono transition-colors duration-150 ease-out hover:text-primary disabled:pointer-events-none disabled:text-foreground/45"
+                title={quickSeedCommand ? 'Скопировать quick seed' : undefined}
+              >
+                seed: {quickSeedCommand ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
+              </button>
             </div>
           </div>
         )}

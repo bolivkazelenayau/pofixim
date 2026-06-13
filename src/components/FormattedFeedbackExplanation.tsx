@@ -6,6 +6,7 @@ import {
   Ege18TextLayout,
   splitEge18LayoutExplanation,
 } from '@/features/exercises/renderers/Ege18TextLayout';
+import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 
 type FormattedFeedbackExplanationProps = {
   text: string;
@@ -13,12 +14,6 @@ type FormattedFeedbackExplanationProps = {
 
 function escapeMarkdownParenListMarkers(value: string) {
   return value.replace(/(^|\n)(\s*)(\d+)\)/gu, '$1$2$3\\)');
-}
-
-function renderEditorMarkdown(value: string) {
-  return value
-    .replace(/==([\s\S]+?)==/g, '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>')
-    .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
 }
 
 function MarkdownBlock({ text }: { text: string }) {

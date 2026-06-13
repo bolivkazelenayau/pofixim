@@ -55,6 +55,9 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   const timeLeftSeconds = Math.ceil(timeLeftMs / 1000);
   const currentCard = cards[index % Math.max(cards.length, 1)];
+  const quickSeedCommand = currentCard?.seedKey
+    ? `/qseed blitz ${currentCard.seedKey} row=${currentCard.rowIndex} word=${currentCard.wordIndex}`
+    : null;
   const archivedCards = [1, 2, 3]
     .map((offset) => cards[(index + offset) % Math.max(cards.length, 1)])
     .filter((card): card is Ege9BlitzCard => Boolean(card && card.id !== currentCard?.id));
@@ -124,6 +127,11 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     dragX.set(0);
     answerLockedRef.current = false;
     setStatus('running');
+  }
+
+  function copyQuickSeedCommand() {
+    if (!quickSeedCommand) return;
+    void navigator.clipboard?.writeText(quickSeedCommand);
   }
 
   const answer = useCallback((choiceIndex: 0 | 1) => {
@@ -449,12 +457,17 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               </button>
             </div>
 
-            <p className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
-              seed:{' '}
-              <span className="font-mono select-all">
-                {currentCard.seedKey ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
-              </span>
-            </p>
+            <div className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
+              <button
+                type="button"
+                onClick={copyQuickSeedCommand}
+                disabled={!quickSeedCommand}
+                className="text-left font-mono transition-colors duration-150 ease-out hover:text-primary disabled:pointer-events-none disabled:text-foreground/45"
+                title={quickSeedCommand ? 'Скопировать quick seed' : undefined}
+              >
+                seed: {quickSeedCommand ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
+              </button>
+            </div>
           </div>
         )}
 

@@ -5,15 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import '@uiw/react-markdown-preview/markdown.css';
-
-function renderEditorMarkdown(value: string) {
-  return value
-    .replace(
-      /==([\s\S]+?)==/g,
-      '<span style="text-decoration-line: underline; text-decoration-style: double; text-decoration-skip-ink: none;">$1</span>',
-    )
-    .replace(/\+\+([\s\S]+?)\+\+/g, '<u>$1</u>');
-}
+import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 
 const SAMPLE_MARKDOWN = `# Markdown preview
 

@@ -31,6 +31,7 @@ interface UseQuickGameReturn<Card, Result> {
   isOpen: boolean;
   isLoading: boolean;
   open: () => Promise<void>;
+  openWithCards: (cards: Card[]) => void;
   close: () => void;
   onFinish: (result: Result) => void;
 }
@@ -82,6 +83,11 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
     setCards([]);
   }, []);
 
+  const openWithCards = useCallback((nextCards: Card[]) => {
+    setCards(nextCards);
+    setIsOpen(nextCards.length > 0);
+  }, []);
+
   const onFinish = useCallback(
     (result: Result) => {
       recordBlitzScore(result.scoreDelta);
@@ -96,5 +102,5 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
     [config.skillTag, recordBlitzScore, addMessage, close]
   );
 
-  return { cards, isOpen, isLoading, open, close, onFinish };
+  return { cards, isOpen, isLoading, open, openWithCards, close, onFinish };
 }
