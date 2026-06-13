@@ -852,10 +852,11 @@ export default function ChatContainer() {
           <button
             onClick={handleResetProgress}
             disabled={!hasHydrated}
-            className="hidden rounded-md px-2 py-1 text-xs font-medium text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:block"
+            className="hidden size-8 items-center justify-center rounded-lg text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:inline-flex"
+            aria-label="Сбросить прогресс"
             title="Начать заново"
           >
-            Сброс
+            <RotateCcw className="size-4" aria-hidden="true" />
           </button>
         </div>
       </div>
