@@ -10,26 +10,37 @@ import type { FeedbackSections, PreviewCheckResult } from './types';
 type AdminPreviewPanelProps = {
  preview: { exercise: Exercise | null; error: string };
  previewMode: 'desktop' | 'mobile';
- previewCheckResult: PreviewCheckResult | null;
- previewFeedbackSections: FeedbackSections | null;
- previewDictationText: string;
- onPreviewModeChange: (mode: 'desktop' | 'mobile') => void;
- onPreviewSubmit: (answer: SubmittedAnswer) => void;
- onPreviewDictationSubmit: (event: FormEvent<HTMLFormElement>) => void;
- onPreviewDictationTextChange: (text: string) => void;
+  previewCheckResult: PreviewCheckResult | null;
+  previewFeedbackSections: FeedbackSections | null;
+  previewDictationText: string;
+  previewFillBlankText: string;
+  onPreviewModeChange: (mode: 'desktop' | 'mobile') => void;
+  onPreviewSubmit: (answer: SubmittedAnswer) => void;
+  onPreviewDictationSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPreviewDictationTextChange: (text: string) => void;
+  onPreviewFillBlankSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPreviewFillBlankTextChange: (text: string) => void;
 };
 
 export default function AdminPreviewPanel({
  preview,
  previewMode,
- previewCheckResult,
- previewFeedbackSections,
- previewDictationText,
- onPreviewModeChange,
- onPreviewSubmit,
- onPreviewDictationSubmit,
- onPreviewDictationTextChange,
+  previewCheckResult,
+  previewFeedbackSections,
+  previewDictationText,
+  previewFillBlankText,
+  onPreviewModeChange,
+  onPreviewSubmit,
+  onPreviewDictationSubmit,
+  onPreviewDictationTextChange,
+  onPreviewFillBlankSubmit,
+  onPreviewFillBlankTextChange,
 }: AdminPreviewPanelProps) {
+ const isFullTextFillBlank =
+  preview.exercise?.type === 'fill_blank' &&
+  (preview.exercise.skillTags.includes('ege.18') ||
+   preview.exercise.seedKey?.startsWith('ege18-bank-'));
+
  return (
   <section className="h-fit rounded-3xl border border-stroke bg-surface-strong p-4">
    <div className="mb-3 flex items-start justify-between gap-3">
@@ -74,13 +85,34 @@ export default function AdminPreviewPanel({
         <div className="mb-2 rounded-[20px] bg-surface/70 px-4 py-3 text-sm text-foreground shadow-none [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0">
       <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(preview.exercise.prompt)}</ReactMarkdown>
      </div>
-     <ExerciseRenderer
-      exercise={preview.exercise}
-      onSubmit={onPreviewSubmit}
-      previewMode={true}
-     />
-     {preview.exercise.type === 'dictation' ? (
-      <form onSubmit={onPreviewDictationSubmit} className="mt-3 space-y-2">
+      <ExerciseRenderer
+       exercise={preview.exercise}
+       onSubmit={onPreviewSubmit}
+       previewMode={true}
+      />
+      {preview.exercise.type === 'fill_blank' && !isFullTextFillBlank ? (
+       <form onSubmit={onPreviewFillBlankSubmit} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <input
+         id="admin-preview-fill-blank-answer"
+         name="previewFillBlankAnswer"
+         type="text"
+         value={previewFillBlankText}
+         onChange={(event) => onPreviewFillBlankTextChange(event.target.value)}
+         placeholder="Введите ответ для проверки..."
+         aria-label="Ответ для быстрой проверки"
+         className="h-10 w-full rounded-xl border border-stroke bg-surface px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        <button
+         type="submit"
+         disabled={!previewFillBlankText.trim()}
+         className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-[var(--stroke)] disabled:active:scale-100"
+        >
+         Проверить
+        </button>
+       </form>
+      ) : null}
+      {preview.exercise.type === 'dictation' ? (
+       <form onSubmit={onPreviewDictationSubmit} className="mt-3 space-y-2">
        <textarea
         id="admin-preview-dictation-text"
         name="previewDictationText"

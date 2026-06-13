@@ -39,10 +39,15 @@ export function useExercisePreview(form: Form) {
     form: Form;
     text: string;
   } | null>(null);
+  const [previewFillBlankState, setPreviewFillBlankState] = useState<{
+    form: Form;
+    text: string;
+  } | null>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
   const previewCheckResult = previewCheckState?.form === form ? previewCheckState.result : null;
   const previewDictationText = previewDictationState?.form === form ? previewDictationState.text : '';
+  const previewFillBlankText = previewFillBlankState?.form === form ? previewFillBlankState.text : '';
 
   const parsedSkillTags = useMemo(
     () => form.skillTags.split(',').map((v) => v.trim()).filter(Boolean),
@@ -123,9 +128,22 @@ export function useExercisePreview(form: Form) {
     setPreviewCheckState({ form, result: null });
   }
 
+  function handlePreviewFillBlankSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = previewFillBlankText.trim();
+    if (!text) return;
+    handlePreviewSubmit({ type: 'fill_blank', value: text });
+  }
+
+  function handlePreviewFillBlankTextChange(text: string) {
+    setPreviewFillBlankState({ form, text });
+    setPreviewCheckState({ form, result: null });
+  }
+
   function resetPreview() {
     setPreviewCheckState({ form, result: null });
     setPreviewDictationState({ form, text: '' });
+    setPreviewFillBlankState({ form, text: '' });
   }
 
   return {
@@ -133,11 +151,14 @@ export function useExercisePreview(form: Form) {
     setPreviewMode,
     previewCheckResult,
     previewDictationText,
+    previewFillBlankText,
     preview,
     previewFeedbackSections,
     handlePreviewSubmit,
     handlePreviewDictationSubmit,
     handlePreviewDictationTextChange,
+    handlePreviewFillBlankSubmit,
+    handlePreviewFillBlankTextChange,
     resetPreview,
   };
 }

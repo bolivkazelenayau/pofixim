@@ -36,6 +36,7 @@ type AdminExerciseEditorProps = {
     checkResult: PreviewCheckResult | null;
     feedbackSections: FeedbackSections | null;
     dictationText: string;
+    fillBlankText: string;
   };
   recovery: {
     draft: DraftRecoveryState;
@@ -65,6 +66,8 @@ type AdminExerciseEditorProps = {
     onPreviewSubmit: (answer: SubmittedAnswer) => void;
     onPreviewDictationSubmit: (event: FormEvent<HTMLFormElement>) => void;
     onPreviewDictationTextChange: (text: string) => void;
+    onPreviewFillBlankSubmit: (event: FormEvent<HTMLFormElement>) => void;
+    onPreviewFillBlankTextChange: (text: string) => void;
     onFloatingSaveClick: () => void;
     onSaveIntent: () => void;
   };
@@ -382,10 +385,13 @@ export default function AdminExerciseEditor({
                 previewCheckResult={previewState.checkResult}
                 previewFeedbackSections={previewState.feedbackSections}
                 previewDictationText={previewState.dictationText}
+                previewFillBlankText={previewState.fillBlankText}
                 onPreviewModeChange={actions.onPreviewModeChange}
                 onPreviewSubmit={actions.onPreviewSubmit}
                 onPreviewDictationSubmit={actions.onPreviewDictationSubmit}
                 onPreviewDictationTextChange={actions.onPreviewDictationTextChange}
+                onPreviewFillBlankSubmit={actions.onPreviewFillBlankSubmit}
+                onPreviewFillBlankTextChange={actions.onPreviewFillBlankTextChange}
               />
             ) : (
               <PreviewPanelShell />

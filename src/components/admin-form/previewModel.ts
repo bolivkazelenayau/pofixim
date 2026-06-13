@@ -113,7 +113,7 @@ export function buildPreviewExercise({
           isEge18FillBlank
             ? stripEge18PromptFromFillBefore(form.fillBefore, form.prompt) || 'Текст до пропуска'
             : form.fillBefore || 'Текст до пропуска',
-        after: form.fillAfter || 'текст после пропуска',
+        after: form.fillAfter || (form.fillBefore ? '' : 'текст после пропуска'),
       },
       answer: {
         accepted: accepted.length > 0 ? accepted : ['пример'],

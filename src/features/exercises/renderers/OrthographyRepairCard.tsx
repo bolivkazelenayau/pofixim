@@ -94,6 +94,53 @@ function splitTextChunk(text: string) {
   return text.split(/(\s+|[,.!?;:()[\]«»"“”]+)/u).filter((part) => part.length > 0);
 }
 
+const HANGING_WORDS = new Set([
+  'а',
+  'в',
+  'во',
+  'и',
+  'к',
+  'ко',
+  'о',
+  'об',
+  'обо',
+  'с',
+  'со',
+  'у',
+  'без',
+  'до',
+  'для',
+  'за',
+  'из',
+  'на',
+  'не',
+  'ни',
+  'но',
+  'от',
+  'по',
+  'под',
+  'при',
+  'про',
+]);
+
+function isWordPart(part: string) {
+  return /[\p{L}\d]/u.test(part);
+}
+
+function shouldKeepWithNext(parts: string[], index: number) {
+  const word = parts[index]?.toLowerCase();
+  const space = parts[index + 1];
+  const nextWord = parts[index + 2];
+  return Boolean(
+    word &&
+      space &&
+      nextWord &&
+      HANGING_WORDS.has(word) &&
+      /^\s+$/u.test(space) &&
+      isWordPart(nextWord),
+  );
+}
+
 export default function OrthographyRepairCard({
   exercise,
   disabled,
@@ -171,9 +218,28 @@ export default function OrthographyRepairCard({
     );
   }
 
+  function renderWrongWordButton(part: string, key: string) {
+    return (
+      <button
+        key={key}
+        type="button"
+        disabled={disabled}
+        onClick={() => markWrongClick(key)}
+        className={`rounded px-0.5 transition-[background-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+          wrongClickKey === key
+            ? 'bg-rose-100 text-rose-900 ring-2 ring-rose-200 dark:bg-rose-300/12 dark:text-rose-100 dark:ring-rose-300/20'
+            : 'hover:bg-stroke dark:hover:bg-stroke'
+        }`}
+        title="Это не отмеченный фрагмент"
+      >
+        {part}
+      </button>
+    );
+  }
+
   return (
     <div className="mb-5 mt-2 rounded-[28px] border border-stroke bg-surface-strong p-4 shadow-sm">
-      <div className="rounded-xl border border-stroke bg-surface px-3 py-3 text-lg font-medium leading-9 text-foreground">
+      <div className="rounded-xl border border-stroke bg-surface px-3 py-3 text-pretty text-lg font-medium leading-9 text-foreground">
         {segments.map((segment) => {
           if (segment.kind === 'target') {
             const repair = repairs[segment.target.id];
@@ -204,27 +270,34 @@ export default function OrthographyRepairCard({
             );
           }
 
-          return splitTextChunk(segment.text).map((part, index) => {
+          const parts = splitTextChunk(segment.text);
+          const renderedParts = [];
+
+          for (let index = 0; index < parts.length; index += 1) {
+            const part = parts[index];
             const key = `${segment.key}-${index}`;
-            const isWord = /[\p{L}\d]/u.test(part);
-            if (!isWord) return <span key={key}>{part}</span>;
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={disabled}
-                onClick={() => markWrongClick(key)}
-                className={`rounded px-0.5 transition-[background-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                  wrongClickKey === key
-                    ? 'bg-rose-100 text-rose-900 ring-2 ring-rose-200 dark:bg-rose-300/12 dark:text-rose-100 dark:ring-rose-300/20'
-                    : 'hover:bg-stroke dark:hover:bg-stroke'
-                }`}
-                title="Это не отмеченный фрагмент"
-              >
-                {part}
-              </button>
+            if (isWordPart(part) && shouldKeepWithNext(parts, index)) {
+              const nextWordIndex = index + 2;
+              renderedParts.push(
+                <span key={`${key}-nowrap`} className="whitespace-nowrap">
+                  {renderWrongWordButton(part, key)}
+                  <span>{parts[index + 1]}</span>
+                  {renderWrongWordButton(
+                    parts[nextWordIndex],
+                    `${segment.key}-${nextWordIndex}`,
+                  )}
+                </span>,
+              );
+              index = nextWordIndex;
+              continue;
+            }
+
+            renderedParts.push(
+              isWordPart(part) ? renderWrongWordButton(part, key) : <span key={key}>{part}</span>,
             );
-          });
+          }
+
+          return renderedParts;
         })}
       </div>
 

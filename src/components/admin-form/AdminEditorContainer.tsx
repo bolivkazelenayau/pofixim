@@ -67,11 +67,14 @@ export default function AdminEditorContainer({
     setPreviewMode,
     previewCheckResult,
     previewDictationText,
+    previewFillBlankText,
     preview,
     previewFeedbackSections,
     handlePreviewSubmit,
     handlePreviewDictationSubmit,
     handlePreviewDictationTextChange,
+    handlePreviewFillBlankSubmit,
+    handlePreviewFillBlankTextChange,
   } = useExercisePreview(formState.form);
 
   return (
@@ -84,6 +87,7 @@ export default function AdminEditorContainer({
         checkResult: previewCheckResult,
         feedbackSections: previewFeedbackSections,
         dictationText: previewDictationText,
+        fillBlankText: previewFillBlankText,
       }}
       recovery={recovery}
       modals={modals}
@@ -95,6 +99,8 @@ export default function AdminEditorContainer({
         onPreviewSubmit: handlePreviewSubmit,
         onPreviewDictationSubmit: handlePreviewDictationSubmit,
         onPreviewDictationTextChange: handlePreviewDictationTextChange,
+        onPreviewFillBlankSubmit: handlePreviewFillBlankSubmit,
+        onPreviewFillBlankTextChange: handlePreviewFillBlankTextChange,
       }}
     />
   );
