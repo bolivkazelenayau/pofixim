@@ -52,6 +52,22 @@ html body[data-scroll-locked] {
   padding-right: 0px !important;
 }
 
+html.blitz-scroll-lock,
+html.blitz-scroll-lock body {
+  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(0, 0, 0, 0.5);
+}
+
+html.blitz-scroll-lock::-webkit-scrollbar-track,
+html.blitz-scroll-lock body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+html.blitz-scroll-lock::-webkit-scrollbar-thumb,
+html.blitz-scroll-lock body::-webkit-scrollbar-thumb {
+  border-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -369,6 +385,64 @@ ins.du {
 .chat-pattern-bg {
   background-color: var(--surface);
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.message-bubble {
+  --bubble-tail-bg: var(--surface-strong);
+  --bubble-tail-border: var(--stroke);
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.message-bubble--bot {
+  --bubble-tail-bg: var(--surface-strong);
+  --bubble-tail-border: var(--stroke);
+}
+
+.message-bubble--user {
+  --bubble-tail-bg: #EEFFDE;
+  --bubble-tail-border: #D5E5C3;
+}
+
+.dark .message-bubble--user {
+  --bubble-tail-bg: #3c2c12;
+  --bubble-tail-border: #74550d;
+}
+
+.message-bubble__shape {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.message-bubble__path {
+  fill: var(--bubble-tail-bg);
+  stroke: var(--bubble-tail-border);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.08));
+}
+
+.message-bubble__content {
+  position: relative;
+  z-index: 1;
+}
+
+.message-bubble--bot-tail::before,
+.message-bubble--bot-tail::after,
+.message-bubble--user-tail::before,
+.message-bubble--user-tail::after {
+  content: none;
 }
 
 .dark .chat-pattern-bg {

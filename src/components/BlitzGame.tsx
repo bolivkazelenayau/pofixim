@@ -171,7 +171,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   // Cleanup timeout on unmount
   useEffect(() => {
+    document.documentElement.classList.add('blitz-scroll-lock');
+
     return () => {
+      document.documentElement.classList.remove('blitz-scroll-lock');
       if (feedbackTimeoutRef.current !== null) {
         window.clearTimeout(feedbackTimeoutRef.current);
       }
@@ -217,9 +220,13 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   };
 
   return (
-    <DialogPrimitive.Root open onOpenChange={handleDialogOpenChange}>
+    <DialogPrimitive.Root open modal={false} onOpenChange={handleDialogOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-black/50" />
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 z-modal bg-black/50"
+          onMouseDown={() => handleDialogOpenChange(false)}
+        />
         <DialogPrimitive.Content className="fixed inset-0 z-modal flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4">
           <DialogPrimitive.Title className="sr-only">Блиц</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">

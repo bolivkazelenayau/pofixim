@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { CheckCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -21,6 +21,116 @@ type FeedbackSections = {
   correctAnswer: string;
   explanation: string;
 };
+
+type TailSide = 'none' | 'left' | 'right';
+
+type BubbleRadii = {
+  topLeft: number;
+  topRight: number;
+  bottomRight: number;
+  bottomLeft: number;
+};
+
+const BUBBLE_RADIUS = 18;
+const GROUPED_RADIUS = 6;
+const TAIL_WIDTH = 8;
+const TAIL_HEIGHT = 11;
+const TAIL_JOIN = 15;
+
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+      setSize((current) =>
+        current.width === width && current.height === height ? current : { width, height },
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, size] as const;
+}
+
+function clampRadius(radius: number, width: number, height: number) {
+  return Math.min(radius, width / 2, height / 2);
+}
+
+function getBubblePath(
+  width: number,
+  height: number,
+  tailSide: TailSide,
+  radii: BubbleRadii,
+) {
+  if (width <= 0 || height <= 0) return '';
+
+  const w = width;
+  const h = height;
+  const tl = clampRadius(radii.topLeft, w, h);
+  const tr = clampRadius(radii.topRight, w, h);
+  const br = clampRadius(radii.bottomRight, w, h);
+  const bl = clampRadius(radii.bottomLeft, w, h);
+  const tw = TAIL_WIDTH;
+  const th = Math.min(TAIL_HEIGHT, Math.max(0, h - Math.max(tl, tr)));
+  const join = Math.min(TAIL_JOIN, w * 0.35);
+
+  if (tailSide === 'left') {
+    return `
+      M ${tl} 0
+      H ${w - tr}
+      Q ${w} 0 ${w} ${tr}
+      V ${h - br}
+      Q ${w} ${h} ${w - br} ${h}
+      H ${join}
+      C ${join * 0.55} ${h} 4 ${h - 0.5} ${-tw} ${h}
+      C ${-4} ${h - 3.5} 0 ${h - 6.5} 0 ${h - th}
+      V ${tl}
+      Q 0 0 ${tl} 0
+      Z
+    `;
+  }
+
+  if (tailSide === 'right') {
+    return `
+      M ${tl} 0
+      H ${w - tr}
+      Q ${w} 0 ${w} ${tr}
+      V ${h - th}
+      C ${w} ${h - 6.5} ${w + 4} ${h - 3.5} ${w + tw} ${h}
+      C ${w - 4} ${h - 0.5} ${w - join * 0.55} ${h} ${w - join} ${h}
+      H ${bl}
+      Q 0 ${h} 0 ${h - bl}
+      V ${tl}
+      Q 0 0 ${tl} 0
+      Z
+    `;
+  }
+
+  return `
+    M ${tl} 0
+    H ${w - tr}
+    Q ${w} 0 ${w} ${tr}
+    V ${h - br}
+    Q ${w} ${h} ${w - br} ${h}
+    H ${bl}
+    Q 0 ${h} 0 ${h - bl}
+    V ${tl}
+    Q 0 0 ${tl} 0
+    Z
+  `;
+}
 
 function splitFeedbackSections(content: string): FeedbackSections | null {
   const labeledMatch = content.match(
@@ -53,6 +163,7 @@ function getFeedbackTone(content: string) {
 }
 
 export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup }: MessageBubbleProps) {
+  const [bubbleRef, bubbleSize] = useElementSize<HTMLDivElement>();
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
   const timeString = useMemo(() => {
     if (!createdAt) return '';
@@ -64,10 +175,22 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
   );
   const feedbackTone = isBot && !isQuestion ? getFeedbackTone(markdownContent) : null;
   const isFeedback = Boolean(feedbackTone || sections);
+  const usesSvgShape = !isQuestion && !isFeedback;
 
   let bubbleClasses = '';
   const first = isFirstInGroup !== false;
   const last = isLastInGroup !== false;
+  const tailSide: TailSide = usesSvgShape && last ? (isBot ? 'left' : 'right') : 'none';
+  const radii = useMemo<BubbleRadii>(() => ({
+    topLeft: isBot && !first ? GROUPED_RADIUS : BUBBLE_RADIUS,
+    topRight: !isBot && !first ? GROUPED_RADIUS : BUBBLE_RADIUS,
+    bottomRight: !isBot && !last ? GROUPED_RADIUS : BUBBLE_RADIUS,
+    bottomLeft: isBot && !last ? GROUPED_RADIUS : BUBBLE_RADIUS,
+  }), [first, isBot, last]);
+  const bubblePath = useMemo(
+    () => getBubblePath(bubbleSize.width, bubbleSize.height, tailSide, radii),
+    [bubbleSize.height, bubbleSize.width, radii, tailSide],
+  );
 
   if (isQuestion) {
     bubbleClasses = 'bg-primary text-white shadow-sm';
@@ -76,15 +199,15 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
       ? 'border border-emerald-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-emerald-400/70 dark:before:bg-emerald-300/65 [&>div>p:first-child]:text-emerald-700 [&>div>p:first-child]:dark:text-emerald-200'
       : 'border border-amber-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-amber-400/75 dark:before:bg-amber-300/70 [&>div>p:first-child]:text-amber-700 [&>div>p:first-child]:dark:text-amber-200';
   } else if (isBot) {
-    bubbleClasses = 'bg-[var(--surface-strong)] text-foreground border border-[var(--stroke)] shadow-sm';
+    bubbleClasses = 'message-bubble message-bubble--bot text-foreground';
     if (!first) bubbleClasses += ' rounded-tl-[6px]';
     if (!last) bubbleClasses += ' rounded-bl-[6px]';
-    if (last) bubbleClasses += ' rounded-bl-none before:absolute before:bottom-[-1px] before:left-[-16px] before:h-4 before:w-4 before:bg-[var(--stroke)] before:[clip-path:polygon(100%_0,100%_100%,0_100%)] after:absolute after:bottom-0 after:left-[-14px] after:h-3.5 after:w-3.5 after:bg-[var(--surface-strong)] after:[clip-path:polygon(100%_0,100%_100%,0_100%)]';
+    if (last) bubbleClasses += ' message-bubble--bot-tail';
   } else {
-    bubbleClasses = 'bg-[#EEFFDE] text-black border border-[#D5E5C3] dark:border-[#74550d] dark:bg-[#3c2c12] dark:text-amber-50 shadow-sm dark:shadow-none';
+    bubbleClasses = 'message-bubble message-bubble--user text-black dark:text-amber-50';
     if (!first) bubbleClasses += ' rounded-tr-[6px]';
     if (!last) bubbleClasses += ' rounded-br-[6px]';
-    if (last) bubbleClasses += ' rounded-br-none before:absolute before:bottom-[-1px] before:right-[-16px] before:h-4 before:w-4 before:bg-[#D5E5C3] before:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:before:bg-[#74550d] after:absolute after:bottom-0 after:right-[-14px] after:h-3.5 after:w-3.5 after:bg-[#EEFFDE] after:[clip-path:polygon(0_0,100%_100%,0_100%)] dark:after:bg-[#3c2c12]';
+    if (last) bubbleClasses += ' message-bubble--user-tail';
   }
 
   return (
@@ -95,10 +218,22 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
       className={`${last ? 'mb-4' : 'mb-1'} flex w-full ${isBot ? 'justify-start' : 'justify-end'}`}
     >
       <div
-        className={`relative max-w-[92%] rounded-2xl px-4 py-3 shadow-sm before:pointer-events-none after:pointer-events-none sm:max-w-[88%] sm:px-5 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-pretty text-[14px] leading-[1.78]' : 'text-pretty text-[15px] leading-[1.65]'} ${bubbleClasses}`}
+        ref={bubbleRef}
+        className={`relative max-w-[92%] rounded-2xl px-4 py-3 ${usesSvgShape ? '' : 'shadow-sm'} before:pointer-events-none after:pointer-events-none sm:max-w-[88%] sm:px-5 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-pretty text-[14px] leading-[1.78]' : 'text-pretty text-[15px] leading-[1.65]'} ${bubbleClasses}`}
       >
-        {sections ? (
-          <div className="space-y-3">
+        {usesSvgShape && bubblePath ? (
+          <svg
+            aria-hidden="true"
+            className="message-bubble__shape"
+            focusable="false"
+            viewBox={`0 0 ${bubbleSize.width} ${bubbleSize.height}`}
+          >
+            <path className="message-bubble__path" d={bubblePath} />
+          </svg>
+        ) : null}
+        <div className={usesSvgShape ? 'message-bubble__content' : undefined}>
+          {sections ? (
+            <div className="space-y-3">
             {sections.lead ? <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.lead)}</ReactMarkdown> : null}
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-600/30 dark:bg-emerald-950/40 px-3 py-2">
               <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-200">
@@ -112,24 +247,25 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
               </div>
               <FormattedFeedbackExplanation text={sections.explanation} />
             </div>
-          </div>
-        ) : (
-          <div className="relative">
+            </div>
+          ) : (
+            <div className="relative">
             <div className={!isBot ? 'pr-12' : 'pr-10'}>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(markdownContent)}</ReactMarkdown>
             </div>
             {!isBot ? (
-              <div className="absolute -bottom-1 -right-2 flex items-center gap-1 text-[11px] font-semibold text-black/65 dark:text-amber-100/80">
+              <div className="absolute -bottom-1 -right-2 flex items-center gap-1 text-[11px] font-semibold text-[#5f9f4b] dark:text-amber-200/80">
                 {timeString && <span>{timeString}</span>}
                 <CheckCheck className="h-[14px] w-[14px]" strokeWidth={2.5} />
               </div>
             ) : (
-              <div className="absolute -bottom-1 -right-1.5 flex items-center gap-1 text-[11px] font-semibold text-foreground/65">
+              <div className={`absolute -bottom-1 -right-1.5 flex items-center gap-1 text-[11px] font-semibold ${isQuestion ? 'text-white/75' : 'text-foreground/65'}`}>
                 {timeString && <span>{timeString}</span>}
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   );

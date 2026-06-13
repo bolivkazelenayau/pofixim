@@ -282,12 +282,7 @@ export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
       conditions.push(notInArray(exercises.id, uniqueSeenIds));
     }
 
-    const rows = await db
-      .select()
-      .from(exercises)
-      .where(and(...conditions))
-      .orderBy(sql`random()`)
-      .limit(limit);
+    const rows = await getRandomFilteredExerciseRows({ conditions, limit });
 
     const cards = rows
       .map(dbExerciseToDomainExercise)
@@ -313,6 +308,7 @@ export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
 export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}) {
   const startedAt = Date.now();
   const limit = Math.min(Math.max(input.limit ?? 80, 10), 160);
+  const rowLimit = Math.min(limit, 32);
 
   try {
     const conditions = [
@@ -328,12 +324,7 @@ export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}
       conditions.push(notInArray(exercises.id, uniqueSeenIds));
     }
 
-    const rows = await db
-      .select()
-      .from(exercises)
-      .where(and(...conditions))
-      .orderBy(sql`random()`)
-      .limit(limit);
+    const rows = await getRandomFilteredExerciseRows({ conditions, limit: rowLimit });
 
     const cards = rows
       .map(dbExerciseToDomainExercise)
@@ -351,6 +342,7 @@ export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}
   } finally {
     logSlowServerAction('getEge13QuickPoolAction', startedAt, {
       limit,
+      rowLimit,
       seenExerciseIds: input.seenExerciseIds?.length ?? 0,
     });
   }
@@ -374,12 +366,7 @@ export async function getEge15QuickPoolAction(input: GetEge15QuickPoolInput = {}
       conditions.push(notInArray(exercises.id, uniqueSeenIds));
     }
 
-    const rows = await db
-      .select()
-      .from(exercises)
-      .where(and(...conditions))
-      .orderBy(sql`random()`)
-      .limit(limit);
+    const rows = await sampleExerciseCandidateRows({ conditions, limit });
 
     const cards = rows
       .map(dbExerciseToDomainExercise)
@@ -524,12 +511,10 @@ async function getExerciseCandidates({
     conditions.push(notInArray(exercises.id, excludedIds));
   }
 
-  const rows = await db
-    .select()
-    .from(exercises)
-    .where(and(...conditions))
-    .orderBy(sql`random()`)
-    .limit(forceType ? 80 : 180);
+  const rows = await sampleExerciseCandidateRows({
+    conditions,
+    limit: forceType ? 80 : 180,
+  });
 
   return rows
     .map(dbExerciseToDomainExercise)
@@ -538,6 +523,99 @@ async function getExerciseCandidates({
       const fp = exerciseFingerprint(exercise);
       return fp ? !recentFingerprints.has(fp) : true;
     });
+}
+
+async function sampleExerciseCandidateRows({
+  conditions,
+  limit,
+}: {
+  conditions: ReturnType<typeof eq>[];
+  limit: number;
+}) {
+  const whereExpr = and(...conditions);
+  const [bounds] = await db
+    .select({
+      minId: sql<number | null>`min(${exercises.id})`,
+      maxId: sql<number | null>`max(${exercises.id})`,
+    })
+    .from(exercises)
+    .where(whereExpr);
+
+  if (!bounds?.minId || !bounds.maxId) return [];
+
+  const targetLimit = Math.ceil(limit * 1.45);
+  const rowsById = new Map<number, typeof exercises.$inferSelect>();
+  const attempts = 5;
+
+  for (let attempt = 0; attempt < attempts && rowsById.size < targetLimit; attempt += 1) {
+    const pivot = randomIntInclusive(bounds.minId, bounds.maxId);
+    const remaining = targetLimit - rowsById.size;
+    const forwardLimit = Math.max(1, Math.ceil(remaining / 2));
+
+    const forwardRows = await db
+      .select()
+      .from(exercises)
+      .where(and(whereExpr, sql`${exercises.id} >= ${pivot}`))
+      .orderBy(sql`${exercises.id} asc`)
+      .limit(forwardLimit);
+    for (const row of forwardRows) rowsById.set(row.id, row);
+
+    const backwardLimit = targetLimit - rowsById.size;
+    if (backwardLimit <= 0) break;
+
+    const backwardRows = await db
+      .select()
+      .from(exercises)
+      .where(and(whereExpr, sql`${exercises.id} < ${pivot}`))
+      .orderBy(desc(exercises.id))
+      .limit(backwardLimit);
+    for (const row of backwardRows) rowsById.set(row.id, row);
+  }
+
+  return shuffleRows([...rowsById.values()]).slice(0, limit);
+}
+
+async function getRandomFilteredExerciseRows({
+  conditions,
+  limit,
+}: {
+  conditions: ReturnType<typeof eq>[];
+  limit: number;
+}) {
+  const idRows = await db
+    .select({ id: exercises.id })
+    .from(exercises)
+    .where(and(...conditions))
+    .orderBy(sql`random()`)
+    .limit(limit);
+
+  const ids = idRows.map((row) => row.id);
+  if (ids.length === 0) return [];
+
+  const rows = await db
+    .select()
+    .from(exercises)
+    .where(inArray(exercises.id, ids))
+    .limit(limit);
+
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  return ids.flatMap((id) => {
+    const row = rowsById.get(id);
+    return row ? [row] : [];
+  });
+}
+
+function randomIntInclusive(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffleRows<T>(rows: T[]) {
+  const shuffled = [...rows];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 async function getRecentExerciseFingerprints(exerciseIds: number[]) {
