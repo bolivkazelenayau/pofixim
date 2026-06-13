@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'motion/react';
 import { CheckCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -14,6 +14,8 @@ type MessageBubbleProps = {
   createdAt?: number;
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
+  holdTail?: boolean;
+  suppressTail?: boolean;
 };
 
 type FeedbackSections = {
@@ -36,6 +38,8 @@ const GROUPED_RADIUS = 6;
 const TAIL_WIDTH = 8;
 const TAIL_HEIGHT = 11;
 const TAIL_JOIN = 15;
+export const MESSAGE_ENTER_DURATION_MS = 180;
+const MESSAGE_ENTER_DURATION_SECONDS = MESSAGE_ENTER_DURATION_MS / 1000;
 
 function useElementSize<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
@@ -49,9 +53,10 @@ function useElementSize<T extends HTMLElement>() {
       const rect = element.getBoundingClientRect();
       const width = Math.round(rect.width);
       const height = Math.round(rect.height);
-      setSize((current) =>
-        current.width === width && current.height === height ? current : { width, height },
-      );
+      setSize((current) => {
+        if (current.width === width && current.height === height) return current;
+        return { width, height };
+      });
     };
 
     updateSize();
@@ -162,7 +167,7 @@ function getFeedbackTone(content: string) {
   return null;
 }
 
-export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup }: MessageBubbleProps) {
+export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup, holdTail = false, suppressTail = false }: MessageBubbleProps) {
   const [bubbleRef, bubbleSize] = useElementSize<HTMLDivElement>();
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
   const timeString = useMemo(() => {
@@ -180,17 +185,24 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
   let bubbleClasses = '';
   const first = isFirstInGroup !== false;
   const last = isLastInGroup !== false;
-  const tailSide: TailSide = usesSvgShape && last ? (isBot ? 'left' : 'right') : 'none';
+  const shouldRenderTail = holdTail || (last && !suppressTail);
+  const tailSide: TailSide = usesSvgShape && shouldRenderTail ? (isBot ? 'left' : 'right') : 'none';
   const radii = useMemo<BubbleRadii>(() => ({
     topLeft: isBot && !first ? GROUPED_RADIUS : BUBBLE_RADIUS,
     topRight: !isBot && !first ? GROUPED_RADIUS : BUBBLE_RADIUS,
-    bottomRight: !isBot && !last ? GROUPED_RADIUS : BUBBLE_RADIUS,
-    bottomLeft: isBot && !last ? GROUPED_RADIUS : BUBBLE_RADIUS,
-  }), [first, isBot, last]);
+    bottomRight: !isBot && !shouldRenderTail ? GROUPED_RADIUS : BUBBLE_RADIUS,
+    bottomLeft: isBot && !shouldRenderTail ? GROUPED_RADIUS : BUBBLE_RADIUS,
+  }), [first, isBot, shouldRenderTail]);
   const bubblePath = useMemo(
     () => getBubblePath(bubbleSize.width, bubbleSize.height, tailSide, radii),
     [bubbleSize.height, bubbleSize.width, radii, tailSide],
   );
+  const bubbleVars = usesSvgShape
+    ? ({
+        '--bubble-tail-bg': isBot ? 'var(--surface-strong)' : '#EEFFDE',
+        '--bubble-tail-border': isBot ? 'var(--stroke)' : '#D5E5C3',
+      } as CSSProperties)
+    : undefined;
 
   if (isQuestion) {
     bubbleClasses = 'bg-primary text-white shadow-sm';
@@ -201,37 +213,62 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
   } else if (isBot) {
     bubbleClasses = 'message-bubble message-bubble--bot text-foreground';
     if (!first) bubbleClasses += ' rounded-tl-[6px]';
-    if (!last) bubbleClasses += ' rounded-bl-[6px]';
-    if (last) bubbleClasses += ' message-bubble--bot-tail';
+    if (!shouldRenderTail) bubbleClasses += ' rounded-bl-[6px]';
+    if (shouldRenderTail) bubbleClasses += ' message-bubble--bot-tail';
   } else {
     bubbleClasses = 'message-bubble message-bubble--user text-black dark:text-amber-50';
     if (!first) bubbleClasses += ' rounded-tr-[6px]';
-    if (!last) bubbleClasses += ' rounded-br-[6px]';
-    if (last) bubbleClasses += ' message-bubble--user-tail';
+    if (!shouldRenderTail) bubbleClasses += ' rounded-br-[6px]';
+    if (shouldRenderTail) bubbleClasses += ' message-bubble--user-tail';
   }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+      transition={{ duration: MESSAGE_ENTER_DURATION_SECONDS, ease: 'easeOut' }}
       className={`${last ? 'mb-4' : 'mb-1'} flex w-full ${isBot ? 'justify-start' : 'justify-end'}`}
     >
       <div
         ref={bubbleRef}
         className={`relative max-w-[92%] rounded-2xl px-4 py-3 ${usesSvgShape ? '' : 'shadow-sm'} before:pointer-events-none after:pointer-events-none sm:max-w-[88%] sm:px-5 [&_strong]:font-bold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_p]:mb-2 [&_p:last-child]:mb-0 ${isFeedback ? 'text-pretty text-[14px] leading-[1.78]' : 'text-pretty text-[15px] leading-[1.65]'} ${bubbleClasses}`}
+        style={bubbleVars}
       >
         {usesSvgShape && bubblePath ? (
           <svg
             aria-hidden="true"
             className="message-bubble__shape"
             focusable="false"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 0,
+              width: '100%',
+              height: '100%',
+              overflow: 'visible',
+              pointerEvents: 'none',
+            }}
             viewBox={`0 0 ${bubbleSize.width} ${bubbleSize.height}`}
           >
-            <path className="message-bubble__path" d={bubblePath} />
+            <path
+              className="message-bubble__path"
+              d={bubblePath}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              style={{
+                fill: 'var(--bubble-tail-bg)',
+                filter: 'drop-shadow(0 1px 2px rgb(0 0 0 / 0.08))',
+                stroke: 'var(--bubble-tail-border)',
+                vectorEffect: 'non-scaling-stroke',
+              }}
+            />
           </svg>
         ) : null}
-        <div className={usesSvgShape ? 'message-bubble__content' : undefined}>
+        <div
+          className={usesSvgShape ? 'message-bubble__content' : undefined}
+          style={usesSvgShape ? { position: 'relative', zIndex: 1 } : undefined}
+        >
           {sections ? (
             <div className="space-y-3">
             {sections.lead ? <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(sections.lead)}</ReactMarkdown> : null}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BarChart3, RotateCcw, Zap, PenTool } from 'lucide-react';
 import type { ExerciseType } from '@/features/exercises/types';
@@ -19,12 +19,23 @@ import { createMessageId } from '@/lib/message-id';
 import BlitzGame from './BlitzGame';
 import Ege13QuickGame from './Ege13QuickGame';
 import Ege15QuickGame from './Ege15QuickGame';
-import MessageBubble from './MessageBubble';
+import MessageBubble, { MESSAGE_ENTER_DURATION_MS } from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
+
+const TAIL_HANDOFF_RATIO = 0.25;
+const TAIL_HANDOFF_MS = Math.round(MESSAGE_ENTER_DURATION_MS * TAIL_HANDOFF_RATIO);
 
 type ExerciseMessage = Message & {
   type: 'exercise';
   exercise: Exercise & { id: number };
+};
+
+type TailHandoffAuthor = 'bot' | 'user';
+
+type TailHandoff = {
+  previousId: string;
+  currentId: string;
+  timer: ReturnType<typeof setTimeout>;
 };
 
 const SLASH_COMMANDS = [
@@ -77,6 +88,28 @@ function isExerciseMessage(message: Message): message is ExerciseMessage {
     message.type === 'exercise' &&
     Boolean(message.exercise) &&
     typeof message.exercise?.id === 'number'
+  );
+}
+
+function isGroupedMessagePair(previous: Message | undefined, current: Message | undefined) {
+  if (!previous || !current || previous.isBot !== current.isBot) return false;
+
+  const timeDiff =
+    current.createdAt && previous.createdAt
+      ? current.createdAt - previous.createdAt
+      : 0;
+
+  return timeDiff < 5 * 60 * 1000;
+}
+
+function getTailHandoffAuthor(message: Message): TailHandoffAuthor {
+  return message.isBot ? 'bot' : 'user';
+}
+
+function isWelcomeMessage(message: Message | undefined) {
+  return (
+    message?.type === 'text' &&
+    (message.id === 'welcome' || message.id.endsWith('-welcome'))
   );
 }
 
@@ -162,14 +195,41 @@ export default function ChatContainer() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
   const isFetchingExercise = useRef(false);
+  const previousMessagesRef = useRef<Message[]>([]);
+  const hasInitializedTailTrackingRef = useRef(false);
+  const tailHandoffsRef = useRef(new Map<TailHandoffAuthor, TailHandoff>());
+  const initialExerciseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [tailHoldMessageIds, setTailHoldMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [tailSuppressMessageIds, setTailSuppressMessageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const globalInputRef = useRef<HTMLTextAreaElement>(null);
   const blitz = useBlitzGame();
   const ege13Quick = useEge13QuickGame();
   const ege15Quick = useEge15QuickGame();
+
+  const clearTailHandoffTimers = useCallback(() => {
+    tailHandoffsRef.current.forEach(({ timer }) => clearTimeout(timer));
+    tailHandoffsRef.current.clear();
+  }, []);
+
+  const clearTailHandoffState = useCallback(() => {
+    clearTailHandoffTimers();
+    setTailHoldMessageIds((current) => (current.size > 0 ? new Set() : current));
+    setTailSuppressMessageIds((current) => (current.size > 0 ? new Set() : current));
+  }, [clearTailHandoffTimers]);
+
+  const clearInitialExerciseTimer = useCallback(() => {
+    if (!initialExerciseTimerRef.current) return;
+    clearTimeout(initialExerciseTimerRef.current);
+    initialExerciseTimerRef.current = null;
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -197,6 +257,107 @@ export default function ChatContainer() {
       unsubscribe();
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (!hasHydrated) {
+      previousMessagesRef.current = messages;
+      hasInitializedTailTrackingRef.current = false;
+      return;
+    }
+
+    if (!hasInitializedTailTrackingRef.current) {
+      previousMessagesRef.current = messages;
+      hasInitializedTailTrackingRef.current = true;
+      clearTailHandoffState();
+      return;
+    }
+
+    const previousMessages = previousMessagesRef.current;
+
+    if (messages.length < previousMessages.length) {
+      clearTailHandoffState();
+    } else if (messages.length > previousMessages.length) {
+      const handoffs = new Map<
+        TailHandoffAuthor,
+        { previousId: string; currentId: string }
+      >();
+
+      for (let index = Math.max(1, previousMessages.length); index < messages.length; index += 1) {
+        const previousMessage = messages[index - 1];
+        const currentMessage = messages[index];
+
+        if (isGroupedMessagePair(previousMessage, currentMessage)) {
+          handoffs.set(getTailHandoffAuthor(currentMessage), {
+            previousId: previousMessage.id,
+            currentId: currentMessage.id,
+          });
+        }
+      }
+
+      if (handoffs.size > 0) {
+        handoffs.forEach((_, author) => {
+          const existingHandoff = tailHandoffsRef.current.get(author);
+          if (existingHandoff) clearTimeout(existingHandoff.timer);
+        });
+
+        setTailHoldMessageIds((current) => {
+          const next = new Set(current);
+          handoffs.forEach(({ previousId }, author) => {
+            const existingHandoff = tailHandoffsRef.current.get(author);
+            if (existingHandoff) next.delete(existingHandoff.previousId);
+            next.add(previousId);
+          });
+          return next;
+        });
+        setTailSuppressMessageIds((current) => {
+          const next = new Set(current);
+          handoffs.forEach(({ currentId }, author) => {
+            const existingHandoff = tailHandoffsRef.current.get(author);
+            if (existingHandoff) next.delete(existingHandoff.currentId);
+            next.add(currentId);
+          });
+          return next;
+        });
+
+        handoffs.forEach(({ previousId, currentId }, author) => {
+          const timer = setTimeout(() => {
+            const activeHandoff = tailHandoffsRef.current.get(author);
+            if (
+              activeHandoff?.previousId !== previousId ||
+              activeHandoff.currentId !== currentId
+            ) {
+              return;
+            }
+
+            tailHandoffsRef.current.delete(author);
+            setTailHoldMessageIds((current) => {
+              if (!current.has(previousId)) return current;
+              const next = new Set(current);
+              next.delete(previousId);
+              return next;
+            });
+            setTailSuppressMessageIds((current) => {
+              if (!current.has(currentId)) return current;
+              const next = new Set(current);
+              next.delete(currentId);
+              return next;
+            });
+          }, TAIL_HANDOFF_MS);
+
+          tailHandoffsRef.current.set(author, { previousId, currentId, timer });
+        });
+      }
+    }
+
+    previousMessagesRef.current = messages;
+  }, [clearTailHandoffState, hasHydrated, messages]);
+
+  useEffect(() => {
+    return () => {
+      clearTailHandoffTimers();
+      clearInitialExerciseTimer();
+    };
+  }, [clearInitialExerciseTimer, clearTailHandoffTimers]);
 
   const lastMessage = messages[messages.length - 1];
   const activeExerciseMessage = 
@@ -236,6 +397,9 @@ export default function ChatContainer() {
 
     initialized.current = false;
     setTyping(false);
+    clearInitialExerciseTimer();
+    clearTailHandoffState();
+    previousMessagesRef.current = [];
     blitz.close();
     ege13Quick.close();
     ege15Quick.close();
@@ -557,19 +721,22 @@ export default function ChatContainer() {
 
     if (
       messages.length === 1 &&
-      messages[0].id === 'welcome' &&
+      isWelcomeMessage(messages[0]) &&
       !initialized.current &&
       !hasRequestedInitialExercise
     ) {
       initialized.current = true;
       markInitialExerciseRequested();
       setTyping(true);
-      setTimeout(() => {
+      clearInitialExerciseTimer();
+      initialExerciseTimerRef.current = setTimeout(() => {
+        initialExerciseTimerRef.current = null;
         setTyping(false);
         fetchNextExercise(seenExerciseIds);
       }, 700);
     }
   }, [
+    clearInitialExerciseTimer,
     fetchNextExercise,
     hasHydrated,
     hasRequestedInitialExercise,
@@ -673,13 +840,11 @@ export default function ChatContainer() {
               let isFirstInGroup = true;
               let isLastInGroup = true;
               
-              if (prevMsg && prevMsg.isBot === msg.isBot) {
-                const timeDiff = msg.createdAt && prevMsg.createdAt ? msg.createdAt - prevMsg.createdAt : 0;
-                if (timeDiff < 5 * 60 * 1000) isFirstInGroup = false;
+              if (isGroupedMessagePair(prevMsg, msg)) {
+                isFirstInGroup = false;
               }
-              if (nextMsg && nextMsg.isBot === msg.isBot) {
-                const timeDiff = nextMsg.createdAt && msg.createdAt ? nextMsg.createdAt - msg.createdAt : 0;
-                if (timeDiff < 5 * 60 * 1000) isLastInGroup = false;
+              if (isGroupedMessagePair(msg, nextMsg)) {
+                isLastInGroup = false;
               }
 
               return (
@@ -691,6 +856,8 @@ export default function ChatContainer() {
                   createdAt={msg.createdAt}
                   isFirstInGroup={isFirstInGroup}
                   isLastInGroup={isLastInGroup}
+                  holdTail={tailHoldMessageIds.has(msg.id)}
+                  suppressTail={tailSuppressMessageIds.has(msg.id)}
                 />
                 {isExerciseMessage(msg) && (
                   <ExerciseRenderer

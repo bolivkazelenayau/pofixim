@@ -6,6 +6,7 @@ import {
   shouldStripEge18FillBeforePrompt,
   splitEge10FeedbackRows,
 } from './feedback';
+import { isAdminDebugEnabled } from './debug';
 import type { Form } from './types';
 
 type StoredDraftEnvelope = {
@@ -57,7 +58,7 @@ export function getDraftSessionId() {
 }
 
 export function logDraftRecoveryDebug(event: string, details?: Record<string, unknown>) {
-  if (typeof window === 'undefined') return;
+  if (!isAdminDebugEnabled()) return;
   console.info(`[admin-draft] ${event}`, details ?? {});
 }
 

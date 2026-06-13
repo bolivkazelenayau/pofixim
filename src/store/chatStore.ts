@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Exercise } from '@/features/exercises/schemas';
+import { createMessageId } from '@/lib/message-id';
 
 export type Message = {
   id: string;
@@ -76,7 +77,7 @@ const WELCOME_TEXT = WELCOME_TEXTS[0];
 
 function createWelcomeMessage(content: string = WELCOME_TEXT): Message {
   return {
-    id: 'welcome',
+    id: createMessageId('welcome'),
     isBot: true,
     content,
     type: 'text',
