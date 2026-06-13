@@ -119,34 +119,55 @@ export function useFormEffects({
 
   useEffect(() => {
     const anchor = mainSaveAnchorRef.current;
-    if (!anchor || typeof IntersectionObserver === 'undefined') return;
+    if (!anchor) return;
+    const saveAnchor = anchor;
+    let nextFrame = 0;
+    let currentVisible: boolean | null = null;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowFloatingSave(!entry.isIntersecting);
-      },
-      {
-        root: null,
-        threshold: 0.05,
-      },
-    );
-    observer.observe(anchor);
-    return () => observer.disconnect();
+    function commit(nextVisible: boolean) {
+      if (nextVisible === currentVisible) return;
+      currentVisible = nextVisible;
+      setShowFloatingSave(nextVisible);
+    }
+
+    function updateFloatingVisibility() {
+      const rect = saveAnchor.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const comfortablyVisible = rect.top < viewportHeight - 112 && rect.bottom > 96;
+      const clearlyAway = rect.top > viewportHeight - 48 || rect.bottom < 48;
+
+      if (comfortablyVisible) {
+        commit(false);
+        return;
+      }
+
+      if (clearlyAway || currentVisible === null) {
+        commit(true);
+      }
+    }
+
+    function scheduleUpdate() {
+      cancelAnimationFrame(nextFrame);
+      nextFrame = requestAnimationFrame(updateFloatingVisibility);
+    }
+
+    scheduleUpdate();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    return () => {
+      cancelAnimationFrame(nextFrame);
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+    };
   }, [mainSaveAnchorRef, setShowFloatingSave]);
 
   useEffect(() => {
     if (selectedId) {
-      logAdminDebug('selection:persist', {
-        selectedId,
-        currentUrl: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-      });
       localStorage.setItem('admin_last_selected_id', String(selectedId));
       document.cookie = `admin_selected_exercise_id=${selectedId}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
       return;
     }
-    logAdminDebug('selection:clear', {
-      currentUrl: `${window.location.pathname}${window.location.search}${window.location.hash}`,
-    });
     localStorage.removeItem('admin_last_selected_id');
     document.cookie = 'admin_selected_exercise_id=; Path=/admin; Max-Age=0; SameSite=Lax';
   }, [selectedId]);

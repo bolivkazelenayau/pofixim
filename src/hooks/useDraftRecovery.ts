@@ -36,7 +36,6 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
   const offerExistingDraftRecovery = useCallback((id: number, serverForm: Form) => {
     const storedDraft = readStoredDraft(id);
     if (!storedDraft) {
-      logDraftRecoveryDebug('offerExistingDraftRecovery:noDraft', { id, serverType: serverForm.type });
       return;
     }
     const { form: localDraft, sessionId } = storedDraft;
