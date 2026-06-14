@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ClipboardEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AudioWaveform,
@@ -240,11 +241,13 @@ function submittedAnswerFromText(exercise: Exercise, text: string): SubmittedAns
   }
 
   if (exercise.type === 'ege21_punctuation_analysis') {
-    return { type: 'ege21_punctuation_analysis', value: value.replace(/[^0-9]/g, '') };
+    const numericValue = value.replace(/[^0-9]/g, '');
+    return numericValue ? { type: 'ege21_punctuation_analysis', value: numericValue } : null;
   }
 
   if (exercise.type === 'ege20_complex_sentence_punctuation') {
-    return { type: 'ege20_complex_sentence_punctuation', value: value.replace(/[^0-9]/g, '') };
+    const numericValue = value.replace(/[^0-9]/g, '');
+    return numericValue ? { type: 'ege20_complex_sentence_punctuation', value: numericValue } : null;
   }
 
   return null;
@@ -258,11 +261,29 @@ function parsePositiveInt(value: string | undefined) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function parseQuickSeedCommand(text: string) {
-  const parts = text.trim().split(/\s+/u);
-  if (parts[0]?.toLowerCase() !== '/qseed' || parts.length < 3) return null;
+function normalizeQuickSeedText(text: string) {
+  return text.trim().replace(/^(?:\/?qseed)(?:\/qseed)*(?=\s|$)/iu, (prefix) => {
+    const count = prefix.match(/qseed/giu)?.length ?? 0;
+    return Array.from({ length: count }, () => '/qseed').join(' ');
+  });
+}
 
-  const modeAlias = parts[1].toLowerCase();
+function normalizeSeedCommandText(text: string) {
+  return text.trim().replace(/^\/?(seed|exercise)(?:\/\1)*(?=\s|$)/iu, (prefix) => {
+    const command = prefix.match(/exercise/iu) ? '/exercise' : '/seed';
+    const count = prefix.match(/seed|exercise/giu)?.length ?? 0;
+    return Array.from({ length: count }, () => command).join(' ');
+  });
+}
+
+function parseQuickSeedCommand(text: string) {
+  const parts = normalizeQuickSeedText(text).split(/\s+/u).filter(Boolean);
+  while (/^\/?qseed$/iu.test(parts[0] ?? '')) {
+    parts.shift();
+  }
+  if (parts.length < 2) return null;
+
+  const modeAlias = parts[0].toLowerCase();
   const mode: QuickSeedMode | null =
     modeAlias === 'blitz' || modeAlias === 'ege9'
       ? 'blitz'
@@ -273,16 +294,16 @@ function parseQuickSeedCommand(text: string) {
           : null;
   if (!mode) return null;
 
-  const seedKey = parts[2];
+  const seedKey = parts[1];
   const options = new Map<string, string>();
-  for (const part of parts.slice(3)) {
+  for (const part of parts.slice(2)) {
     const [rawKey, ...rawValue] = part.split('=');
     const key = rawKey?.toLowerCase();
     const value = rawValue.join('=');
     if (key && value) options.set(key, value);
   }
 
-  const positionalSelector = parts[3]?.includes('=') ? undefined : parts[3];
+  const positionalSelector = parts[2]?.includes('=') ? undefined : parts[2];
 
   return {
     mode,
@@ -296,6 +317,87 @@ function parseQuickSeedCommand(text: string) {
     wordIndex: parsePositiveInt(options.get('word') ?? options.get('w')),
     cardId: options.get('card') ?? options.get('id'),
   };
+}
+
+function looksLikeQuickSeedCommand(text: string) {
+  return /^\/?qseed(?:\s|\/|$)/iu.test(text.trim());
+}
+
+function quickSeedUsageText() {
+  return 'Команда qseed неполная. Формат: `/qseed blitz <seed> row=1 word=1`, `/qseed ege13 <seed> row=1`, `/qseed ege15 <seed> pos=1`.';
+}
+
+function normalizeNestedSeedCommand(text: string) {
+  const value = normalizeQuickSeedText(normalizeSeedKeyInput(text));
+
+  if (/^\/?qseed\s+/iu.test(value)) {
+    return value.startsWith('/') ? value : `/${value}`;
+  }
+
+  if (/^(?:blitz|ege9|ege13|13|ege15|15)\s+\S+/iu.test(value)) {
+    return `/qseed ${value}`;
+  }
+
+  return null;
+}
+
+function normalizeSeedKeyInput(text: string) {
+  const parts = normalizeSeedCommandText(text).split(/\s+/u).filter(Boolean);
+  while (/^\/?(?:seed|exercise)$/iu.test(parts[0] ?? '')) {
+    parts.shift();
+  }
+  return parts.join(' ');
+}
+
+function looksLikeBareSeedKey(text: string) {
+  const value = text.trim();
+  if (!value || value.startsWith('/') || /\s/u.test(value)) return false;
+  if (/^(?:seed|exercise|qseed)$/iu.test(value)) return false;
+
+  return /^(?=.*\d)[a-z0-9]+(?:-[a-z0-9]+)+$/iu.test(value);
+}
+
+function getVisiblePastedCommandText(text: string) {
+  const value = text.trim();
+  const quickSeed = parseQuickSeedCommand(value);
+  if (quickSeed && looksLikeQuickSeedCommand(value)) {
+    return normalizeQuickSeedText(value)
+      .split(/\s+/u)
+      .filter((part) => !/^\/?qseed$/iu.test(part))
+      .join(' ');
+  }
+
+  if (/^\/?(?:seed|exercise)\s+/iu.test(value)) {
+    const seedKey = normalizeSeedKeyInput(value);
+    return looksLikeBareSeedKey(seedKey) ? seedKey : null;
+  }
+
+  return null;
+}
+
+function getCommandAwarePasteValue(
+  currentValue: string,
+  pastedText: string,
+  selectionStart: number,
+  selectionEnd: number,
+) {
+  const visibleCommandText = getVisiblePastedCommandText(pastedText);
+  const normalizedPastedText = visibleCommandText
+    ?? (looksLikeBareSeedKey(pastedText) ? pastedText.trim() : null);
+  if (!normalizedPastedText) return null;
+
+  const prefixMatch = currentValue.match(/^(\s*\/(?:seed|exercise|qseed)\s*)/iu);
+  const commandPrefix = prefixMatch?.[1];
+  if (commandPrefix && selectionStart >= commandPrefix.length) {
+    const before = currentValue.slice(0, selectionStart);
+    const after = currentValue.slice(selectionEnd);
+    const separator = /\s$/u.test(before) ? '' : ' ';
+    return `${before}${separator}${normalizedPastedText}${after}`;
+  }
+
+  if (currentValue.trim().length > 0) return null;
+
+  return normalizedPastedText;
 }
 
 export default function ChatContainer() {
@@ -328,10 +430,12 @@ export default function ChatContainer() {
   const hasInitializedTailTrackingRef = useRef(false);
   const tailHandoffsRef = useRef(new Map<TailHandoffAuthor, TailHandoff>());
   const initialExerciseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exerciseHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [highlightedExerciseMessageId, setHighlightedExerciseMessageId] = useState<string | null>(null);
   const [tailHoldMessageIds, setTailHoldMessageIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -359,6 +463,38 @@ export default function ChatContainer() {
     clearTimeout(initialExerciseTimerRef.current);
     initialExerciseTimerRef.current = null;
   }, []);
+
+  const highlightRenderedExerciseBySeedKey = useCallback((rawSeedKey: string) => {
+    const seedKey = normalizeSeedKeyInput(rawSeedKey);
+    const existingMessage = messages
+      .filter(isExerciseMessage)
+      .find((message) => message.exercise.seedKey === seedKey);
+
+    if (!existingMessage) return false;
+
+    if (exerciseHighlightTimerRef.current) {
+      clearTimeout(exerciseHighlightTimerRef.current);
+      exerciseHighlightTimerRef.current = null;
+    }
+
+    setHighlightedExerciseMessageId(null);
+    requestAnimationFrame(() => {
+      setHighlightedExerciseMessageId(existingMessage.id);
+      const element = document.querySelector<HTMLElement>(
+        `[data-exercise-message-id="${existingMessage.id}"]`,
+      );
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    exerciseHighlightTimerRef.current = setTimeout(() => {
+      setHighlightedExerciseMessageId((current) =>
+        current === existingMessage.id ? null : current,
+      );
+      exerciseHighlightTimerRef.current = null;
+    }, 900);
+
+    return true;
+  }, [messages]);
 
   useEffect(() => {
     let isMounted = true;
@@ -485,6 +621,9 @@ export default function ChatContainer() {
     return () => {
       clearTailHandoffTimers();
       clearInitialExerciseTimer();
+      if (exerciseHighlightTimerRef.current) {
+        clearTimeout(exerciseHighlightTimerRef.current);
+      }
     };
   }, [clearInitialExerciseTimer, clearTailHandoffTimers]);
 
@@ -609,7 +748,9 @@ export default function ChatContainer() {
   );
 
   const fetchExerciseBySeedKey = useCallback(
-    async (seedKey: string) => {
+    async (rawSeedKey: string) => {
+      const seedKey = normalizeSeedKeyInput(rawSeedKey);
+      if (highlightRenderedExerciseBySeedKey(seedKey)) return;
       if (isFetchingExercise.current) return;
 
       isFetchingExercise.current = true;
@@ -645,7 +786,7 @@ export default function ChatContainer() {
         exercise: res.exercise,
       });
     },
-    [addMessage, markExercisePresented, sessionId, setSessionId, setTyping],
+    [addMessage, highlightRenderedExerciseBySeedKey, markExercisePresented, sessionId, setSessionId, setTyping],
   );
 
   const fetchQuickCardsBySeed = useCallback(
@@ -675,16 +816,16 @@ export default function ChatContainer() {
       }
 
       if (quickSeed.mode === 'ege13') {
-        ege13Quick.openWithCards(res.cards as Ege13QuickCard[]);
+        ege13Quick.openWithCards(res.cards as Ege13QuickCard[], { mode: 'inspect' });
         return;
       }
 
       if (quickSeed.mode === 'ege15') {
-        ege15Quick.openWithCards(res.cards as Ege15QuickCard[]);
+        ege15Quick.openWithCards(res.cards as Ege15QuickCard[], { mode: 'inspect' });
         return;
       }
 
-      blitz.openWithCards(res.cards as Ege9BlitzCard[]);
+      blitz.openWithCards(res.cards as Ege9BlitzCard[], { mode: 'inspect' });
     },
     [addMessage, blitz, ege13Quick, ege15Quick, setTyping],
   );
@@ -738,12 +879,16 @@ export default function ChatContainer() {
         const submittedAnswer = explicitAnswer ?? inferred?.submittedAnswer;
 
         if (exercise && submittedAnswer) {
-          const result = checkExerciseAnswer(exercise, submittedAnswer, { streak: 0 });
-          feedbacks.push({
-            messageId: message.id,
-            exerciseId: exercise.id,
-            content: buildFeedbackText(result, exercise.type),
-          });
+          try {
+            const result = checkExerciseAnswer(exercise, submittedAnswer, { streak: 0 });
+            feedbacks.push({
+              messageId: message.id,
+              exerciseId: exercise.id,
+              content: buildFeedbackText(result, exercise.type),
+            });
+          } catch {
+            // Older or malformed local messages should not break live exercise refresh.
+          }
         }
 
         latestSubmittedAnswer = null;
@@ -1012,22 +1157,69 @@ export default function ChatContainer() {
     }
   }
 
+  const handleGlobalInputPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = event.clipboardData.getData('text').trim();
+    const nextValue = getCommandAwarePasteValue(
+      globalInputValue,
+      pastedText,
+      event.currentTarget.selectionStart,
+      event.currentTarget.selectionEnd,
+    );
+    if (!nextValue) return;
+
+    event.preventDefault();
+    setActiveSlashCommandIndex(0);
+    setGlobalInputValue(nextValue);
+    requestAnimationFrame(() => {
+      globalInputRef.current?.focus();
+      globalInputRef.current?.setSelectionRange(nextValue.length, nextValue.length);
+    });
+  };
+
   const handleGlobalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = globalInputValue.trim();
     if (!text) return;
+    const normalizedCommandText = normalizeQuickSeedText(normalizeSeedCommandText(text));
 
-    const command = text.toLowerCase();
-    const quickSeed = parseQuickSeedCommand(text);
+    const command = normalizedCommandText.toLowerCase();
+    const quickSeed = parseQuickSeedCommand(normalizedCommandText);
     if (quickSeed) {
       setGlobalInputValue('');
       void fetchQuickCardsBySeed(quickSeed);
       return;
     }
 
-    const seedMatch = text.match(/^\/(?:seed|exercise)\s+(.+)$/i);
+    if (looksLikeBareSeedKey(normalizedCommandText)) {
+      setGlobalInputValue('');
+      void fetchExerciseBySeedKey(normalizedCommandText);
+      return;
+    }
+
+    if (looksLikeQuickSeedCommand(normalizedCommandText)) {
+      setGlobalInputValue('');
+      addMessage({
+        id: createMessageId('qseed-usage'),
+        isBot: true,
+        content: quickSeedUsageText(),
+        type: 'text',
+      });
+      return;
+    }
+
+    const seedMatch = normalizedCommandText.match(/^\/(?:seed|exercise)\s+(.+)$/i);
     if (seedMatch) {
-      const seedKey = seedMatch[1].trim();
+      const nestedQuickSeed = normalizeNestedSeedCommand(seedMatch[1]);
+      const quickSeedFromSeedCommand = nestedQuickSeed
+        ? parseQuickSeedCommand(nestedQuickSeed)
+        : null;
+      if (quickSeedFromSeedCommand) {
+        setGlobalInputValue('');
+        void fetchQuickCardsBySeed(quickSeedFromSeedCommand);
+        return;
+      }
+
+      const seedKey = normalizeSeedKeyInput(seedMatch[1]);
       setGlobalInputValue('');
       void fetchExerciseBySeedKey(seedKey);
       return;
@@ -1144,13 +1336,28 @@ export default function ChatContainer() {
     <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-sm sm:h-[calc(100dvh-2rem)]">
       <AnimatePresence initial={false}>
         {blitz.isOpen && (
-          <BlitzGame cards={blitz.cards} onClose={blitz.close} onFinish={blitz.onFinish} />
+          <BlitzGame
+            cards={blitz.cards}
+            mode={blitz.mode}
+            onClose={blitz.close}
+            onFinish={blitz.onFinish}
+          />
         )}
         {ege13Quick.isOpen && (
-          <Ege13QuickGame cards={ege13Quick.cards} onClose={ege13Quick.close} onFinish={ege13Quick.onFinish} />
+          <Ege13QuickGame
+            cards={ege13Quick.cards}
+            mode={ege13Quick.mode}
+            onClose={ege13Quick.close}
+            onFinish={ege13Quick.onFinish}
+          />
         )}
         {ege15Quick.isOpen && (
-          <Ege15QuickGame cards={ege15Quick.cards} onClose={ege15Quick.close} onFinish={ege15Quick.onFinish} />
+          <Ege15QuickGame
+            cards={ege15Quick.cards}
+            mode={ege15Quick.mode}
+            onClose={ege15Quick.close}
+            onFinish={ege15Quick.onFinish}
+          />
         )}
       </AnimatePresence>
 
@@ -1229,6 +1436,8 @@ export default function ChatContainer() {
                   <ExerciseRenderer
                     exercise={msg.exercise}
                     disabled={answeredExerciseIds.includes(msg.exercise.id)}
+                    highlight={highlightedExerciseMessageId === msg.id}
+                    highlightId={msg.id}
                     onSubmit={(answer, label) =>
                       handleExerciseSubmit(msg.exercise, answer, label)
                     }
@@ -1331,6 +1540,7 @@ export default function ChatContainer() {
                   setActiveSlashCommandIndex(0);
                   setGlobalInputValue(e.target.value);
                 }}
+                onPaste={handleGlobalInputPaste}
                 onKeyDown={(event) => {
                   if (showSlashCommands && visibleSlashCommands.length > 0) {
                     if (event.key === 'ArrowDown') {

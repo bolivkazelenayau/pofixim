@@ -1,15 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'motion/react';
-import { Timer, Trophy, X, Zap } from 'lucide-react';
+import { Copy, Timer, Trophy, X, Zap } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type BlitzDuration = 30 | 60 | 120;
 
 type BlitzGameProps = {
   cards: Ege9BlitzCard[];
+  mode?: 'normal' | 'inspect';
   onClose: () => void;
   onFinish: (result: BlitzResult) => void;
 };
@@ -31,9 +37,10 @@ function scoreForAnswer(combo: number) {
   return BASE_POINTS + streakBonus;
 }
 
-export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) {
+export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }: BlitzGameProps) {
+  const isInspectMode = mode === 'inspect';
   const [duration, setDuration] = useState<BlitzDuration>(30);
-  const [status, setStatus] = useState<'offer' | 'running' | 'finished'>('offer');
+  const [status, setStatus] = useState<'offer' | 'running' | 'finished'>(isInspectMode ? 'running' : 'offer');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(0);
   const [index, setIndex] = useState(0);
@@ -44,20 +51,25 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   const [scoreDelta, setScoreDelta] = useState(0);
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
   const finishedRef = useRef(false);
   const answerLockedRef = useRef(false);
   const feedbackTimeoutRef = useRef<number | null>(null);
 
   const timeLeftMs = useMemo(() => {
+    if (isInspectMode) return duration * 1000;
     if (status !== 'running' || !startedAt) return duration * 1000;
     return Math.max(0, duration * 1000 - (now - startedAt));
-  }, [duration, now, startedAt, status]);
+  }, [duration, isInspectMode, now, startedAt, status]);
 
   const timeLeftSeconds = Math.ceil(timeLeftMs / 1000);
   const currentCard = cards[index % Math.max(cards.length, 1)];
   const quickSeedCommand = currentCard?.seedKey
     ? `/qseed blitz ${currentCard.seedKey} row=${currentCard.rowIndex} word=${currentCard.wordIndex}`
     : null;
+  const quickSeedLabel = currentCard?.seedKey
+    ? `${currentCard.seedKey} · row ${currentCard.rowIndex} · word ${currentCard.wordIndex}`
+    : `id:${currentCard?.sourceExerciseId ?? 'n/a'}`;
   const archivedCards = [1, 2, 3]
     .map((offset) => cards[(index + offset) % Math.max(cards.length, 1)])
     .filter((card): card is Ege9BlitzCard => Boolean(card && card.id !== currentCard?.id));
@@ -94,6 +106,10 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
+    if (isInspectMode) {
+      onClose();
+      return;
+    }
     finishedRef.current = true;
     setStatus('finished');
     onFinish({
@@ -103,7 +119,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
       bestCombo,
       scoreDelta,
     });
-  }, [bestCombo, correctCount, duration, onFinish, scoreDelta, wrongCount]);
+  }, [bestCombo, correctCount, duration, isInspectMode, onClose, onFinish, scoreDelta, wrongCount]);
 
   function start() {
     if (cards.length === 0) return;
@@ -129,9 +145,31 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
     setStatus('running');
   }
 
-  function copyQuickSeedCommand() {
+  useEffect(() => {
+    if (isInspectMode) {
+      setStatus('running');
+      return;
+    }
+
+    setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+  }, [isInspectMode]);
+
+  async function copySeedKey() {
+    if (!currentCard?.seedKey) return;
+    const didCopy = await copyTextToClipboard(currentCard.seedKey);
+    setCopyToast(didCopy ? 'Seed скопирован' : 'Не удалось скопировать');
+  }
+
+  async function copyQuickSeedCommand() {
     if (!quickSeedCommand) return;
-    void navigator.clipboard?.writeText(quickSeedCommand);
+    const didCopy = await copyTextToClipboard(quickSeedCommand);
+    setCopyToast(didCopy ? 'qseed скопирован' : 'Не удалось скопировать');
+  }
+
+  function stopCopyInteraction(
+    event: ReactMouseEvent<HTMLButtonElement> | ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.stopPropagation();
   }
 
   const answer = useCallback((choiceIndex: 0 | 1) => {
@@ -179,6 +217,12 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   // Cleanup timeout on unmount
   useEffect(() => {
+    if (!copyToast) return;
+    const timer = window.setTimeout(() => setCopyToast(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copyToast]);
+
+  useEffect(() => {
     document.documentElement.classList.add('blitz-scroll-lock');
 
     return () => {
@@ -190,20 +234,20 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
   }, []);
 
   useEffect(() => {
-    if (status !== 'running') return;
+    if (status !== 'running' || isInspectMode) return;
 
     const id = window.setInterval(() => {
       setNow(Date.now());
     }, 100);
 
     return () => window.clearInterval(id);
-  }, [status]);
+  }, [isInspectMode, status]);
 
   useEffect(() => {
-    if (status === 'running' && timeLeftMs <= 0) {
+    if (!isInspectMode && status === 'running' && timeLeftMs <= 0) {
       finish();
     }
-  }, [finish, status, timeLeftMs]);
+  }, [finish, isInspectMode, status, timeLeftMs]);
 
   useEffect(() => {
     if (status !== 'running') return;
@@ -220,7 +264,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
 
   const handleDialogOpenChange = (open: boolean) => {
     if (open) return;
-    if (status === 'running') {
+    if (status === 'running' && !isInspectMode) {
       finish();
       return;
     }
@@ -235,7 +279,16 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
           className="fixed inset-0 z-modal bg-black/50"
           onMouseDown={() => handleDialogOpenChange(false)}
         />
-        <DialogPrimitive.Content className="fixed inset-0 z-modal flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4">
+        <DialogPrimitive.Content
+          className="fixed inset-0 z-modal flex items-end justify-center p-0 outline-none sm:items-center sm:px-3 sm:py-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleDialogOpenChange(false);
+            }
+          }}
+          onInteractOutside={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+        >
           <DialogPrimitive.Title className="sr-only">Блиц</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             Быстрый режим тренировки: выберите длительность, отвечайте стрелками или кнопками, Escape завершает раунд.
@@ -245,13 +298,19 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
         className={`relative flex max-h-[94svh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[32px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[40px] ${
-          status === 'running' ? 'min-h-[68svh] sm:min-h-0' : ''
+          status === 'running' && !isInspectMode ? 'min-h-[68svh] sm:min-h-0' : ''
         }`}
         aria-label="Блиц"
       >
+        {copyToast && (
+          <div className="pointer-events-none absolute bottom-4 left-1/2 z-sticky -translate-x-1/2 rounded-full bg-foreground px-3 py-1.5 text-xs font-bold text-background shadow-lg">
+            {copyToast}
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={status === 'running' ? finish : onClose}
+          onClick={status === 'running' && !isInspectMode ? finish : onClose}
           className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
             status === 'running' ? 'top-3' : 'top-[22px] sm:top-[26px]'
           }`}
@@ -261,7 +320,7 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
 
-        {status === 'offer' && (
+        {status === 'offer' && !isInspectMode && (
           <div className="p-5 sm:p-6">
             <div className="mb-5 flex items-start gap-3 pr-10">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
@@ -307,9 +366,15 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
         {status === 'running' && currentCard && (
           <div className="flex flex-1 flex-col p-3 sm:block sm:p-5">
             <div className="relative mb-2 flex min-h-8 items-center justify-between gap-2 sm:mb-3">
-              <div className="rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black tabular-nums text-foreground shadow-sm sm:px-3 sm:text-sm">
-                {timeLeftSeconds} c
-              </div>
+              {isInspectMode ? (
+                <div className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-black uppercase tracking-[0.08em] text-primary shadow-sm sm:px-3 sm:text-sm">
+                  qseed
+                </div>
+              ) : (
+                <div className="rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-2.5 py-1 text-xs font-black tabular-nums text-foreground shadow-sm sm:px-3 sm:text-sm">
+                  {timeLeftSeconds} c
+                </div>
+              )}
               <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
@@ -323,12 +388,14 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               )}
             </div>
 
-            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[var(--stroke)] sm:mb-4 sm:h-2">
-              <div
-                className="h-full origin-left rounded-full bg-primary transition-transform duration-100 ease-linear"
-                style={{ transform: `scaleX(${Math.max(0, progress)})` }}
-              />
-            </div>
+            {!isInspectMode && (
+              <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[var(--stroke)] sm:mb-4 sm:h-2">
+                <div
+                  className="h-full origin-left rounded-full bg-primary transition-transform duration-100 ease-linear"
+                  style={{ transform: `scaleX(${Math.max(0, progress)})` }}
+                />
+              </div>
+            )}
 
             <div className="relative grid min-h-[360px] flex-1 grid-cols-1 items-stretch gap-3 [perspective:900px] sm:min-h-[278px]">
               {archivedCards.map((card, archiveIndex) => (
@@ -457,15 +524,33 @@ export default function BlitzGame({ cards, onClose, onFinish }: BlitzGameProps) 
               </button>
             </div>
 
-            <div className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
               <button
                 type="button"
-                onClick={copyQuickSeedCommand}
-                disabled={!quickSeedCommand}
+                onPointerDown={stopCopyInteraction}
+                onClick={(event) => {
+                  stopCopyInteraction(event);
+                  void copySeedKey();
+                }}
+                disabled={!currentCard.seedKey}
                 className="text-left font-mono transition-colors duration-150 ease-out hover:text-primary disabled:pointer-events-none disabled:text-foreground/45"
-                title={quickSeedCommand ? 'Скопировать quick seed' : undefined}
+                title={currentCard.seedKey ? 'Скопировать seed key' : undefined}
               >
-                seed: {quickSeedCommand ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
+                seed: {quickSeedLabel}
+              </button>
+              <button
+                type="button"
+                onPointerDown={stopCopyInteraction}
+                onClick={(event) => {
+                  stopCopyInteraction(event);
+                  void copyQuickSeedCommand();
+                }}
+                disabled={!quickSeedCommand}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-foreground/45 transition-[background-color,color] duration-150 ease-out hover:bg-[var(--stroke)] hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                aria-label="Скопировать qseed"
+                title="Скопировать qseed"
+              >
+                <Copy className="size-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>

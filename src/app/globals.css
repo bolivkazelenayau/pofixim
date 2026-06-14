@@ -52,22 +52,6 @@ html body[data-scroll-locked] {
   padding-right: 0px !important;
 }
 
-html.blitz-scroll-lock,
-html.blitz-scroll-lock body {
-  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(0, 0, 0, 0.5);
-}
-
-html.blitz-scroll-lock::-webkit-scrollbar-track,
-html.blitz-scroll-lock body::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.5);
-}
-
-html.blitz-scroll-lock::-webkit-scrollbar-thumb,
-html.blitz-scroll-lock body::-webkit-scrollbar-thumb {
-  border-color: rgba(0, 0, 0, 0.5);
-  background-color: rgba(255, 255, 255, 0.18);
-}
-
 body {
   background: var(--background);
   color: var(--foreground);

@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import type { Exercise, SubmittedAnswer } from '../schemas';
 import MultipleChoiceCard from './MultipleChoiceCard';
 import FillBlankCard from './FillBlankCard';
@@ -13,12 +15,15 @@ import WordBankClozeCard from './WordBankClozeCard';
 import WordSearchCard from './WordSearchCard';
 import DictationCard from './DictationCard';
 import OrthographyRepairCard from './OrthographyRepairCard';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type ExerciseRendererProps = {
   exercise: Exercise;
   disabled?: boolean;
   onSubmit: (answer: SubmittedAnswer, answerLabel: string) => void;
   previewMode?: boolean;
+  highlight?: boolean;
+  highlightId?: string;
 };
 
 export default function ExerciseRenderer({
@@ -26,8 +31,23 @@ export default function ExerciseRenderer({
   disabled,
   onSubmit,
   previewMode,
+  highlight,
+  highlightId,
 }: ExerciseRendererProps) {
+  const seedLabel = exercise.seedKey ?? `id:${exercise.id ?? 'n/a'}`;
+  const [copyToast, setCopyToast] = useState<string | null>(null);
   let content: React.ReactNode;
+
+  async function copySeed() {
+    const didCopy = await copyTextToClipboard(seedLabel);
+    setCopyToast(didCopy ? 'Seed скопирован' : 'Не удалось скопировать');
+  }
+
+  useEffect(() => {
+    if (!copyToast) return;
+    const timer = window.setTimeout(() => setCopyToast(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copyToast]);
 
   switch (exercise.type) {
     case 'multiple_choice':
@@ -148,11 +168,51 @@ export default function ExerciseRenderer({
   }
 
   return (
-    <div>
-      {content}
+    <div className="relative">
+      <motion.div
+        data-exercise-message-id={highlightId}
+        className="rounded-[28px]"
+        animate={
+          highlight
+            ? {
+                opacity: [1, 0.86, 1, 1],
+                boxShadow: [
+                  '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
+                  '0 0 0 3px color-mix(in srgb, var(--primary) 42%, transparent), 0 12px 34px color-mix(in srgb, var(--primary) 18%, transparent)',
+                  '0 0 0 2px color-mix(in srgb, var(--primary) 24%, transparent), 0 9px 26px color-mix(in srgb, var(--primary) 10%, transparent)',
+                  '0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent), 0 5px 16px color-mix(in srgb, var(--primary) 4%, transparent)',
+                  '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
+                ],
+              }
+            : {
+                opacity: 1,
+                boxShadow: '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
+              }
+        }
+        transition={{
+          duration: 0.9,
+          ease: [0.16, 1, 0.3, 1],
+          times: [0, 0.16, 0.38, 0.68, 1],
+        }}
+      >
+        {content}
+      </motion.div>
       <p className="-mt-1 mb-2 text-[11px] text-foreground/60">
-        seed: <span className="font-mono select-all">{exercise.seedKey ?? `id:${exercise.id ?? 'n/a'}`}</span>
+        seed:{' '}
+        <button
+          type="button"
+          onClick={copySeed}
+          className="font-mono transition-colors duration-150 ease-out hover:text-primary focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary/30"
+          title="Скопировать seed key"
+        >
+          {seedLabel}
+        </button>
       </p>
+      {copyToast && (
+        <div className="pointer-events-none absolute bottom-8 left-0 z-sticky rounded-full bg-foreground px-3 py-1.5 text-xs font-bold text-background shadow-lg">
+          {copyToast}
+        </div>
+      )}
     </div>
   );
 }

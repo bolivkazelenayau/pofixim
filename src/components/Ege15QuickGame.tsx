@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, BadgeCheck, Trophy, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Copy, Trophy, X } from 'lucide-react';
 import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
 import { refreshEge15QuickCardAction } from '@/app/actions/exercises';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type Ege15QuickGameProps = {
   cards: Ege15QuickCard[];
+  mode?: 'normal' | 'inspect';
   onClose: () => void;
   onFinish: (result: Ege15QuickResult) => void;
 };
@@ -35,10 +37,12 @@ function keepRussianShortWords(text: string) {
 
 export default function Ege15QuickGame({
   cards,
+  mode = 'normal',
   onClose,
   onFinish,
 }: Ege15QuickGameProps) {
-  const [status, setStatus] = useState<'offer' | 'running' | 'finished'>('offer');
+  const isInspectMode = mode === 'inspect';
+  const [status, setStatus] = useState<'offer' | 'running' | 'finished'>(isInspectMode ? 'running' : 'offer');
   const [index, setIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
@@ -49,6 +53,7 @@ export default function Ege15QuickGame({
   const [isAnswerLocked, setIsAnswerLocked] = useState(false);
   const [localCards, setLocalCards] = useState<Ege15QuickCard[]>(cards);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
   const finishedRef = useRef(false);
   const answerLockedRef = useRef(false);
 
@@ -58,6 +63,11 @@ export default function Ege15QuickGame({
       ? `/qseed ege15 ${currentCard.seedKey} pos=${currentCard.positionIndex}`
       : `/qseed ege15 ${currentCard.seedKey} card=${currentCard.id}`
     : null;
+  const quickSeedLabel = currentCard?.seedKey
+    ? currentCard.positionIndex
+      ? `${currentCard.seedKey} · pos ${currentCard.positionIndex}`
+      : `${currentCard.seedKey} · card`
+    : `id:${currentCard?.sourceExerciseId ?? 'n/a'}`;
   const wordLength = currentCard ? currentCard.before.length + 1 + currentCard.after.length : 0;
   const tokenFontClass = wordLength > 18
     ? 'text-[clamp(1.25rem,5.7vw,2rem)] sm:text-[2rem]'
@@ -67,6 +77,10 @@ export default function Ege15QuickGame({
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
+    if (isInspectMode) {
+      onClose();
+      return;
+    }
     finishedRef.current = true;
     setStatus('finished');
     onFinish({
@@ -75,7 +89,16 @@ export default function Ege15QuickGame({
       bestCombo,
       scoreDelta,
     });
-  }, [bestCombo, correctCount, onFinish, scoreDelta, wrongCount]);
+  }, [bestCombo, correctCount, isInspectMode, onClose, onFinish, scoreDelta, wrongCount]);
+
+  const closeFromBackdrop = useCallback(() => {
+    if (status === 'running' && !isInspectMode) {
+      finish();
+      return;
+    }
+
+    onClose();
+  }, [finish, isInspectMode, onClose, status]);
 
   function start() {
     if (localCards.length === 0) return;
@@ -92,9 +115,25 @@ export default function Ege15QuickGame({
     setStatus('running');
   }
 
-  function copyQuickSeedCommand() {
+  useEffect(() => {
+    if (isInspectMode) {
+      setStatus('running');
+      return;
+    }
+
+    setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+  }, [isInspectMode]);
+
+  async function copySeedKey() {
+    if (!currentCard?.seedKey) return;
+    const didCopy = await copyTextToClipboard(currentCard.seedKey);
+    setCopyToast(didCopy ? 'Seed скопирован' : 'Не удалось скопировать');
+  }
+
+  async function copyQuickSeedCommand() {
     if (!quickSeedCommand) return;
-    void navigator.clipboard?.writeText(quickSeedCommand);
+    const didCopy = await copyTextToClipboard(quickSeedCommand);
+    setCopyToast(didCopy ? 'qseed скопирован' : 'Не удалось скопировать');
   }
 
   const answer = useCallback((choiceIndex: 0 | 1) => {
@@ -144,15 +183,25 @@ export default function Ege15QuickGame({
   }, [currentCard, isRefreshing]);
 
   useEffect(() => {
-    if (!isAnswerLocked) return;
+    if (!copyToast) return;
+    const timer = window.setTimeout(() => setCopyToast(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copyToast]);
 
-    const onFocus = () => {
+  useEffect(() => {
+    if (status !== 'running') return;
+
+    const refresh = () => {
       void handleRefresh();
     };
+    const refreshTimer = window.setInterval(refresh, 5000);
 
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [isAnswerLocked, handleRefresh]);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [handleRefresh, status]);
 
   useEffect(() => {
     if (status !== 'running') return;
@@ -175,19 +224,33 @@ export default function Ege15QuickGame({
   }, [answer, finish, nextCard, status]);
 
   return (
-    <div className="fixed inset-0 z-modal flex items-end justify-center bg-black/50 p-0 sm:items-center sm:px-3 sm:py-4">
+    <div
+      className="fixed inset-0 z-modal flex items-end justify-center bg-black/50 p-0 sm:items-center sm:px-3 sm:py-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          closeFromBackdrop();
+        }
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
         className="relative flex max-h-[94svh] w-full max-w-[540px] flex-col overflow-hidden rounded-t-[32px] border border-white/75 bg-[var(--surface-strong)] shadow-xl sm:max-h-[92vh] sm:rounded-[40px]"
+        onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Быстрый тип 15"
       >
+        {copyToast && (
+          <div className="pointer-events-none absolute bottom-4 left-1/2 z-sticky -translate-x-1/2 rounded-full bg-foreground px-3 py-1.5 text-xs font-bold text-background shadow-lg">
+            {copyToast}
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={status === 'running' ? finish : onClose}
+          onClick={status === 'running' && !isInspectMode ? finish : onClose}
           className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
             status === 'running' ? 'top-3' : 'top-[22px] sm:top-[26px]'
           }`}
@@ -197,7 +260,7 @@ export default function Ege15QuickGame({
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
 
-        {status === 'offer' && (
+        {status === 'offer' && !isInspectMode && (
           <div className="p-5 sm:p-6">
             <div className="mb-5 flex items-start gap-3 pr-10">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
@@ -226,11 +289,15 @@ export default function Ege15QuickGame({
         {status === 'running' && currentCard && (
           <div className="flex flex-1 flex-col p-3 sm:p-5">
             <div className="relative mb-3 flex min-h-8 items-center sm:mb-4">
-              {combo > 0 && (
+              {isInspectMode ? (
+                <div className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-black uppercase tracking-[0.08em] text-primary shadow-sm sm:px-3 sm:text-sm">
+                  qseed
+                </div>
+              ) : combo > 0 ? (
                 <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20 sm:px-3 sm:text-sm">
                   x{combo}
                 </div>
-              )}
+              ) : null}
               <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
@@ -299,15 +366,25 @@ export default function Ege15QuickGame({
               </div>
             )}
 
-            <div className="mt-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-foreground/60 sm:mt-3 sm:text-[11px]">
+              <button
+                type="button"
+                onClick={copySeedKey}
+                disabled={!currentCard.seedKey}
+                className="text-left font-mono transition-colors duration-150 ease-out hover:text-primary disabled:pointer-events-none disabled:text-foreground/45"
+                title={currentCard.seedKey ? 'Скопировать seed key' : undefined}
+              >
+                seed: {quickSeedLabel}
+              </button>
               <button
                 type="button"
                 onClick={copyQuickSeedCommand}
                 disabled={!quickSeedCommand}
-                className="text-left font-mono transition-colors duration-150 ease-out hover:text-primary disabled:pointer-events-none disabled:text-foreground/45"
-                title={quickSeedCommand ? 'Скопировать quick seed' : undefined}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-foreground/45 transition-[background-color,color] duration-150 ease-out hover:bg-[var(--stroke)] hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                aria-label="Скопировать qseed"
+                title="Скопировать qseed"
               >
-                seed: {quickSeedCommand ?? `id:${currentCard.sourceExerciseId ?? 'n/a'}`}
+                <Copy className="size-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>

@@ -30,8 +30,9 @@ interface UseQuickGameReturn<Card, Result> {
   cards: Card[];
   isOpen: boolean;
   isLoading: boolean;
+  mode: 'normal' | 'inspect';
   open: () => Promise<void>;
-  openWithCards: (cards: Card[]) => void;
+  openWithCards: (cards: Card[], options?: { mode?: 'normal' | 'inspect' }) => void;
   close: () => void;
   onFinish: (result: Result) => void;
 }
@@ -43,6 +44,7 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
   const [cards, setCards] = useState<Card[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'normal' | 'inspect'>('normal');
   const isLoadingRef = useRef(false);
 
   const open = useCallback(
@@ -60,6 +62,7 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
         if (res.success && res.cards.length > 0) {
           const shuffled = config.shuffleCards(res.cards, String(Date.now()));
           setCards(shuffled);
+          setMode('normal');
           setIsOpen(true);
           return;
         }
@@ -81,26 +84,30 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
   const close = useCallback(() => {
     setIsOpen(false);
     setCards([]);
+    setMode('normal');
   }, []);
 
-  const openWithCards = useCallback((nextCards: Card[]) => {
+  const openWithCards = useCallback((nextCards: Card[], options?: { mode?: 'normal' | 'inspect' }) => {
     setCards(nextCards);
+    setMode(options?.mode ?? 'normal');
     setIsOpen(nextCards.length > 0);
   }, []);
 
   const onFinish = useCallback(
     (result: Result) => {
-      recordBlitzScore(result.scoreDelta);
-      addMessage({
-        id: createMessageId(`${config.skillTag}-result`),
-        isBot: true,
-        content: `${config.skillTag === 'ege.9' ? 'Блиц' : config.skillTag === 'ege.13' ? 'Тип 13' : 'Тип 15'}: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
-        type: 'text',
-      });
+      if (mode === 'normal') {
+        recordBlitzScore(result.scoreDelta);
+        addMessage({
+          id: createMessageId(`${config.skillTag}-result`),
+          isBot: true,
+          content: `${config.skillTag === 'ege.9' ? 'Блиц' : config.skillTag === 'ege.13' ? 'Тип 13' : 'Тип 15'}: +${result.scoreDelta} очков. Верно: ${result.correctCount}, ошибки: ${result.wrongCount}, лучшее комбо: ${result.bestCombo}.`,
+          type: 'text',
+        });
+      }
       close();
     },
-    [config.skillTag, recordBlitzScore, addMessage, close]
+    [config.skillTag, mode, recordBlitzScore, addMessage, close]
   );
 
-  return { cards, isOpen, isLoading, open, openWithCards, close, onFinish };
+  return { cards, isOpen, isLoading, mode, open, openWithCards, close, onFinish };
 }
