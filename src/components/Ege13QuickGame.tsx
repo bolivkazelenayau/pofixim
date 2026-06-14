@@ -257,7 +257,7 @@ export default function Ege13QuickGame({
         {status === 'offer' && !isInspectMode && (
           <div className="p-5 sm:p-6">
             <div className="mb-5 flex items-start gap-3 pr-10">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-sm">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
                 <BookOpenCheck className="h-5 w-5" />
               </div>
               <div>
@@ -288,7 +288,7 @@ export default function Ege13QuickGame({
                   qseed
                 </div>
               ) : combo > 0 ? (
-                <div className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
+                <div className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:px-3 sm:text-sm">
                   x{combo}
                 </div>
               ) : null}

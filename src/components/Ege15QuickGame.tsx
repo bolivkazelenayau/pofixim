@@ -298,7 +298,7 @@ export default function Ege15QuickGame({
                   x{combo}
                 </div>
               ) : null}
-              <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20 sm:px-3 sm:text-sm">
+              <div className="absolute left-1/2 -translate-x-1/2 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black tabular-nums text-sky-700 ring-1 ring-sky-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20 sm:px-3 sm:text-sm">
                 {scoreDelta}
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function Ege15QuickGame({
                 </div>
                 <div className={`${tokenFontClass} font-black leading-none text-foreground`}>
                   <span>{currentCard.before}</span>
-                  <span className="mx-1 inline-flex h-[1.08em] min-w-[1.08em] translate-y-[0.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_rgba(51,144,236,0.22)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]">
+                  <span className="mx-1 inline-flex h-[1.08em] min-w-[1.08em] translate-y-[0.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_color-mix(in_srgb,var(--primary)_22%,transparent)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]">
                     ?
                   </span>
                   <span>{currentCard.after}</span>

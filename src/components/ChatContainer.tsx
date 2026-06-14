@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -415,7 +415,6 @@ export default function ChatContainer() {
     streak,
     seenExerciseIds,
     cooldownExerciseIds,
-    answeredExerciseIds,
     sessionId,
     hasRequestedInitialExercise,
     markInitialExerciseRequested,
@@ -435,6 +434,8 @@ export default function ChatContainer() {
   const [hasHydrated, setHasHydrated] = useState(false);
   const [globalInputValue, setGlobalInputValue] = useState('');
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [isSlashCommandMenuDismissed, setIsSlashCommandMenuDismissed] = useState(false);
+  const [isSlashCommandMenuForcedOpen, setIsSlashCommandMenuForcedOpen] = useState(false);
   const [highlightedExerciseMessageId, setHighlightedExerciseMessageId] = useState<string | null>(null);
   const [tailHoldMessageIds, setTailHoldMessageIds] = useState<Set<string>>(
     () => new Set(),
@@ -443,6 +444,7 @@ export default function ChatContainer() {
     () => new Set(),
   );
   const globalInputRef = useRef<HTMLTextAreaElement>(null);
+  const globalInputShellRef = useRef<HTMLDivElement>(null);
   const blitz = useBlitzGame();
   const ege13Quick = useEge13QuickGame();
   const ege15Quick = useEge15QuickGame();
@@ -464,13 +466,13 @@ export default function ChatContainer() {
     initialExerciseTimerRef.current = null;
   }, []);
 
-  const highlightRenderedExerciseBySeedKey = useCallback((rawSeedKey: string) => {
+  const highlightLatestExerciseIfSameSeed = useCallback((rawSeedKey: string) => {
     const seedKey = normalizeSeedKeyInput(rawSeedKey);
-    const existingMessage = messages
-      .filter(isExerciseMessage)
-      .find((message) => message.exercise.seedKey === seedKey);
+    const latestExerciseMessage = [...messages].reverse().find(isExerciseMessage);
 
-    if (!existingMessage) return false;
+    if (!latestExerciseMessage || latestExerciseMessage.exercise.seedKey !== seedKey) {
+      return false;
+    }
 
     if (exerciseHighlightTimerRef.current) {
       clearTimeout(exerciseHighlightTimerRef.current);
@@ -479,16 +481,16 @@ export default function ChatContainer() {
 
     setHighlightedExerciseMessageId(null);
     requestAnimationFrame(() => {
-      setHighlightedExerciseMessageId(existingMessage.id);
+      setHighlightedExerciseMessageId(latestExerciseMessage.id);
       const element = document.querySelector<HTMLElement>(
-        `[data-exercise-message-id="${existingMessage.id}"]`,
+        `[data-exercise-message-id="${latestExerciseMessage.id}"]`,
       );
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     exerciseHighlightTimerRef.current = setTimeout(() => {
       setHighlightedExerciseMessageId((current) =>
-        current === existingMessage.id ? null : current,
+        current === latestExerciseMessage.id ? null : current,
       );
       exerciseHighlightTimerRef.current = null;
     }, 900);
@@ -628,14 +630,23 @@ export default function ChatContainer() {
   }, [clearInitialExerciseTimer, clearTailHandoffTimers]);
 
   const lastMessage = messages[messages.length - 1];
+  const answeredExerciseMessageIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const message of messages) {
+      if (message.feedbackForExerciseMessageId) {
+        ids.add(message.feedbackForExerciseMessageId);
+      }
+    }
+    return ids;
+  }, [messages]);
   const activeExerciseMessage = 
-    lastMessage && isExerciseMessage(lastMessage) && !answeredExerciseIds.includes(lastMessage.exercise.id)
+    lastMessage && isExerciseMessage(lastMessage) && !answeredExerciseMessageIds.has(lastMessage.id)
       ? lastMessage
       : null;
   const slashCommandQuery = globalInputValue.startsWith('/')
     ? globalInputValue.slice(1).toLowerCase()
     : null;
-  const visibleSlashCommands = slashCommandQuery === null
+  const visibleSlashCommands = slashCommandQuery === null || isSlashCommandMenuForcedOpen
     ? []
     : SLASH_COMMANDS.filter((item) => {
         const command = item.command.slice(1);
@@ -644,11 +655,33 @@ export default function ChatContainer() {
           item.title.toLowerCase().includes(slashCommandQuery)
         );
       });
-  const showSlashCommands = slashCommandQuery !== null && visibleSlashCommands.length > 0;
+  const visibleForcedSlashCommands = isSlashCommandMenuForcedOpen ? SLASH_COMMANDS : visibleSlashCommands;
+  const showSlashCommands =
+    !isSlashCommandMenuDismissed &&
+    (isSlashCommandMenuForcedOpen || slashCommandQuery !== null) &&
+    visibleForcedSlashCommands.length > 0;
   const activeSlashCommand =
     showSlashCommands
-      ? visibleSlashCommands[Math.min(activeSlashCommandIndex, visibleSlashCommands.length - 1)]
+      ? visibleForcedSlashCommands[Math.min(activeSlashCommandIndex, visibleForcedSlashCommands.length - 1)]
       : null;
+
+  useEffect(() => {
+    if (!showSlashCommands) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const shell = globalInputShellRef.current;
+      const target = event.target;
+      if (!shell || !(target instanceof Node) || shell.contains(target)) return;
+
+      setIsSlashCommandMenuDismissed(true);
+      setIsSlashCommandMenuForcedOpen(false);
+      setActiveSlashCommandIndex(0);
+      setGlobalInputValue((current) => (current.trim() === '/' ? '' : current));
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [showSlashCommands]);
 
   const supportsGlobalInput =
     activeExerciseMessage &&
@@ -750,7 +783,7 @@ export default function ChatContainer() {
   const fetchExerciseBySeedKey = useCallback(
     async (rawSeedKey: string) => {
       const seedKey = normalizeSeedKeyInput(rawSeedKey);
-      if (highlightRenderedExerciseBySeedKey(seedKey)) return;
+      if (highlightLatestExerciseIfSameSeed(seedKey)) return;
       if (isFetchingExercise.current) return;
 
       isFetchingExercise.current = true;
@@ -784,9 +817,17 @@ export default function ChatContainer() {
         content: res.exercise.prompt,
         type: 'exercise',
         exercise: res.exercise,
+        allowDuplicateExerciseInstance: true,
       });
     },
-    [addMessage, highlightRenderedExerciseBySeedKey, markExercisePresented, sessionId, setSessionId, setTyping],
+    [
+      addMessage,
+      highlightLatestExerciseIfSameSeed,
+      markExercisePresented,
+      sessionId,
+      setSessionId,
+      setTyping,
+    ],
   );
 
   const fetchQuickCardsBySeed = useCallback(
@@ -976,6 +1017,7 @@ export default function ChatContainer() {
     exercise: ExerciseMessage['exercise'],
     submittedAnswer: SubmittedAnswer,
     answerLabel: string,
+    exerciseMessageId?: string,
   ) => {
     if (!sessionId) {
       addMessage({
@@ -1030,6 +1072,7 @@ export default function ChatContainer() {
       content: buildFeedbackText(res.result, exercise.type),
       type: 'text',
       feedbackForExerciseId: exercise.id,
+      feedbackForExerciseMessageId: exerciseMessageId,
       submittedAnswer,
     });
 
@@ -1114,6 +1157,8 @@ export default function ChatContainer() {
   }
 
   function runSlashCommand(command: SlashCommand) {
+    setIsSlashCommandMenuDismissed(false);
+    setIsSlashCommandMenuForcedOpen(false);
     if (command === '/seed' || command === '/qseed') {
       setGlobalInputValue(command === '/seed' ? '/seed ' : '/qseed ');
       requestAnimationFrame(() => globalInputRef.current?.focus());
@@ -1169,6 +1214,8 @@ export default function ChatContainer() {
 
     event.preventDefault();
     setActiveSlashCommandIndex(0);
+    setIsSlashCommandMenuDismissed(false);
+    setIsSlashCommandMenuForcedOpen(false);
     setGlobalInputValue(nextValue);
     requestAnimationFrame(() => {
       globalInputRef.current?.focus();
@@ -1178,6 +1225,8 @@ export default function ChatContainer() {
 
   const handleGlobalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSlashCommandMenuDismissed(false);
+    setIsSlashCommandMenuForcedOpen(false);
     const text = globalInputValue.trim();
     if (!text) return;
     const normalizedCommandText = normalizeQuickSeedText(normalizeSeedCommandText(text));
@@ -1268,7 +1317,7 @@ export default function ChatContainer() {
     }
 
     setGlobalInputValue('');
-    handleExerciseSubmit(activeExerciseMessage.exercise, answer, text);
+    handleExerciseSubmit(activeExerciseMessage.exercise, answer, text, activeExerciseMessage.id);
   };
 
   useEffect(() => {
@@ -1435,11 +1484,11 @@ export default function ChatContainer() {
                 {isExerciseMessage(msg) && (
                   <ExerciseRenderer
                     exercise={msg.exercise}
-                    disabled={answeredExerciseIds.includes(msg.exercise.id)}
+                    disabled={answeredExerciseMessageIds.has(msg.id)}
                     highlight={highlightedExerciseMessageId === msg.id}
                     highlightId={msg.id}
                     onSubmit={(answer, label) =>
-                      handleExerciseSubmit(msg.exercise, answer, label)
+                      handleExerciseSubmit(msg.exercise, answer, label, msg.id)
                     }
                   />
                 )}
@@ -1464,7 +1513,7 @@ export default function ChatContainer() {
             <div className="h-4 w-64 max-w-full rounded bg-[var(--stroke)]" />
           </div>
         ) : (
-          <div className="relative">
+          <div ref={globalInputShellRef} className="relative">
             <AnimatePresence initial={false}>
               {showSlashCommands && (
                 <motion.div
@@ -1477,7 +1526,7 @@ export default function ChatContainer() {
                   aria-activedescendant={activeSlashCommand ? `slash-command-${activeSlashCommand.command.slice(1)}` : undefined}
                   className="absolute bottom-[calc(100%+0.5rem)] left-0 z-popover w-full overflow-hidden rounded-2xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-xl"
                 >
-                  {visibleSlashCommands.map((item, index) => {
+                  {visibleForcedSlashCommands.map((item, index) => {
                     const Icon = getSlashCommandIcon(item.command);
                     const isActive = index === activeSlashCommandIndex;
                     return (
@@ -1520,7 +1569,15 @@ export default function ChatContainer() {
                 type="button"
                 onClick={() => {
                   setActiveSlashCommandIndex(0);
-                  setGlobalInputValue(prev => prev.startsWith('/') ? '' : '/');
+                  if (showSlashCommands) {
+                    setIsSlashCommandMenuDismissed(true);
+                    setIsSlashCommandMenuForcedOpen(false);
+                    setGlobalInputValue((current) => (current.trim() === '/' ? '' : current));
+                  } else {
+                    setIsSlashCommandMenuDismissed(false);
+                    setIsSlashCommandMenuForcedOpen(true);
+                    setGlobalInputValue((current) => (current.trim() ? current : '/'));
+                  }
                   globalInputRef.current?.focus();
                 }}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
@@ -1538,22 +1595,33 @@ export default function ChatContainer() {
                 value={globalInputValue}
                 onChange={(e) => {
                   setActiveSlashCommandIndex(0);
+                  setIsSlashCommandMenuDismissed(false);
+                  setIsSlashCommandMenuForcedOpen(false);
                   setGlobalInputValue(e.target.value);
                 }}
+                onFocus={() => setIsSlashCommandMenuDismissed(false)}
                 onPaste={handleGlobalInputPaste}
                 onKeyDown={(event) => {
-                  if (showSlashCommands && visibleSlashCommands.length > 0) {
+                  if (showSlashCommands && visibleForcedSlashCommands.length > 0) {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setIsSlashCommandMenuDismissed(true);
+                      setIsSlashCommandMenuForcedOpen(false);
+                      setActiveSlashCommandIndex(0);
+                      setGlobalInputValue((current) => (current.trim() === '/' ? '' : current));
+                      return;
+                    }
                     if (event.key === 'ArrowDown') {
                       event.preventDefault();
                       setActiveSlashCommandIndex((current) =>
-                        (current + 1) % visibleSlashCommands.length,
+                        (current + 1) % visibleForcedSlashCommands.length,
                       );
                       return;
                     }
                     if (event.key === 'ArrowUp') {
                       event.preventDefault();
                       setActiveSlashCommandIndex((current) =>
-                        (current - 1 + visibleSlashCommands.length) % visibleSlashCommands.length,
+                        (current - 1 + visibleForcedSlashCommands.length) % visibleForcedSlashCommands.length,
                       );
                       return;
                     }

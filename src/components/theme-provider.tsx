@@ -25,6 +25,11 @@ function applyTheme(theme: Theme) {
   root.style.colorScheme = theme;
 }
 
+function writeThemeCookie(theme: Theme) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `theme=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
 function readThemeFromStorage(): Theme {
   if (typeof window === 'undefined') return 'light';
   try {
@@ -63,12 +68,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     applyTheme(theme);
+    writeThemeCookie(theme);
   }, [theme]);
 
   const setTheme = React.useCallback((nextTheme: Theme) => {
     const root = document.documentElement;
     root.classList.add('theme-switching');
     applyTheme(nextTheme);
+    writeThemeCookie(nextTheme);
     try {
       window.localStorage.setItem('theme', nextTheme);
       window.dispatchEvent(new Event('theme-change'));

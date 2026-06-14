@@ -43,8 +43,8 @@ export default function AdminMessageToast({ message, isError }: AdminMessageToas
   <div
    role={isError ? 'alert' : 'status'}
    aria-live={isError ? 'assertive' : 'polite'}
-   className={`fixed right-6 bottom-6 z-toast mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-xl transition-[opacity,transform] duration-200 ease-out ${
-    isVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+   className={`fixed right-6 bottom-6 z-toast mb-4 max-w-[min(36rem,calc(100vw-3rem))] rounded-xl border px-5 py-3 text-sm leading-6 font-medium whitespace-normal break-words shadow-xl transition-opacity duration-200 ease-out ${
+    isVisible ? 'opacity-100' : 'opacity-0'
    } ${
     isError
      ? 'border-red-200 bg-red-50 text-red-700'

@@ -163,7 +163,11 @@ function getFeedbackTone(content: string) {
 }
 
 function shouldRenderTrustedHtml(content: string) {
-  return /^📊\s+\*\*Таблица лидеров\*\*/u.test(content) && content.includes('<table');
+  const trimmed = content.trim();
+  return (
+    (/^📊\s+\*\*Таблица лидеров\*\*/u.test(content) && content.includes('<table')) ||
+    /^<div class="dictation-diff">/u.test(trimmed)
+  );
 }
 
 export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup, holdTail = false, suppressTail = false }: MessageBubbleProps) {
@@ -199,8 +203,8 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
   );
   const bubbleVars = usesSvgShape
     ? ({
-        '--bubble-tail-bg': isBot ? 'var(--surface-strong)' : '#EEFFDE',
-        '--bubble-tail-border': isBot ? 'var(--stroke)' : '#D5E5C3',
+        '--bubble-tail-bg': isBot ? 'var(--surface-strong)' : 'var(--message-user-bg)',
+        '--bubble-tail-border': isBot ? 'var(--stroke)' : 'var(--message-user-border)',
       } as CSSProperties)
     : undefined;
 
@@ -257,9 +261,13 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
               strokeLinejoin="round"
               strokeWidth={1}
               style={{
-                fill: 'var(--bubble-tail-bg)',
+                fill: isBot
+                  ? 'var(--bubble-tail-bg, var(--surface-strong))'
+                  : 'var(--bubble-tail-bg, var(--message-user-bg, #EEFFDE))',
                 filter: 'drop-shadow(0 1px 2px rgb(0 0 0 / 0.08))',
-                stroke: 'var(--bubble-tail-border)',
+                stroke: isBot
+                  ? 'var(--bubble-tail-border, var(--stroke))'
+                  : 'var(--bubble-tail-border, var(--message-user-border, #D5E5C3))',
                 vectorEffect: 'non-scaling-stroke',
               }}
             />

@@ -22,6 +22,10 @@ type AdminPreviewPanelProps = {
   onPreviewFillBlankTextChange: (text: string) => void;
 };
 
+function isTrustedPreviewHtml(value: string) {
+ return /^<div class="dictation-diff">/u.test(value.trim());
+}
+
 export default function AdminPreviewPanel({
  preview,
  previewMode,
@@ -134,21 +138,21 @@ export default function AdminPreviewPanel({
      ) : null}
      {previewCheckResult && (
       <div
-       className={`relative mt-3 rounded-3xl border px-4 py-3 text-sm whitespace-pre-wrap before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
-        preview.exercise.type === 'dictation'
-         ? 'border-cyan-200 bg-cyan-50 text-cyan-950 before:bg-cyan-400 dark:border-cyan-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-cyan-300/65'
-         : previewCheckResult.isCorrect
+        className={`relative mt-3 rounded-3xl border px-4 py-3 text-sm whitespace-pre-wrap before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
+         previewCheckResult.isCorrect
           ? 'border-emerald-200 bg-emerald-50 text-emerald-900 before:bg-emerald-400 dark:border-emerald-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-emerald-300/65 [&>p:first-child]:dark:text-emerald-200'
-          : 'border-amber-200 bg-amber-50 text-amber-900 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/70 [&>p:first-child]:dark:text-amber-200'
-       }`}
+          : preview.exercise.type === 'dictation'
+           ? 'border-amber-200 bg-amber-50 text-amber-950 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/65'
+           : 'border-amber-200 bg-amber-50 text-amber-900 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/70 [&>p:first-child]:dark:text-amber-200'
+        }`}
       >
        {previewFeedbackSections ? (
         <div className="space-y-3">
          {previewFeedbackSections.lead ? (
           <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.lead)}</ReactMarkdown>
          ) : null}
-         <div className="rounded-[20px] border border-emerald-200 bg-emerald-100/60 px-3 py-2 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/30 dark:text-emerald-200">
-          <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300">
+          <div className="rounded-[20px] border border-emerald-200 bg-emerald-100/60 px-3 py-2 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/30 dark:text-emerald-200">
+           <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300">
            Правильный ответ
           </div>
           <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.correctAnswer)}</ReactMarkdown>
@@ -161,7 +165,11 @@ export default function AdminPreviewPanel({
          </div>
         </div>
        ) : (
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewCheckResult.text)}</ReactMarkdown>
+        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+         {isTrustedPreviewHtml(previewCheckResult.text)
+          ? previewCheckResult.text
+          : renderEditorMarkdown(previewCheckResult.text)}
+        </ReactMarkdown>
        )}
       </div>
      )}

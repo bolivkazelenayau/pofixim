@@ -87,8 +87,8 @@ const MARK_GROUPS: Array<{
 ];
 
 const STATUS_CLASS: Record<SlotStatus, string> = {
-  idle: 'border-dashed border-stroke bg-surface-strong hover:border-cyan-300 dark:bg-foreground/5 dark:hover:border-cyan-300/60',
-  selected: 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-100 dark:border-cyan-300 dark:bg-cyan-300/12 dark:ring-cyan-300/20',
+  idle: 'border-dashed border-stroke bg-surface-strong hover:border-amber-300 dark:bg-foreground/5 dark:hover:border-amber-300/60',
+  selected: 'border-amber-500 bg-amber-50 ring-2 ring-amber-100 dark:border-amber-300 dark:bg-amber-300/12 dark:ring-amber-300/20',
   filled: 'border-amber-300 bg-amber-50 dark:border-amber-300/45 dark:bg-amber-300/12',
   correct: 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100 dark:border-emerald-300/60 dark:bg-emerald-300/12 dark:ring-emerald-300/20',
   missing: 'border-yellow-400 bg-yellow-50 ring-2 ring-yellow-100 dark:border-yellow-300/60 dark:bg-yellow-300/12 dark:ring-yellow-300/20',
@@ -235,9 +235,7 @@ export default function PunctuationConstructorCard({
   previewMode,
 }: Props) {
   const [placements, setPlacements] = useState<Placement[]>([]);
-  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(
-    () => firstMeaningfulSlot(exercise),
-  );
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [selectedMark, setSelectedMark] = useState<ConstructorMark | null>(null);
   const [checked, setChecked] = useState(false);
   const [hintIndex, setHintIndex] = useState(-1);
@@ -411,7 +409,7 @@ export default function PunctuationConstructorCard({
                 <span
                   className={`mx-0.5 rounded-md bg-surface-strong px-2 py-0.5 ${
                     showStructure && hasStructure
-                      ? 'ring-2 ring-cyan-100 dark:ring-cyan-300/15'
+                      ? 'ring-2 ring-amber-100 dark:ring-amber-300/15'
                       : ''
                   }`}
                 >
@@ -586,7 +584,7 @@ export default function PunctuationConstructorCard({
       )}
 
       {currentHint && (
-        <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-950 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-100">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
           {currentHint}
         </div>
       )}
@@ -596,7 +594,7 @@ export default function PunctuationConstructorCard({
           {exercise.payload.segments.map((segment) => (
             <span
               key={`${segment.kind}-${segment.tokenStart}-${segment.tokenEnd}`}
-              className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-900 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-100"
+              className="rounded-full border border-amber-200 bg-amber-50/70 px-3 py-1 text-xs font-semibold text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100"
             >
               {segment.label}
             </span>
@@ -743,7 +741,7 @@ function MarkButton({
       className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-2.5 text-lg font-black text-foreground shadow-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50 ${
         isSelected
           ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200 dark:border-amber-300 dark:bg-amber-300/18 dark:text-amber-100 dark:ring-amber-300/20'
-          : 'border-cyan-300 bg-white hover:border-cyan-500 hover:bg-cyan-50 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10'
+          : 'border-stroke bg-surface-strong hover:border-amber-300 hover:bg-amber-50/70 dark:border-amber-300/20 dark:bg-foreground/5 dark:hover:border-amber-300/60 dark:hover:bg-amber-300/10'
       }`}
     >
       {markGlyph(mark)}

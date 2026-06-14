@@ -119,6 +119,9 @@ export function useExerciseList({
     [serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, serverSortBy, listSortDir],
   );
   const queryKey = adminExerciseKeys.list(listFilters);
+  const normalizedListQuery = normalizeSearchText(listQuery);
+  const normalizedServerListQuery = normalizeSearchText(serverListQuery);
+  const isSearchDebouncing = normalizedListQuery !== normalizedServerListQuery;
   const isDefaultInitialListQuery =
     serverListQuery === '' &&
     listTypeFilter === 'all' &&
@@ -191,6 +194,7 @@ export function useExerciseList({
             cursorUpdatedAt: lastPage.nextCursorUpdatedAt ?? null,
           }
         : undefined,
+    placeholderData: (previousData) => previousData,
   });
 
   const items = useMemo(() => {
@@ -295,7 +299,9 @@ export function useExerciseList({
   const filteredItems = useMemo(() => {
     const q = normalizeSearchText(listQuery);
     const serverQ = normalizeSearchText(serverListQuery);
-    const shouldApplyClientTextFilter = Boolean(q && q !== serverQ);
+    const shouldApplyClientTextFilter = Boolean(
+      q && (q !== serverQ || listQueryResult.isPlaceholderData),
+    );
     const filtered = items.filter((item) => {
       if (listTypeFilter !== 'all' && item.type !== listTypeFilter) return false;
       if (listStatusFilter !== 'all' && item.qualityStatus !== listStatusFilter) return false;
@@ -319,7 +325,17 @@ export function useExerciseList({
       else cmp = a.qualityStatus.localeCompare(b.qualityStatus);
       return listSortDir === 'asc' ? cmp : -cmp;
     });
-  }, [items, listQuery, serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, listSortBy, listSortDir]);
+  }, [
+    items,
+    listQuery,
+    serverListQuery,
+    listQueryResult.isPlaceholderData,
+    listTypeFilter,
+    listStatusFilter,
+    listExamTypeFilter,
+    listSortBy,
+    listSortDir,
+  ]);
 
   const groupedItems = useMemo(() => {
     const groups = new Map<string, ListItem[]>();
@@ -332,6 +348,8 @@ export function useExerciseList({
   }, [filteredItems]);
 
   const flatFilteredItems = filteredItems;
+  const isListRefreshing =
+    listQueryResult.isFetching && !listQueryResult.isFetchingNextPage;
 
   return {
     items,
@@ -340,7 +358,7 @@ export function useExerciseList({
     setTotalItems,
     matchingItems: displayedMatchingItems,
     setMatchingItems,
-    initialListPending: !sortPrefsReady || (items.length === 0 && listQueryResult.isFetching),
+    initialListPending: !sortPrefsReady || (items.length === 0 && listQueryResult.isPending),
     hasActiveListFilter,
     filteredItems,
     groupedItems,
@@ -358,7 +376,9 @@ export function useExerciseList({
     listSortDir,
     setListSortDir,
     sortPrefsReady,
-    hasMore: Boolean(listQueryResult.hasNextPage),
+    hasMore: Boolean(
+      listQueryResult.hasNextPage && !isSearchDebouncing && !isListRefreshing,
+    ),
     loadingMore: listQueryResult.isFetchingNextPage,
     refreshList,
     loadMore,

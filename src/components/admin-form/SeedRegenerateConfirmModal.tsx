@@ -12,7 +12,7 @@ export default function SeedRegenerateConfirmModal({
  return (
   <AlertDialogPrimitive.Root open onOpenChange={(open) => !open && onCancel()}>
    <AlertDialogPrimitive.Portal>
-    <AlertDialogPrimitive.Overlay className="fixed inset-0 z-modal bg-slate-900/45" />
+    <AlertDialogPrimitive.Overlay className="admin-modal-overlay" />
     <AlertDialogPrimitive.Content className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-stroke bg-surface-strong p-5 text-foreground shadow-sm outline-none">
      <AlertDialogPrimitive.Title className="text-base font-semibold">
       Подтверждение

@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import type { Form } from '@/components/admin-form/types';
+import { validateExerciseEditorInput } from '@/app/actions/admin-exercise-validation';
+import { buildPayloadFromForm } from '@/components/admin-form/formMapping';
 import { getDraftKey, getDraftSessionId, logDraftRecoveryDebug, readStoredDraft } from '@/components/admin-form/draftStorage';
 import { logAdminDebug } from '@/components/admin-form/debug';
 import type { DraftRecoveryState } from '@/components/admin-form/types';
@@ -17,6 +19,25 @@ type UseDraftRecoveryConfig = {
   sessionDraftIdsRef: React.MutableRefObject<Set<number>>;
   clearPendingDraftMarker: (id: number) => void;
 };
+
+function getAutoRestoreBlockReason(form: Form) {
+  if (!form.prompt.trim()) {
+    return 'draft без формулировки';
+  }
+  if (!form.explanation.trim()) {
+    return 'draft без объяснения';
+  }
+  if (form.type === 'dictation' && !form.dictationText.trim()) {
+    return 'draft без эталонной расшифровки';
+  }
+
+  try {
+    const validationError = validateExerciseEditorInput(buildPayloadFromForm(form));
+    return validationError;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'draft не проходит проверку';
+  }
+}
 
 export function useDraftRecovery(config: UseDraftRecoveryConfig) {
   const {
@@ -47,6 +68,24 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
       return;
     }
     const currentSessionId = getDraftSessionId();
+    const autoRestoreBlockReason = getAutoRestoreBlockReason(localDraft);
+    if (autoRestoreBlockReason) {
+      logDraftRecoveryDebug('offerExistingDraftRecovery:showModalInvalidDraft', {
+        id,
+        draftSessionId: sessionId,
+        currentSessionId,
+        reason: autoRestoreBlockReason,
+        serverType: serverForm.type,
+        draftType: localDraft.type,
+      });
+      setIsError(false);
+      setMessage(
+        `Локальная копия требует выбора: ${autoRestoreBlockReason}. Можно восстановить её вручную или открыть версию из БД.`,
+      );
+      setDraftRecovery({ id, serverForm, draftForm: localDraft });
+      return;
+    }
+
     if (sessionId && sessionId === currentSessionId) {
       sessionDraftIdsRef.current.add(id);
       setForm(localDraft);
@@ -57,6 +96,8 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
         serverFormId: serverForm.id ?? null,
       });
       setDatabaseSaveState('local');
+      setIsError(false);
+      setMessage('Локальные изменения восстановлены. Они пока отличаются от версии в БД.');
       setDraftRecovery(null);
       logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSameSession', {
         id,
@@ -76,6 +117,8 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
         serverFormId: serverForm.id ?? null,
       });
       setDatabaseSaveState('local');
+      setIsError(false);
+      setMessage('Локальные изменения восстановлены. Они пока отличаются от версии в БД.');
       setDraftRecovery(null);
       logDraftRecoveryDebug('offerExistingDraftRecovery:autoRestoreSessionRef', {
         id,

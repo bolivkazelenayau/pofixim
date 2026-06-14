@@ -259,7 +259,7 @@ export default function OrthographyRepairCard({
                     : isWrong
                       ? 'mx-0.5 border-rose-400 bg-rose-50 px-1.5 font-bold text-rose-900 dark:border-rose-300/60 dark:bg-rose-300/12 dark:text-rose-100'
                       : repair
-                        ? 'mx-0.5 border-cyan-300 bg-cyan-50 px-1.5 font-bold text-cyan-950 dark:border-cyan-300/45 dark:bg-cyan-300/12 dark:text-cyan-100'
+                        ? 'mx-0.5 border-amber-300 bg-amber-50 px-1.5 font-bold text-amber-950 dark:border-amber-300/45 dark:bg-amber-300/12 dark:text-amber-100'
                         : isSelected
                           ? 'mx-0.5 border-amber-400 bg-amber-100 px-1.5 font-bold text-amber-950 ring-2 ring-amber-200 dark:border-amber-300 dark:bg-amber-300/18 dark:text-amber-100 dark:ring-amber-300/20'
                           : 'border-transparent bg-transparent text-foreground hover:bg-stroke dark:hover:bg-stroke'
@@ -302,8 +302,8 @@ export default function OrthographyRepairCard({
       </div>
 
       {selectedTarget ? (
-        <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-3 dark:border-cyan-300/20 dark:bg-cyan-300/10">
-          <div className="mb-2 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)] dark:border-amber-300/20 dark:bg-amber-300/10 dark:shadow-none">
+          <div className="mb-2 text-sm font-semibold text-amber-950 dark:text-amber-100">
             Исправьте: <span className="font-bold">«{selectedTarget.surface}»</span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -313,7 +313,7 @@ export default function OrthographyRepairCard({
                 type="button"
                 disabled={disabled}
                 onClick={() => chooseRepair(option)}
-                className="rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:border-cyan-500 hover:bg-cyan-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-cyan-300/25 dark:bg-foreground/5 dark:text-cyan-50 dark:hover:border-cyan-300/70 dark:hover:bg-cyan-300/10"
+                className="rounded-lg border border-amber-300/70 bg-surface-strong px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:border-amber-500 hover:bg-amber-100/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-amber-300/25 dark:bg-foreground/5 dark:text-amber-50 dark:hover:border-amber-300/70 dark:hover:bg-amber-300/10"
               >
                 {option}
               </button>

@@ -472,7 +472,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
                       ? 'border-emerald-400 bg-emerald-50 shadow-[0_0_28px_rgba(16,185,129,0.3)] dark:bg-emerald-950/40'
                       : lastAnswerCorrect === false
                         ? 'border-red-400 bg-red-50 shadow-[0_0_28px_rgba(239,68,68,0.3)] dark:bg-red-950/40'
-                        : 'border-[var(--stroke)] bg-[radial-gradient(circle_at_50%_0%,rgba(51,144,236,0.12),transparent_42%),linear-gradient(180deg,var(--surface-strong),var(--surface))]'
+                        : 'border-[var(--stroke)] bg-[radial-gradient(circle_at_50%_0%,color-mix(in_srgb,var(--primary)_12%,transparent),transparent_42%),linear-gradient(180deg,var(--surface-strong),var(--surface))]'
                   }`}
                 >
                   <div className="absolute right-3 top-3 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-primary sm:right-4 sm:top-4 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.12em]">
@@ -481,7 +481,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
                   <div className={`mt-auto flex max-w-full items-center justify-center gap-x-1.5 whitespace-nowrap px-1 ${wordFontClass} font-black leading-[1.02] text-foreground sm:mt-0 sm:gap-x-1`}>
                     <span className="min-w-0">{currentCard.before}</span>
                     <span
-                      className="inline-flex h-[1.08em] min-w-[1.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_rgba(51,144,236,0.22)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]"
+                      className="inline-flex h-[1.08em] min-w-[1.08em] items-center justify-center rounded-xl border-2 border-primary bg-white px-1 text-primary shadow-[0_10px_30px_color-mix(in_srgb,var(--primary)_22%,transparent)] ring-4 ring-primary/10 dark:bg-[var(--surface-strong)]"
                     >
                       ?
                     </span>

@@ -13,7 +13,9 @@ export type Message = {
   correctOptionIndex?: number;
   explanation?: string;
   exercise?: Exercise;
+  allowDuplicateExerciseInstance?: boolean;
   feedbackForExerciseId?: number;
+  feedbackForExerciseMessageId?: string;
   submittedAnswer?: SubmittedAnswer;
   createdAt?: number;
 };
@@ -151,6 +153,7 @@ export const useChatStore = create<ChatState>()(
           const incomingExercise = msg.type === 'exercise' ? msg.exercise : undefined;
           if (
             msg.type === 'exercise' &&
+            !msg.allowDuplicateExerciseInstance &&
             incomingExercise?.id &&
             state.messages.some(
               (message) =>
