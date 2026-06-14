@@ -338,6 +338,12 @@ export function useExerciseList({
   ]);
 
   const groupedItems = useMemo(() => {
+    if (listSortBy === 'updatedAt') {
+      return filteredItems.length > 0
+        ? [['По дате изменения', filteredItems] satisfies [string, ListItem[]]]
+        : [];
+    }
+
     const groups = new Map<string, ListItem[]>();
     for (const item of filteredItems) {
       const key = `ЕГЭ ${examTypeOf(item)} · ${item.type}`;
@@ -345,7 +351,7 @@ export function useExerciseList({
       groups.get(key)!.push(item);
     }
     return [...groups.entries()];
-  }, [filteredItems]);
+  }, [filteredItems, listSortBy]);
 
   const flatFilteredItems = filteredItems;
   const isListRefreshing =
