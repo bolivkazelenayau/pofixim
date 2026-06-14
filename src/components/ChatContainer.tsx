@@ -7,8 +7,8 @@ import {
   AudioWaveform,
   BadgeCheck,
   BarChart3,
+  Bean,
   BookOpenCheck,
-  Hash,
   ListChecks,
   RotateCcw,
   Wrench,
@@ -130,7 +130,7 @@ function getSlashCommandIcon(command: SlashCommand) {
       return BadgeCheck;
     case '/seed':
     case '/qseed':
-      return Hash;
+      return Bean;
     case '/stats':
       return BarChart3;
     case '/start':

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
+import { Bean } from 'lucide-react';
 import type { Exercise, SubmittedAnswer } from '../schemas';
 import MultipleChoiceCard from './MultipleChoiceCard';
 import FillBlankCard from './FillBlankCard';
@@ -197,8 +198,9 @@ export default function ExerciseRenderer({
       >
         {content}
       </motion.div>
-      <p className="-mt-1 mb-2 text-[11px] text-foreground/60">
-        seed:{' '}
+      <p className="-mt-1 mb-2 ml-2 flex items-center gap-1.5 text-[11px] text-foreground/60">
+        <Bean className="h-3 w-3" aria-hidden="true" />
+        <span>seed:</span>
         <button
           type="button"
           onClick={copySeed}

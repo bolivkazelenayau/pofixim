@@ -27,11 +27,22 @@
 
 - `getNextExerciseAction`
 - `submitExerciseAnswerAction`
+- `getExerciseBySeedKeyAction`
+- `getQuickCardsBySeedAction`
 - `getBlitzPoolAction`
 - `getEge13QuickPoolAction`
 - `getEge15QuickPoolAction`
 
 Состояние пользователя хранится в Zustand persist. Submit ответа пишет попытку и обновляет learning session в одной транзакции. При `returnNextExercise` сервер сразу возвращает следующее упражнение.
+
+Для ручной проверки и воспроизводимого UX поддержаны seed-команды:
+
+- `/seed <seed_key>` или вставка голого `seed_key` - открыть конкретное обычное упражнение.
+- `/qseed blitz <seed_key> row=1 word=1` - открыть конкретную карточку блица без стартового таймер-флоу.
+- `/qseed ege13 <seed_key> row=1` - открыть конкретную карточку ЕГЭ 13.
+- `/qseed ege15 <seed_key> pos=1` - открыть конкретную карточку ЕГЭ 15.
+
+Если seed уже отрендерен в чате, повторный вызов не создаёт дубль сообщения, а подсвечивает существующую карточку.
 
 ## Matchmaking
 
@@ -54,7 +65,7 @@ Scorer учитывает:
 - quick ЕГЭ 13;
 - quick ЕГЭ 15.
 
-ЕГЭ 13/15 сохраняют live refresh explanation: если объяснение изменилось в админке, карточка может подтянуть свежие данные из БД без пересборки приложения.
+ЕГЭ 13/15 и уже отрендеренные задания в чате сохраняют live refresh: если формулировка, payload, answer или explanation изменились в админке, UI может подтянуть свежую версию из БД без пересборки приложения и без получения нового упражнения.
 
 ## Админка
 
@@ -184,9 +195,9 @@ npm.cmd run db:seed:ege-live
 ## Проверки
 
 ```powershell
-npx.cmd tsc --noEmit
-npm.cmd run lint
-npm.cmd run build
+rtk npx tsc --noEmit
+rtk npm run lint
+rtk npm run build
 node --check local-proxy.js
 ```
 

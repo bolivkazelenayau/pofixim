@@ -1,6 +1,6 @@
 # Архитектура V2
 
-Обновлено: 2026-06-11
+Обновлено: 2026-06-14
 
 ## 1. Назначение проекта
 
@@ -132,11 +132,15 @@ PoFixim - платформа для хранения, проверки, реда
 
 - `getNextExerciseAction`
 - `submitExerciseAnswerAction`
+- `getExerciseBySeedKeyAction`
+- `getQuickCardsBySeedAction`
 - `getBlitzPoolAction`
 - `getEge13QuickPoolAction`
 - `getEge15QuickPoolAction`
 - `refreshEge13QuickCardAction`
 - `refreshEge15QuickCardAction`
+- `getExerciseVersionsByIdsAction`
+- `getExercisesByIdsAction`
 
 `submitExerciseAnswerAction` теперь делает атомарную запись:
 
@@ -149,6 +153,45 @@ PoFixim - платформа для хранения, проверки, реда
 7. при `returnNextExercise: true` сразу возвращает следующее упражнение.
 
 Это уменьшает лишний round-trip после ответа.
+
+### 6.1 Seed/qseed control plane
+
+Главная поддерживает управляемый запуск заданий через chat input. Это не часть matchmaking, а отдельный reproducibility-layer для проверки конкретных строк банка и quick-карточек.
+
+Поддержанные команды:
+
+- `/seed <seed_key>` - открыть конкретное обычное упражнение через `getExerciseBySeedKeyAction`.
+- Голый `seed_key` из буфера - работает как `/seed <seed_key>`, но в input не показывается автоподставленная команда.
+- `/qseed blitz <seed_key> row=1 word=1` - открыть конкретную блиц-карточку.
+- `/qseed ege13 <seed_key> row=1` - открыть конкретный ряд ЕГЭ 13.
+- `/qseed ege15 <seed_key> pos=1` - открыть конкретную позицию ЕГЭ 15.
+
+Нормализация команд в `ChatContainer` специально терпима к пользовательским промахам:
+
+- `/seed/seed live-ege15-48135`;
+- `/qseed/qseed ege13 ege13-bank-59877 row=1`;
+- `/seed /qseed blitz ege9-bank-46177 row=1 word=1`;
+- лишние повторные `/seed` или `/qseed` в начале.
+
+Paste UX устроен отдельно от submit parsing: при вставке seed/qseed input может показывать более чистую строку, но обработчик submit всё равно восстанавливает смысл команды. Если пользователь уже ввёл `/seed ` или `/qseed `, вставка не стирает префикс, а подставляет полезную часть.
+
+Если обычный seed уже есть среди отрендеренных сообщений, новый bubble не создаётся. Вместо этого существующая карточка скроллится в центр и получает короткий motion-highlight только по контейнеру упражнения. Это защищает чат от дублей и делает повторный вызов сидов понятным.
+
+Все seed/qseed labels копируются через `copyTextToClipboard`, который использует Clipboard API в secure context и fallback через временный textarea для Tailscale/LAN HTTP-сценариев.
+
+### 6.2 Live refresh отрендеренных упражнений
+
+Задания, уже показанные в чате, могут обновляться из БД без нового matchmaking-запроса. `ChatContainer` хранит id отрендеренных exercises, периодически и на focus/visibility проверяет только их `updatedAt` через `getExerciseVersionsByIdsAction`, а при изменении подтягивает свежие записи через `getExercisesByIdsAction`.
+
+Важные границы:
+
+- poll interval сейчас `5000 ms`;
+- проверяются только уже показанные упражнения;
+- новые задания не подбираются;
+- score, seen/cooldown и matchmaking state не трогаются;
+- feedback пересчитывается по сохранённому пользовательскому ответу, если упражнение обновилось.
+
+Это компромисс для локальной схемы `3000 + 3002/3003`: изменения из админки становятся видны в чате без WebSocket/SSE-инфраструктуры.
 
 ## 7. Matchmaking
 
@@ -207,6 +250,24 @@ PoFixim - платформа для хранения, проверки, реда
 - `ege.15` + `fill_blank`
 
 Для ЕГЭ 13/15 сохранено важное поведение: карточки могут refresh-иться из БД уже после рендера. Это нужно, чтобы изменения `explanation` в админке подтягивались без пересборки приложения и без полного сброса UI.
+
+Quick modes также поддерживают inspect/qseed mode:
+
+- стартовый offer/timer flow пропускается;
+- модалка открывается сразу на выбранной карточке;
+- закрытие backdrop не превращает inspect-карточку в результат игры;
+- seed и qseed можно скопировать из подписи карточки;
+- для блица qseed mode не запускает соревновательный таймер.
+
+Селекторы qseed:
+
+- blitz: `row=<n> word=<n>`;
+- ЕГЭ 13: `row=<n>`;
+- ЕГЭ 15: `pos=<n>` или fallback `card=<id>`.
+
+Карточки quick modes refresh-ятся из БД по текущим seed/selectors, чтобы изменения слов, рядов, вариантов и explanation в админке были видны уже открытым модалкам.
+
+Backdrop-поведение согласовано между blitz/ege13/ege15: если это реальная running-сессия, закрытие может пройти через finish/result flow; если это offer/inspect/qseed, модалка просто закрывается.
 
 ## 9. Админка
 
@@ -326,6 +387,16 @@ Login rate limit:
 - сразу ставит/снимает класс `dark`;
 - выставляет `documentElement.style.colorScheme`;
 - `ThemeProvider` при hydration читает текущий класс документа.
+
+## 12.1 UI rendering details
+
+Сообщения чата рендерятся через `MessageBubble`. Обычные bubble используют SVG-shape: прямоугольник с радиусами и хвостом является одним `path`, поэтому `fill`, `stroke` и `drop-shadow` применяются к единому силуэту. Это убирает эффект приклеенного CSS-треугольника.
+
+Tail handoff отделён от семантического `isLastInGroup`: у предыдущего сообщения хвост может быть временно удержан, а у нового временно подавлен, чтобы в группе был только один визуальный хвост во время входной анимации.
+
+Старые CSS-хвосты через `::before`/`::after` отключены. Размер SVG берётся через `ResizeObserver`, но входная анимация message bubble держится на compositor-friendly свойствах `opacity` и `transform`, чтобы path не пересчитывался от layout-анимации.
+
+Leaderboard из `/stats` рендерится как trusted HTML только для ожидаемого формата stats-сообщения. Остальной markdown продолжает проходить через `renderEditorMarkdown`, чтобы обычные сообщения не превращались в произвольный raw HTML.
 
 ## 13. SSR, CSR и кэш
 
@@ -486,9 +557,9 @@ $env:MAIN_HTTP_BENCH_CASES="next,next-seen,blitz,ege13,ege15"
 Минимальный набор:
 
 ```powershell
-npx.cmd tsc --noEmit
-npm.cmd run lint
-npm.cmd run build
+rtk npx tsc --noEmit
+rtk npm run lint
+rtk npm run build
 ```
 
 Для proxy:
@@ -508,7 +579,10 @@ node --check local-proxy.js
 - Delete/edit batch sync теперь предсказуемее.
 - Theme flash исправлен.
 - Submit ответа атомарен на уровне БД.
-- Quick EGE13/EGE15 сохраняют live refresh explanation.
+- Обычные задания и quick modes сохраняют live refresh уже отрендеренного контента.
+- Seed/qseed дают воспроизводимый ручной доступ к обычным и quick-заданиям.
+- Clipboard fallback работает лучше в localhost/Tailscale/LAN сценариях.
+- Bubble tail, tail handoff и repeated seed highlight отполированы как отдельные UX-состояния.
 - Matchmaking вернул широкий пул без сужения по difficulty до скоринга.
 - Tailscale proxy стал безопаснее через CIDR allowlist.
 - Есть воспроизводимые p95-скрипты для админки и главной.
