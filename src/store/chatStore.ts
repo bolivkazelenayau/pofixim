@@ -52,6 +52,8 @@ type ChatState = {
   recordBlitzScore: (scoreDelta: number) => void;
   spendScore: (amount: number) => void;
   resetProgress: () => void;
+  isDemoMode: boolean;
+  setDemoMode: (isDemo: boolean) => void;
 };
 
 type PersistedChatState = Pick<
@@ -65,6 +67,7 @@ type PersistedChatState = Pick<
   | 'hasRequestedInitialExercise'
   | 'score'
   | 'streak'
+  | 'isDemoMode'
 >;
 
 const WELCOME_TEXTS = [
@@ -125,6 +128,7 @@ function normalizePersistedChatState(
         : false,
     score: typeof state.score === 'number' ? state.score : 0,
     streak: typeof state.streak === 'number' ? state.streak : 0,
+    isDemoMode: typeof state.isDemoMode === 'boolean' ? state.isDemoMode : false,
   };
 }
 
@@ -148,6 +152,8 @@ export const useChatStore = create<ChatState>()(
       score: 0,
       streak: 0,
       isTyping: false,
+      isDemoMode: false,
+      setDemoMode: (isDemoMode) => set({ isDemoMode }),
       addMessage: (msg) =>
         set((state) => {
           const incomingExercise = msg.type === 'exercise' ? msg.exercise : undefined;
@@ -298,6 +304,7 @@ export const useChatStore = create<ChatState>()(
         hasRequestedInitialExercise: state.hasRequestedInitialExercise,
         score: state.score,
         streak: state.streak,
+        isDemoMode: state.isDemoMode,
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,

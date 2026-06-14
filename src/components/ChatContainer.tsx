@@ -395,6 +395,8 @@ export default function ChatContainer() {
     hasRequestedInitialExercise,
     markInitialExerciseRequested,
     resetProgress,
+    isDemoMode,
+    setDemoMode,
   } = useChatStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -619,19 +621,29 @@ export default function ChatContainer() {
     lastMessage && isExerciseMessage(lastMessage) && !answeredExerciseMessageIds.has(lastMessage.id)
       ? lastMessage
       : null;
+  const currentSlashCommands = useMemo(() => {
+    if (!isDemoMode) return SLASH_COMMANDS;
+    return SLASH_COMMANDS.filter((c) => c.command !== '/seed' && c.command !== '/qseed').map((c) => {
+      if (c.command === '/dictation') return { ...c, title: 'Мини-диктант' };
+      if (c.command === '/ege13_quick') return { ...c, title: 'Тренажёр заданий ЕГЭ' };
+      if (c.command === '/ege15_quick') return { ...c, title: 'Мини-упражнения' };
+      return c;
+    });
+  }, [isDemoMode]);
+
   const slashCommandQuery = globalInputValue.startsWith('/')
     ? globalInputValue.slice(1).toLowerCase()
     : null;
   const visibleSlashCommands = slashCommandQuery === null || isSlashCommandMenuForcedOpen
     ? []
-    : SLASH_COMMANDS.filter((item) => {
+    : currentSlashCommands.filter((item) => {
         const command = item.command.slice(1);
         return (
           command.startsWith(slashCommandQuery) ||
           item.title.toLowerCase().includes(slashCommandQuery)
         );
       });
-  const visibleForcedSlashCommands = isSlashCommandMenuForcedOpen ? SLASH_COMMANDS : visibleSlashCommands;
+  const visibleForcedSlashCommands = isSlashCommandMenuForcedOpen ? currentSlashCommands : visibleSlashCommands;
   const showSlashCommands =
     !isSlashCommandMenuDismissed &&
     (isSlashCommandMenuForcedOpen || slashCommandQuery !== null) &&
@@ -670,7 +682,7 @@ export default function ChatContainer() {
     ].includes(activeExerciseMessage.exercise.type);
 
   const handleResetProgress = () => {
-    if (!hasHydrated) return;
+    if (!hasHydrated || isDemoMode) return;
 
     initialized.current = false;
     setTyping(false);
@@ -1135,6 +1147,12 @@ export default function ChatContainer() {
   function runSlashCommand(command: SlashCommand) {
     setIsSlashCommandMenuDismissed(false);
     setIsSlashCommandMenuForcedOpen(false);
+
+    if (isDemoMode) {
+      setGlobalInputValue('');
+      return;
+    }
+
     if (command === '/seed' || command === '/qseed') {
       setGlobalInputValue(command === '/seed' ? '/seed ' : '/qseed ');
       requestAnimationFrame(() => globalInputRef.current?.focus());
@@ -1208,6 +1226,24 @@ export default function ChatContainer() {
     const normalizedCommandText = normalizeQuickSeedText(normalizeSeedCommandText(text));
 
     const command = normalizedCommandText.toLowerCase();
+
+    if (command === '/demo' || command === '/demo on') {
+      setGlobalInputValue('');
+      setDemoMode(true);
+      return;
+    }
+
+    if (command === '/demo off') {
+      setGlobalInputValue('');
+      setDemoMode(false);
+      return;
+    }
+
+    if (isDemoMode) {
+      setGlobalInputValue('');
+      return;
+    }
+
     const quickSeed = parseQuickSeedCommand(normalizedCommandText);
     if (quickSeed) {
       setGlobalInputValue('');
@@ -1463,9 +1499,10 @@ export default function ChatContainer() {
                     disabled={answeredExerciseMessageIds.has(msg.id)}
                     highlight={highlightedExerciseMessageId === msg.id}
                     highlightId={msg.id}
-                    onSubmit={(answer, label) =>
-                      handleExerciseSubmit(msg.exercise, answer, label, msg.id)
-                    }
+                    onSubmit={(answer, label) => {
+                      if (isDemoMode) return;
+                      handleExerciseSubmit(msg.exercise, answer, label, msg.id);
+                    }}
                   />
                 )}
               </div>
