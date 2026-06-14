@@ -92,6 +92,13 @@ type RefreshEge13QuickCardInput = {
   rowIndex: number;
 };
 
+type RefreshEge9BlitzCardInput = {
+  exerciseId: number;
+  cardId: string;
+  rowIndex: number;
+  wordIndex: number;
+};
+
 type RefreshEge15QuickCardInput = {
   exerciseId: number;
   cardId: string;
@@ -99,6 +106,26 @@ type RefreshEge15QuickCardInput = {
 };
 
 const invalidExerciseIds = new Set<number>();
+
+export async function refreshEge9BlitzCardAction(input: RefreshEge9BlitzCardInput) {
+  try {
+    const exercise = await getExerciseById(input.exerciseId);
+    if (!exercise || exercise.type !== 'ege_multi_select') {
+      return { success: false, error: 'Exercise not found or wrong type' };
+    }
+    const cards = buildEge9BlitzCards(exercise);
+    const card = cards.find((c) => c.id === input.cardId) ?? cards.find(
+      (c) => c.rowIndex === input.rowIndex && c.wordIndex === input.wordIndex,
+    );
+    if (!card) {
+      return { success: false, error: 'Card not found in reassembled exercise' };
+    }
+    return { success: true, card };
+  } catch (error) {
+    console.error('Failed to refresh EGE-9 blitz card:', error);
+    return { success: false, error: 'Failed to refresh card' };
+  }
+}
 
 export async function refreshEge13QuickCardAction(input: RefreshEge13QuickCardInput) {
   try {

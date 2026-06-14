@@ -11,19 +11,19 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
   if (form.type !== 'fill_blank') return null;
 
   return (
-    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <div className="mt-3 grid gap-3">
       <Field id="admin-field-fill-before" label="Текст до пропуска">
-        <input
+        <textarea
           name="fillBefore"
-          className={inputClass}
+          className={`${inputClass} min-h-28 resize-y leading-6`}
           value={form.fillBefore}
           onChange={(e) => setForm((f) => ({ ...f, fillBefore: e.target.value }))}
         />
       </Field>
       <Field id="admin-field-fill-after" label="Текст после пропуска">
-        <input
+        <textarea
           name="fillAfter"
-          className={inputClass}
+          className={`${inputClass} min-h-20 resize-y leading-6`}
           value={form.fillAfter}
           onChange={(e) => setForm((f) => ({ ...f, fillAfter: e.target.value }))}
         />
@@ -31,7 +31,6 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
       <Field
         id="admin-field-fill-accepted"
         label="Допустимые ответы (через запятую)"
-        className="sm:col-span-2"
       >
         <input
           name="fillAccepted"

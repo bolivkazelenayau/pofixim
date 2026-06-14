@@ -9,7 +9,9 @@ import { animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { Copy, Timer, Trophy, X, Zap } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { Ege9BlitzCard } from '@/features/exercises/ege9Blitz';
+import { refreshEge9BlitzCardAction } from '@/app/actions/exercises';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { subscribeToExerciseUpdates } from '@/lib/exercise-update-events';
 
 type BlitzDuration = 30 | 60 | 120;
 
@@ -51,6 +53,8 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   const [scoreDelta, setScoreDelta] = useState(0);
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
+  const [localCards, setLocalCards] = useState<Ege9BlitzCard[]>(cards);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const finishedRef = useRef(false);
   const answerLockedRef = useRef(false);
@@ -63,7 +67,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   }, [duration, isInspectMode, now, startedAt, status]);
 
   const timeLeftSeconds = Math.ceil(timeLeftMs / 1000);
-  const currentCard = cards[index % Math.max(cards.length, 1)];
+  const currentCard = localCards[index % Math.max(localCards.length, 1)];
   const quickSeedCommand = currentCard?.seedKey
     ? `/qseed blitz ${currentCard.seedKey} row=${currentCard.rowIndex} word=${currentCard.wordIndex}`
     : null;
@@ -71,7 +75,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     ? `${currentCard.seedKey} · row ${currentCard.rowIndex} · word ${currentCard.wordIndex}`
     : `id:${currentCard?.sourceExerciseId ?? 'n/a'}`;
   const archivedCards = [1, 2, 3]
-    .map((offset) => cards[(index + offset) % Math.max(cards.length, 1)])
+    .map((offset) => localCards[(index + offset) % Math.max(localCards.length, 1)])
     .filter((card): card is Ege9BlitzCard => Boolean(card && card.id !== currentCard?.id));
   const progress = status === 'running' ? timeLeftMs / (duration * 1000) : 1;
   const choiceWords = currentCard
@@ -122,7 +126,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   }, [bestCombo, correctCount, duration, isInspectMode, onClose, onFinish, scoreDelta, wrongCount]);
 
   function start() {
-    if (cards.length === 0) return;
+    if (localCards.length === 0) return;
     if (feedbackTimeoutRef.current !== null) {
       window.clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = null;
@@ -146,6 +150,10 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   }
 
   useEffect(() => {
+    setLocalCards(cards);
+  }, [cards]);
+
+  useEffect(() => {
     if (isInspectMode) {
       setStatus('running');
       return;
@@ -165,6 +173,23 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     const didCopy = await copyTextToClipboard(quickSeedCommand);
     setCopyToast(didCopy ? 'qseed скопирован' : 'Не удалось скопировать');
   }
+
+  const handleRefresh = useCallback(async () => {
+    if (!currentCard?.sourceExerciseId || isRefreshing) return;
+    setIsRefreshing(true);
+    const res = await refreshEge9BlitzCardAction({
+      exerciseId: currentCard.sourceExerciseId,
+      cardId: currentCard.id,
+      rowIndex: currentCard.rowIndex,
+      wordIndex: currentCard.wordIndex,
+    });
+    if (res.success && res.card) {
+      setLocalCards((prev) =>
+        prev.map((card) => (card.id === currentCard.id ? res.card! : card)),
+      );
+    }
+    setIsRefreshing(false);
+  }, [currentCard, isRefreshing]);
 
   function stopCopyInteraction(
     event: ReactMouseEvent<HTMLButtonElement> | ReactPointerEvent<HTMLButtonElement>,
@@ -221,6 +246,31 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     const timer = window.setTimeout(() => setCopyToast(null), 1400);
     return () => window.clearTimeout(timer);
   }, [copyToast]);
+
+  useEffect(() => {
+    if (status !== 'running') return;
+
+    const refresh = () => {
+      void handleRefresh();
+    };
+    const refreshTimer = window.setInterval(refresh, 5000);
+
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [handleRefresh, status]);
+
+  useEffect(() => {
+    if (!currentCard?.sourceExerciseId) return;
+
+    return subscribeToExerciseUpdates((exerciseId) => {
+      if (exerciseId === currentCard.sourceExerciseId) {
+        void handleRefresh();
+      }
+    });
+  }, [currentCard?.sourceExerciseId, handleRefresh]);
 
   useEffect(() => {
     document.documentElement.classList.add('blitz-scroll-lock');
@@ -354,7 +404,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
             <button
               type="button"
               onClick={start}
-              disabled={cards.length === 0}
+              disabled={localCards.length === 0}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-black text-white shadow-sm transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
             >
               <Timer className="h-5 w-5" />

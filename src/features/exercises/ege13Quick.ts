@@ -17,7 +17,7 @@ export type Ege13QuickCard = {
 };
 
 const MARKER_RE =
-  /(?:\((?:НЕ|НИ)\)(?:\([^)]+\))*[\p{Script=Cyrillic}-]+)|(?:\((?:НЕ|НИ)\)[\p{Script=Cyrillic}-]+)/u;
+  /(?:\((?:НЕ|НИ)\)\s*(?:\([^)]+\)\s*)*[\p{Script=Cyrillic}-]+)|(?:\((?:НЕ|НИ)\)\s*[\p{Script=Cyrillic}-]+)/u;
 const NE_NI_RE = /\((?:НЕ|НИ)\)/u;
 const CYRILLIC_BOUNDARY_LEFT = '(?<![\\p{Script=Cyrillic}-])';
 const CYRILLIC_BOUNDARY_RIGHT = '(?![\\p{Script=Cyrillic}-])';
@@ -35,7 +35,7 @@ export function buildEge13QuickCards(
   exercise.payload.options.slice(0, 5).forEach((optionLine, optionIndex) => {
     const rowIndex = optionIndex + 1;
     const context = stripMarkdown(optionLine);
-    const marker = context.match(MARKER_RE)?.[0];
+    const marker = normalizeMarker(context.match(MARKER_RE)?.[0]);
     if (!marker || !NE_NI_RE.test(marker)) return;
 
     const explanationRow = explanationRows.get(rowIndex) ?? '';
@@ -100,7 +100,7 @@ function classifyWriting({
     return firstJoinedAt < firstSeparateAt ? 'joined' : 'separate';
   }
 
-  const markerParts = marker.match(/\((НЕ|НИ)\)([\p{Script=Cyrillic}-]+)/u);
+  const markerParts = marker.match(/\((НЕ|НИ)\)\s*([\p{Script=Cyrillic}-]+)/u);
   if (!markerParts) return null;
 
   const particle = markerParts[1].toUpperCase();
@@ -118,6 +118,10 @@ function classifyWriting({
   if (separate.test(row)) return 'separate';
   if (joined.test(row)) return 'joined';
   return null;
+}
+
+function normalizeMarker(value: string | undefined) {
+  return value?.replace(/\)\s+/u, ')').replace(/\s+/g, ' ').trim();
 }
 
 function extractExplanationRows(explanation: string) {

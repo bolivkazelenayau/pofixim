@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import FormattedFeedbackExplanation from '@/components/FormattedFeedbackExplanation';
+import FeedbackSectionsCard from '@/components/FeedbackSectionsCard';
 import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
@@ -138,7 +138,7 @@ export default function AdminPreviewPanel({
      ) : null}
      {previewCheckResult && (
       <div
-        className={`relative mt-3 rounded-3xl border px-4 py-3 text-sm whitespace-pre-wrap before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
+        className={`relative mt-3 rounded-3xl border px-4 py-3 text-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full ${
          previewCheckResult.isCorrect
           ? 'border-emerald-200 bg-emerald-50 text-emerald-900 before:bg-emerald-400 dark:border-emerald-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-emerald-300/65 [&>p:first-child]:dark:text-emerald-200'
           : preview.exercise.type === 'dictation'
@@ -147,29 +147,15 @@ export default function AdminPreviewPanel({
         }`}
       >
        {previewFeedbackSections ? (
-        <div className="space-y-3">
-         {previewFeedbackSections.lead ? (
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.lead)}</ReactMarkdown>
-         ) : null}
-          <div className="rounded-[20px] border border-emerald-200 bg-emerald-100/60 px-3 py-2 text-emerald-900 dark:border-emerald-600/30 dark:bg-emerald-950/30 dark:text-emerald-200">
-           <div className="mb-1 text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300">
-           Правильный ответ
-          </div>
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{renderEditorMarkdown(previewFeedbackSections.correctAnswer)}</ReactMarkdown>
-         </div>
-         <div className="rounded-[20px] border border-stroke bg-surface-strong/70 px-3 py-2 text-foreground">
-          <div className="mb-1 text-xs font-semibold uppercase text-foreground/80 ">
-           Объяснение
-          </div>
-          <FormattedFeedbackExplanation text={previewFeedbackSections.explanation} />
-         </div>
-        </div>
+        <FeedbackSectionsCard sections={previewFeedbackSections} />
        ) : (
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-         {isTrustedPreviewHtml(previewCheckResult.text)
-          ? previewCheckResult.text
-          : renderEditorMarkdown(previewCheckResult.text)}
-        </ReactMarkdown>
+        <div className="whitespace-pre-wrap">
+         <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+          {isTrustedPreviewHtml(previewCheckResult.text)
+           ? previewCheckResult.text
+           : renderEditorMarkdown(previewCheckResult.text)}
+         </ReactMarkdown>
+        </div>
        )}
       </div>
      )}

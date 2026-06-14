@@ -8,26 +8,8 @@ import { buildDictationFeedbackText } from '@/features/exercises/dictationFeedba
 import { checkExerciseAnswer } from '@/features/exercises/checkers';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 
-function answerFeedbackPrefix(isCorrect: boolean) {
-  return isCorrect ? 'Верно. ' : 'Почти, но есть ловушка. ';
-}
-
-function buildStepFeedbackText(
-  result: ReturnType<typeof checkExerciseAnswer>,
-  exerciseType?: Exercise['type'],
-) {
-  if (
-    exerciseType === 'ege_multi_select' ||
-    exerciseType === 'punctuation_constructor' ||
-    exerciseType === 'orthography_repair'
-  ) {
-    return '';
-  }
-  if (!result || result.stepFeedback.length === 0) {
-    return '';
-  }
-  const lines = result.stepFeedback.map((step, index) => `${index + 1}. ${step.message}`);
-  return `\n\nРазбор по шагам:\n${lines.join('\n')}`;
+function correctAnswerFeedbackPrefix() {
+  return 'Верно. ';
 }
 
 export function useExercisePreview(form: Form) {
@@ -93,22 +75,13 @@ export function useExercisePreview(form: Form) {
         : undefined;
     const computedCorrectAnswer = result.feedback.correctAnswer?.trim();
     const fallbackCorrectAnswer = previewFeedback?.correctAnswer.join('\n\n');
-    const usesInlineFeedback =
-      preview.exercise.type === 'punctuation_constructor' ||
-      preview.exercise.type === 'orthography_repair';
-    const prefix =
-      usesInlineFeedback && !result.isCorrect
-        ? ''
-        : answerFeedbackPrefix(result.isCorrect);
+    const prefix = result.isCorrect ? correctAnswerFeedbackPrefix() : '';
     const prefixText = prefix ? `${prefix}\n\n` : '';
     setPreviewCheckState({
       form,
       result: {
         isCorrect: result.isCorrect,
-        text: `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(
-          result,
-          preview.exercise.type,
-        )}`,
+        text: `${prefixText}${result.feedback.explanation}`,
         correctAnswer: computedCorrectAnswer || fallbackCorrectAnswer,
         detailedExplanation:
           previewFeedback?.explanation.join('\n') ?? result.feedback.detailedExplanation,

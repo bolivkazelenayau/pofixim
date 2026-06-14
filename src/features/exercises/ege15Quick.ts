@@ -19,7 +19,7 @@ export type Ege15QuickCard = {
   explanationSnippet?: string;
 };
 
-const NUMBERED_GAP_RE = /[\p{Script=Cyrillic}-]*\s?\(\d+\)[\p{Script=Cyrillic}-]*/gu;
+const NUMBERED_GAP_RE = /[\p{Script=Cyrillic}-]*\s?\(\d+\)\s?[\p{Script=Cyrillic}-]*/gu;
 const CYRILLIC_WORD_RE = /[\p{Script=Cyrillic}-]+/u;
 const INVISIBLE_TEXT_RE = /[\u00ad\u200b\u200c\u200d\ufeff]/g;
 

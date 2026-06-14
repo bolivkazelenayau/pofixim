@@ -60,6 +60,8 @@ export function buildEge9BlitzCards(
     const cleanOptionLine = stripMarkdown(optionLine);
 
     for (const masked of findMaskedWordMatches(cleanOptionLine)) {
+      wordIndex += 1;
+
       const donorWord = findBestUnusedDonorWordForMaskedWord(
         masked.value,
         donorWords,
@@ -79,7 +81,6 @@ export function buildEge9BlitzCards(
         seed: `${exercise.seedKey}:${rowIndex}:${wordIndex}`,
       });
       const correctChoiceIndex = choices[0] === missingLetter ? 0 : 1;
-      wordIndex += 1;
 
       cards.push({
         id: `${exercise.seedKey ?? exercise.id ?? 'ege9'}-${rowIndex}-${wordIndex}-${masked.start}`,
@@ -187,6 +188,11 @@ function findBestUnusedDonorWordForMaskedWord(
     if (usedDonorIndexes.has(i)) continue;
 
     const donorWord = donorWords[i];
+    if (extractSingleLetterGap(maskedWord, donorWord)) {
+      usedDonorIndexes.add(i);
+      return donorWord;
+    }
+
     let cursor = 0;
     let matches = true;
 
@@ -220,6 +226,12 @@ function extractSingleLetterGap(maskedWord: string, donorWord: string) {
   const lowerAfter = after.toLowerCase();
 
   if (!lowerDonor.startsWith(lowerBefore) || !lowerDonor.endsWith(lowerAfter)) {
+    const fuzzyGap = extractSingleLetterGapFuzzy(
+      before,
+      after,
+      donorWord,
+    );
+    if (fuzzyGap) return fuzzyGap;
     return null;
   }
 
@@ -234,6 +246,84 @@ function extractSingleLetterGap(maskedWord: string, donorWord: string) {
     missingLetter,
     after,
   };
+}
+
+function extractSingleLetterGapFuzzy(
+  before: string,
+  after: string,
+  donorWord: string,
+) {
+  const donorLetters = [...donorWord];
+  const beforeLength = [...before].length;
+  let best:
+    | { index: number; distance: number }
+    | null = null;
+
+  for (let index = 1; index < donorLetters.length; index += 1) {
+    const donorBefore = donorLetters.slice(0, index).join('');
+    const donorAfter = donorLetters.slice(index + 1).join('');
+    const beforeDistance = boundedEditDistance(
+      before.toLowerCase(),
+      donorBefore.toLowerCase(),
+      1,
+    );
+    if (beforeDistance === null) continue;
+
+    const afterDistance = boundedEditDistance(
+      after.toLowerCase(),
+      donorAfter.toLowerCase(),
+      2,
+    );
+    if (afterDistance === null) continue;
+
+    const distance = beforeDistance + afterDistance;
+    if (distance > 3) continue;
+    if (Math.abs(beforeLength - index) > 1) continue;
+
+    if (!best || distance < best.distance) {
+      best = { index, distance };
+    }
+  }
+
+  if (!best) return null;
+
+  return {
+    before,
+    missingLetter: donorLetters[best.index],
+    after,
+  };
+}
+
+function boundedEditDistance(left: string, right: string, maxDistance: number) {
+  const leftLetters = [...left];
+  const rightLetters = [...right];
+  if (Math.abs(leftLetters.length - rightLetters.length) > maxDistance) {
+    return null;
+  }
+
+  let previous = Array.from({ length: rightLetters.length + 1 }, (_, index) => index);
+
+  for (let leftIndex = 1; leftIndex <= leftLetters.length; leftIndex += 1) {
+    const current = [leftIndex];
+    let rowMin = current[0];
+
+    for (let rightIndex = 1; rightIndex <= rightLetters.length; rightIndex += 1) {
+      const cost = leftLetters[leftIndex - 1] === rightLetters[rightIndex - 1] ? 0 : 1;
+      const next = Math.min(
+        previous[rightIndex] + 1,
+        current[rightIndex - 1] + 1,
+        previous[rightIndex - 1] + cost,
+      );
+      current[rightIndex] = next;
+      rowMin = Math.min(rowMin, next);
+    }
+
+    if (rowMin > maxDistance) return null;
+    previous = current;
+  }
+
+  const distance = previous[rightLetters.length];
+  return distance <= maxDistance ? distance : null;
 }
 
 function buildChoices({

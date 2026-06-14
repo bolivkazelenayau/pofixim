@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, BookOpenCheck, Copy, Trophy, X } from 'lucide-re
 import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
 import { refreshEge13QuickCardAction } from '@/app/actions/exercises';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { subscribeToExerciseUpdates } from '@/lib/exercise-update-events';
 
 type Ege13QuickGameProps = {
   cards: Ege13QuickCard[];
@@ -196,6 +197,16 @@ export default function Ege13QuickGame({
       window.removeEventListener('focus', refresh);
     };
   }, [handleRefresh, status]);
+
+  useEffect(() => {
+    if (!currentCard?.sourceExerciseId) return;
+
+    return subscribeToExerciseUpdates((exerciseId) => {
+      if (exerciseId === currentCard.sourceExerciseId) {
+        void handleRefresh();
+      }
+    });
+  }, [currentCard?.sourceExerciseId, handleRefresh]);
 
   useEffect(() => {
     if (status !== 'running') return;

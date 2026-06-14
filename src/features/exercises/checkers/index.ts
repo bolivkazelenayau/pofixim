@@ -991,7 +991,7 @@ function buildPedagogy(
       ],
       nextRecommendation: {
         mode: 'retry',
-        reason: 'Нужна повторная попытка по алгоритму ЕГЭ-14.',
+        reason: 'Проверь часть речи, контекст и способ написания спорного слова.',
       },
     };
   }
@@ -1019,7 +1019,7 @@ function buildPedagogy(
       ],
       nextRecommendation: {
         mode: 'retry',
-        reason: 'Нужна повторная попытка с разметкой структуры предложения.',
+        reason: 'Проверь границы конструкции и место знака в предложении.',
       },
     };
   }
@@ -1031,12 +1031,12 @@ function buildPedagogy(
       {
         stepId: fallbackStepId,
         ok: false,
-        message: 'Ответ не совпал с ожидаемым правилом.',
+        message: 'Проверь выбранный ответ по правилу этого задания.',
       },
     ],
     nextRecommendation: {
       mode: 'retry',
-      reason: 'Нужна повторная попытка с опорой на алгоритм.',
+      reason: 'Проверь условие, правило и выбранный ответ.',
     },
   };
 }

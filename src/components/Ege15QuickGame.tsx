@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Copy, Trophy, X } from 'lucide-react
 import type { Ege15QuickCard } from '@/features/exercises/ege15Quick';
 import { refreshEge15QuickCardAction } from '@/app/actions/exercises';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { subscribeToExerciseUpdates } from '@/lib/exercise-update-events';
 
 type Ege15QuickGameProps = {
   cards: Ege15QuickCard[];
@@ -202,6 +203,16 @@ export default function Ege15QuickGame({
       window.removeEventListener('focus', refresh);
     };
   }, [handleRefresh, status]);
+
+  useEffect(() => {
+    if (!currentCard?.sourceExerciseId) return;
+
+    return subscribeToExerciseUpdates((exerciseId) => {
+      if (exerciseId === currentCard.sourceExerciseId) {
+        void handleRefresh();
+      }
+    });
+  }, [currentCard?.sourceExerciseId, handleRefresh]);
 
   useEffect(() => {
     if (status !== 'running') return;

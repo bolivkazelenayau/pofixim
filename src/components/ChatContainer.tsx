@@ -168,8 +168,8 @@ function isWelcomeMessage(message: Message | undefined) {
   );
 }
 
-function answerFeedbackPrefix(isCorrect: boolean) {
-  return isCorrect ? 'Верно. ' : 'Почти, но есть ловушка. ';
+function correctAnswerFeedbackPrefix() {
+  return 'Верно. ';
 }
 
 function isFullTextFillBlankExercise(exercise: Exercise) {
@@ -192,10 +192,7 @@ function buildFeedbackText(
       ? 'Верно.'
       : buildDictationFeedbackText(result.normalizedAnswer, result.feedback.explanation);
   }
-  const prefix =
-    exerciseType === 'punctuation_constructor' && !result.isCorrect
-      ? ''
-      : answerFeedbackPrefix(result.isCorrect);
+  const prefix = result.isCorrect ? correctAnswerFeedbackPrefix() : '';
   const prefixText = prefix ? `${prefix}\n\n` : '';
 
   if (result.feedback.correctAnswer && result.feedback.detailedExplanation) {
@@ -204,28 +201,7 @@ function buildFeedbackText(
     return `${prefixText}${correctAnswerLabel}:\n${result.feedback.correctAnswer}\n\n${explanationLabel}:\n${result.feedback.detailedExplanation}`;
   }
 
-  return `${prefixText}${result.feedback.explanation}${buildStepFeedbackText(result, exerciseType)}`;
-}
-
-function buildStepFeedbackText(
-  result: ReturnType<typeof checkExerciseAnswer> | undefined,
-  exerciseType?: Exercise['type'],
-) {
-  if (
-    exerciseType === 'ege_multi_select' ||
-    exerciseType === 'punctuation_constructor'
-  ) {
-    return '';
-  }
-  if (!result || result.stepFeedback.length === 0) {
-    return '';
-  }
-
-  const lines = result.stepFeedback.map(
-    (step, index) => `${index + 1}. ${step.message}`,
-  );
-
-  return `\n\nРазбор по шагам:\n${lines.join('\n')}`;
+  return `${prefixText}${result.feedback.explanation}`;
 }
 
 function submittedAnswerFromText(exercise: Exercise, text: string): SubmittedAnswer | null {
