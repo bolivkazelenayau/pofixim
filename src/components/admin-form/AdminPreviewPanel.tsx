@@ -23,7 +23,7 @@ type AdminPreviewPanelProps = {
 };
 
 function isTrustedPreviewHtml(value: string) {
- return /^<div class="dictation-diff">/u.test(value.trim());
+ return /^<div class="dictation-(?:diff|feedback)">/u.test(value.trim());
 }
 
 export default function AdminPreviewPanel({

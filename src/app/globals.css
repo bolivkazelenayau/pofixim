@@ -292,6 +292,11 @@ ins.du {
   text-decoration-skip-ink: none;
 }
 
+.dictation-feedback {
+  display: grid;
+  gap: 10px;
+}
+
 .dictation-diff {
   border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--stroke));
   border-radius: 12px;
@@ -340,6 +345,50 @@ ins.du {
   color: #7c2d12;
 }
 
+.dictation-diff__token--replace-phrase {
+  border-color: #fb7185;
+  background: #ffe4e6;
+  color: #881337;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.dictation-diff__punctuation-missing {
+  display: inline;
+  color: #b45309;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-color: #f59e0b;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.dictation-feedback__explanation {
+  border: 1px solid color-mix(in srgb, var(--stroke) 82%, transparent);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 10px 12px;
+  color: var(--foreground);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.dictation-feedback__explanation-title {
+  margin-bottom: 6px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dictation-feedback__explanation p {
+  margin: 0 0 10px;
+}
+
+.dictation-feedback__explanation p:last-child {
+  margin-bottom: 0;
+}
+
 .dark .dictation-diff {
   border-color: rgba(245, 158, 11, 0.42);
   background: color-mix(in srgb, var(--surface-strong) 82%, #f59e0b 18%);
@@ -367,6 +416,27 @@ ins.du {
   border-color: rgba(251, 146, 60, 0.76);
   background: rgba(251, 146, 60, 0.17);
   color: #fed7aa;
+}
+
+.dark .dictation-diff__token--replace-phrase {
+  border-color: rgba(251, 113, 133, 0.72);
+  background: rgba(251, 113, 133, 0.16);
+  color: #fecdd3;
+}
+
+.dark .dictation-diff__punctuation-missing {
+  color: #facc15;
+  text-decoration-color: rgba(250, 204, 21, 0.86);
+}
+
+.dark .dictation-feedback__explanation {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(255, 255, 255, 0.035);
+  color: #f8f3ea;
+}
+
+.dark .dictation-feedback__explanation-title {
+  color: #f7d37d;
 }
 
 @keyframes admin-md-skeleton-pulse {

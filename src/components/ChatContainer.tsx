@@ -190,7 +190,7 @@ function buildFeedbackText(
   if (exerciseType === 'dictation') {
     return result.isCorrect
       ? 'Верно.'
-      : buildDictationFeedbackText(result.normalizedAnswer);
+      : buildDictationFeedbackText(result.normalizedAnswer, result.feedback.explanation);
   }
   const prefix =
     exerciseType === 'punctuation_constructor' && !result.isCorrect

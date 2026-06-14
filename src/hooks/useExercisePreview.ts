@@ -82,7 +82,7 @@ export function useExercisePreview(form: Form) {
         form,
         result: {
           isCorrect: result.isCorrect,
-          text: buildDictationFeedbackText(result.normalizedAnswer),
+          text: buildDictationFeedbackText(result.normalizedAnswer, result.feedback.explanation),
         },
       });
       return;

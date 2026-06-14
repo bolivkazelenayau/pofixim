@@ -158,7 +158,7 @@ function splitFeedbackSections(content: string): FeedbackSections | null {
 
 function getFeedbackTone(content: string) {
   if (/^\s*Верно\./u.test(content)) return 'correct';
-  if (/^\s*(Почти|Проверь|Правильный ответ:|<div[^>]*>\s*<div[^>]*>Ошибок:)/u.test(content)) return 'wrong';
+  if (/^\s*(Почти|Проверь|Правильный ответ:|<div class="dictation-feedback">|<div[^>]*>\s*<div[^>]*>Ошибок:)/u.test(content)) return 'wrong';
   return null;
 }
 
@@ -166,7 +166,7 @@ function shouldRenderTrustedHtml(content: string) {
   const trimmed = content.trim();
   return (
     (/^📊\s+\*\*Таблица лидеров\*\*/u.test(content) && content.includes('<table')) ||
-    /^<div class="dictation-diff">/u.test(trimmed)
+    /^<div class="dictation-(?:diff|feedback)">/u.test(trimmed)
   );
 }
 
