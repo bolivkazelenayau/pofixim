@@ -407,7 +407,7 @@ export default function PunctuationConstructorCard({
                 className="inline-flex items-center"
               >
                 <span
-                  className={`mx-0.5 rounded-md bg-surface-strong px-2 py-0.5 ${
+                  className={`mx-0.5 inline-flex min-h-10 items-center rounded-md bg-surface-strong px-2 ${
                     showStructure && hasStructure
                       ? 'ring-2 ring-amber-100 dark:ring-amber-300/15'
                       : ''
@@ -776,10 +776,7 @@ function Slot({
   const placeholder = feedback?.expected.length
     ? glyphs(feedback.expected).replace(/./gu, '·')
     : '·';
-  const compact = placements.length === 0 && !selectedMark;
-  const sizeClass = compact
-    ? 'h-10 min-w-10 px-1.5'
-    : 'min-h-11 min-w-11 px-1.5';
+  const sizeClass = 'h-10 min-w-10 px-1.5';
   const slotLabel = selectedMark
     ? `Add ${MARK_META[selectedMark].label} to slot ${slotIndex}`
     : `Select punctuation slot ${slotIndex}`;
@@ -828,17 +825,17 @@ function Slot({
       title={`slot ${slotIndex}`}
     >
       {placements.length > 0 ? (
-        <span className="flex items-center gap-0.5">
+        <span className="flex max-w-9 flex-wrap items-center justify-center gap-px leading-none">
           {placements.map((placement, index) => (
             <span
               key={`${placement.mark}-${slotIndex}-${index}`}
-              className="group inline-flex h-7 min-w-6 items-center justify-center rounded-md bg-amber-100 px-1 text-base font-black text-amber-900 shadow-inner dark:bg-amber-300/18 dark:text-amber-100 dark:shadow-none"
-              title={MARK_META[placement.mark].label}
+              className="group/mark relative inline-flex size-4 items-center justify-center"
             >
               <button
                 type="button"
                 disabled={disabled}
-                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="inline-flex size-3.5 items-center justify-center rounded-sm text-[11px] font-black leading-none text-amber-950 transition-[background-color,color] duration-150 ease-out hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-70 dark:text-amber-50 dark:hover:bg-amber-300/20"
+                title={`${MARK_META[placement.mark].label}. Delete — удалить, ←/→ — поменять порядок`}
                 aria-label={`${MARK_META[placement.mark].label} in slot ${slotIndex}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -855,52 +852,63 @@ function Slot({
                     event.stopPropagation();
                     onRemoveMark(slotIndex, index);
                   }
+                  if (event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onMoveMark(slotIndex, index, -1);
+                  }
+                  if (event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onMoveMark(slotIndex, index, 1);
+                  }
                 }}
-                title={`${MARK_META[placement.mark].label}. Delete — удалить`}
               >
                 {markGlyph(placement.mark)}
               </button>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemoveMark(slotIndex, index);
-                }}
-                className="ml-0.5 inline-flex size-8 items-center justify-center rounded-full text-[12px] leading-none text-amber-900/55 transition-colors duration-150 ease-out hover:bg-amber-200 hover:text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-100/55 dark:hover:bg-amber-300/20 dark:hover:text-amber-50"
-                aria-label={`Удалить знак ${MARK_META[placement.mark].label}`}
-                title="Удалить знак"
-              >
-                ×
-              </button>
-              {placements.length > 1 && (
-                <span className="ml-1 inline-flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                  <button
-                    type="button"
-                    disabled={disabled || index === 0}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onMoveMark(slotIndex, index, -1);
-                    }}
-                    className="inline-flex size-8 items-center justify-center rounded text-[10px] transition-colors duration-150 ease-out hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:hover:bg-amber-300/20"
-                    aria-label={`Move ${MARK_META[placement.mark].label} left`}
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    disabled={disabled || index === placements.length - 1}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onMoveMark(slotIndex, index, 1);
-                    }}
-                    className="inline-flex size-8 items-center justify-center rounded text-[10px] transition-colors duration-150 ease-out hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:hover:bg-amber-300/20"
-                    aria-label={`Move ${MARK_META[placement.mark].label} right`}
-                  >
-                    ›
-                  </button>
-                </span>
-              )}
+              <span className="pointer-events-none absolute -top-7 left-1/2 z-20 inline-flex -translate-x-1/2 items-center rounded-md border border-amber-200 bg-amber-50/95 p-0.5 opacity-0 shadow-sm transition-opacity duration-150 ease-out group-hover/mark:pointer-events-auto group-hover/mark:opacity-100 group-focus-within/mark:pointer-events-auto group-focus-within/mark:opacity-100 dark:border-amber-300/20 dark:bg-stone-950/95">
+                {placements.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={disabled || index === 0}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMoveMark(slotIndex, index, -1);
+                      }}
+                      className="inline-flex size-5 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
+                      aria-label={`Move ${MARK_META[placement.mark].label} left`}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      disabled={disabled || index === placements.length - 1}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMoveMark(slotIndex, index, 1);
+                      }}
+                      className="inline-flex size-5 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
+                      aria-label={`Move ${MARK_META[placement.mark].label} right`}
+                    >
+                      ›
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveMark(slotIndex, index);
+                  }}
+                  className="inline-flex size-5 items-center justify-center rounded text-[11px] leading-none text-amber-950/70 transition-colors duration-150 ease-out hover:bg-amber-100 hover:text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50/70 dark:hover:bg-amber-300/20 dark:hover:text-amber-50"
+                  aria-label={`Удалить знак ${MARK_META[placement.mark].label}`}
+                  title="Удалить знак"
+                >
+                  ×
+                </button>
+              </span>
             </span>
           ))}
         </span>
