@@ -86,6 +86,7 @@ export function useAdminEditorController({
     markSaveSucceeded: markDatabaseSaveSucceeded,
   } = useFormPersistence({
     form,
+    setForm,
     isEdit,
     isDraftLoaded,
     saving,

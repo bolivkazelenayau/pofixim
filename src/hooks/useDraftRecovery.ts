@@ -39,6 +39,13 @@ function getAutoRestoreBlockReason(form: Form) {
   }
 }
 
+function withServerVersion(draftForm: Form, serverForm: Form): Form {
+  return {
+    ...draftForm,
+    updatedAt: serverForm.updatedAt ?? draftForm.updatedAt ?? null,
+  };
+}
+
 export function useDraftRecovery(config: UseDraftRecoveryConfig) {
   const {
     setForm,
@@ -87,12 +94,13 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
     }
 
     if (sessionId && sessionId === currentSessionId) {
+      const versionedDraft = withServerVersion(localDraft, serverForm);
       sessionDraftIdsRef.current.add(id);
-      setForm(localDraft);
+      setForm(versionedDraft);
       setSelectedId(id);
       logAdminDebug('draftRecovery:autoRestoreSameSession', {
         id,
-        localDraftId: localDraft.id ?? null,
+        localDraftId: versionedDraft.id ?? null,
         serverFormId: serverForm.id ?? null,
       });
       setDatabaseSaveState('local');
@@ -109,11 +117,12 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
       return;
     }
     if (sessionDraftIdsRef.current.has(id)) {
-      setForm(localDraft);
+      const versionedDraft = withServerVersion(localDraft, serverForm);
+      setForm(versionedDraft);
       setSelectedId(id);
       logAdminDebug('draftRecovery:autoRestoreSessionRef', {
         id,
-        localDraftId: localDraft.id ?? null,
+        localDraftId: versionedDraft.id ?? null,
         serverFormId: serverForm.id ?? null,
       });
       setDatabaseSaveState('local');
@@ -141,17 +150,21 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
 
   const useRecoveredDraft = useCallback(() => {
     if (!draftRecovery) return;
+    const versionedDraft = withServerVersion(
+      draftRecovery.draftForm,
+      draftRecovery.serverForm,
+    );
     logDraftRecoveryDebug('useRecoveredDraft', {
       id: draftRecovery.id,
       draftType: draftRecovery.draftForm.type,
       serverType: draftRecovery.serverForm.type,
     });
     lastPersistedSnapshotRef.current = JSON.stringify(draftRecovery.serverForm);
-    setForm(draftRecovery.draftForm);
+    setForm(versionedDraft);
     setSelectedId(draftRecovery.id);
     logAdminDebug('draftRecovery:useRecoveredDraft', {
       id: draftRecovery.id,
-      draftFormId: draftRecovery.draftForm.id ?? null,
+      draftFormId: versionedDraft.id ?? null,
       serverFormId: draftRecovery.serverForm.id ?? null,
     });
     setDatabaseSaveState('local');

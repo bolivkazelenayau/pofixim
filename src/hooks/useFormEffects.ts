@@ -8,6 +8,7 @@ import { EMPTY } from '@/components/admin-form/defaults';
 import { slugFromPrompt } from '@/components/admin-form/utils';
 import { logAdminDebug } from '@/components/admin-form/debug';
 import type { Form } from '@/components/admin-form/types';
+import { persistedSnapshotMatchesForm } from './formSnapshots';
 
 interface UseFormEffectsOptions {
   form: Form;
@@ -174,7 +175,7 @@ export function useFormEffects({
 
   useEffect(() => {
     if (!isDraftLoaded) return;
-    setHasUnsavedChanges(JSON.stringify(form) !== lastPersistedSnapshotRef.current);
+    setHasUnsavedChanges(!persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, isDraftLoaded]);
 

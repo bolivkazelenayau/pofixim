@@ -6,9 +6,11 @@ import { updateExerciseAction } from '@/app/actions/admin';
 import { writeStoredDraft, getDraftKey } from '@/components/admin-form/draftStorage';
 import type { Form } from '@/components/admin-form/types';
 import { publishExerciseUpdated } from '@/lib/exercise-update-events';
+import { getFormContentSnapshot, persistedSnapshotMatchesForm } from './formSnapshots';
 
 type FormPersistenceConfig = {
   form: Form;
+  setForm: React.Dispatch<React.SetStateAction<Form>>;
   isEdit: boolean;
   isDraftLoaded: boolean;
   saving: boolean;
@@ -32,6 +34,7 @@ function clearPendingDraftCookie(id: number) {
 
 export function useFormPersistence({
   form,
+  setForm,
   isEdit,
   isDraftLoaded,
   saving,
@@ -52,6 +55,8 @@ export function useFormPersistence({
   const autosaveInFlightRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveRetryTimerRef = useRef<number | null>(null);
+  const localDraftTimerRef = useRef<number | null>(null);
+  const lastLocalDraftSnapshotRef = useRef('');
 
   useEffect(() => {
     latestFormRef.current = form;
@@ -67,37 +72,90 @@ export function useFormPersistence({
     latestFormRef.current = form;
     if (!isDraftLoaded) return;
     const snapshot = JSON.stringify(form);
-    if (snapshot === lastPersistedSnapshotRef.current) return;
-    writeStoredDraft(form.id ?? null, form);
-    if (form.id) sessionDraftIdsRef.current.add(form.id);
+    if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) {
+      if (isEdit) {
+        clearLocal(form);
+        setDatabaseSaveState('saved');
+      }
+      return;
+    }
+    scheduleLocalDraftWrite(form);
     setDatabaseSaveState('local');
     if (form.id) {
       document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
     }
   }, [form, isDraftLoaded, sessionDraftIdsRef]);
 
-  function storeLocal(source: Form) {
+  function writeLocalDraftNow(source: Form) {
+    const snapshot = JSON.stringify(source);
+    if (snapshot === lastLocalDraftSnapshotRef.current) return;
     writeStoredDraft(source.id ?? null, source);
+    lastLocalDraftSnapshotRef.current = snapshot;
     if (source.id) {
       sessionDraftIdsRef.current.add(source.id);
       document.cookie = `admin_pending_draft_id=${source.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
     }
   }
 
-  function markSaveSucceeded(source: Form, snapshot: string) {
-    lastPersistedSnapshotRef.current = snapshot;
-    setDatabaseSavedAt(new Date());
-    if (JSON.stringify(latestFormRef.current) !== snapshot) {
-      storeLocal(latestFormRef.current);
-      setDatabaseSaveState('local');
-      return;
+  function scheduleLocalDraftWrite(source: Form) {
+    if (localDraftTimerRef.current != null) {
+      window.clearTimeout(localDraftTimerRef.current);
     }
+    localDraftTimerRef.current = window.setTimeout(() => {
+      localDraftTimerRef.current = null;
+      writeLocalDraftNow(source);
+    }, 500);
+  }
+
+  function cancelPendingLocalDraftWrite() {
+    if (localDraftTimerRef.current != null) {
+      window.clearTimeout(localDraftTimerRef.current);
+      localDraftTimerRef.current = null;
+    }
+  }
+
+  function storeLocal(source: Form) {
+    cancelPendingLocalDraftWrite();
+    writeLocalDraftNow(source);
+  }
+
+  function clearLocal(source: Form) {
+    cancelPendingLocalDraftWrite();
     localStorage.removeItem(getDraftKey(source.id));
+    lastLocalDraftSnapshotRef.current = '';
     if (source.id) {
       clearPendingDraftCookie(source.id);
       sessionDraftIdsRef.current.delete(source.id);
     }
+  }
+
+  function markSaveSucceeded(source: Form, snapshot: string) {
+    const latestForm = latestFormRef.current;
+    const latestSnapshot = JSON.stringify(latestForm);
+    const latestMatchesSaved =
+      latestSnapshot === snapshot ||
+      getFormContentSnapshot(latestForm) === getFormContentSnapshot(source);
+
+    lastPersistedSnapshotRef.current = snapshot;
+    setDatabaseSavedAt(new Date());
+    if (!latestMatchesSaved) {
+      storeLocal(latestForm);
+      setDatabaseSaveState('local');
+      return;
+    }
+    clearLocal(source);
     setDatabaseSaveState('saved');
+  }
+
+  function syncSavedVersion(source: Form) {
+    setForm((current) => {
+      if (current.id !== source.id) return current;
+      if (getFormContentSnapshot(current) !== getFormContentSnapshot(source)) return current;
+      if (current.updatedAt === source.updatedAt) return current;
+      const nextForm = { ...current, updatedAt: source.updatedAt };
+      latestFormRef.current = nextForm;
+      return nextForm;
+    });
   }
 
   function saveError(error: string | undefined, switchCancelled = false) {
@@ -122,7 +180,10 @@ export function useFormPersistence({
         return false;
       }
       if (res.success) {
-        markSaveSucceeded(targetForm, snapshot);
+        const savedUpdatedAt = 'updatedAt' in res ? res.updatedAt ?? targetForm.updatedAt ?? null : targetForm.updatedAt ?? null;
+        const savedForm = { ...targetForm, updatedAt: savedUpdatedAt };
+        markSaveSucceeded(savedForm, JSON.stringify(savedForm));
+        syncSavedVersion(savedForm);
         publishExerciseUpdated(id);
         return true;
       }
@@ -156,6 +217,10 @@ export function useFormPersistence({
       window.clearTimeout(autosaveRetryTimerRef.current);
       autosaveRetryTimerRef.current = null;
     }
+    if (localDraftTimerRef.current != null) {
+      window.clearTimeout(localDraftTimerRef.current);
+      localDraftTimerRef.current = null;
+    }
   }, []);
 
   const autosaveCurrentToDbIfNeeded = useCallback(
@@ -163,7 +228,7 @@ export function useFormPersistence({
       if (!isEdit || !form.id || form.id === nextId || saving || deleting) return true;
       if (deletedExerciseIdsRef.current.has(form.id)) return true;
       const snapshot = JSON.stringify(form);
-      if (snapshot === lastPersistedSnapshotRef.current) return true;
+      if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) return true;
       const saved = await performSave(form, snapshot, form.id);
       if (!saved && form.id) scheduleRetry(form, snapshot, form.id);
       return saved;
@@ -178,7 +243,11 @@ export function useFormPersistence({
     if (saving || deleting || switchingExerciseRef.current) return;
     if (deletedExerciseIdsRef.current.has(form.id)) return;
     const snapshot = JSON.stringify(form);
-    if (snapshot === lastPersistedSnapshotRef.current) return;
+    if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) {
+      clearLocal(form);
+      setDatabaseSaveState('saved');
+      return;
+    }
 
     autosaveTimerRef.current = window.setTimeout(async () => {
       const saved = await performSave(form, snapshot, form.id!);

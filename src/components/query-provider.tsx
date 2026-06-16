@@ -4,7 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, type ReactNode } from 'react';
 
-export default function QueryProvider({ children }: { children: ReactNode }) {
+export default function QueryProvider({
+  children,
+  devtools = true,
+}: {
+  children: ReactNode;
+  devtools?: boolean;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -23,8 +29,11 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV === 'development' ? (
-        <ReactQueryDevtools initialIsOpen={false} />
+      {devtools && process.env.NODE_ENV === 'development' ? (
+        <ReactQueryDevtools
+          buttonPosition="bottom-left"
+          initialIsOpen={false}
+        />
       ) : null}
     </QueryClientProvider>
   );

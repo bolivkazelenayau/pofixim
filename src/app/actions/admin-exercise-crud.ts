@@ -89,6 +89,17 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
           .limit(1);
 
         if (current.length > 0) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.info('[admin-debug] updateExercise:stale', {
+              id: input.id,
+              seedKey: payload.normalizedSeedKey,
+              knownUpdatedAt: input.knownUpdatedAt,
+              currentUpdatedAt: current[0]?.updatedAt ?? null,
+              promptLength: input.prompt.length,
+              explanationLength: input.explanation.length,
+            });
+          }
+
           return {
             success: false,
             code: 'STALE_EXERCISE_VERSION',

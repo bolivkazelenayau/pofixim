@@ -3,6 +3,7 @@ import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query
 import { cookies } from 'next/headers';
 import AdminFormClient from '@/components/admin-form/AdminFormClient';
 import ThemeToggle from '@/components/ThemeToggle';
+import QueryProvider from '@/components/query-provider';
 import { getExerciseByIdAction, listExercisesAction } from '@/app/actions/admin';
 import { logoutAdminAction } from '@/app/admin/login/actions';
 import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
@@ -103,17 +104,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       </div>
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <AdminFormClient
-          initialSelectedId={initialSelectedId}
-          initialSelectedExercise={initialSelectedExercise}
-          initialTypeFilter={initialListFilters.type}
-          initialStatusFilter={initialListFilters.qualityStatus}
-          initialExamTypeFilter={initialListFilters.examType}
-          initialSortBy={initialListFilters.sortBy}
-          initialSortDir={initialListFilters.sortDir}
-        />
-      </HydrationBoundary>
+      <QueryProvider devtools={false}>
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <AdminFormClient
+            initialSelectedId={initialSelectedId}
+            initialSelectedExercise={initialSelectedExercise}
+            initialTypeFilter={initialListFilters.type}
+            initialStatusFilter={initialListFilters.qualityStatus}
+            initialExamTypeFilter={initialListFilters.examType}
+            initialSortBy={initialListFilters.sortBy}
+            initialSortDir={initialListFilters.sortDir}
+          />
+        </HydrationBoundary>
+      </QueryProvider>
     </main>
   );
 }

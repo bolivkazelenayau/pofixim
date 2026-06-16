@@ -1,6 +1,8 @@
 import type { exercises } from '@/db/schema';
 
-export type ExerciseRow = typeof exercises.$inferSelect;
+export type ExerciseRow = Omit<typeof exercises.$inferSelect, 'updatedAt'> & {
+  updatedAt: Date | string;
+};
 
 export type MapperRecord = Record<string, unknown>;
 

@@ -175,6 +175,10 @@ export function useExerciseSubmit({
       url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
       payloadId: payload.id ?? null,
       seedKey: payload.seedKey ?? null,
+      formUpdatedAt: form.updatedAt ?? null,
+      payloadKnownUpdatedAt: payload.knownUpdatedAt ?? null,
+      promptLength: form.prompt.length,
+      explanationLength: form.explanation.length,
     });
     if (wasEdit && form.id !== selectedId) {
       logAdminDebug('submit:blocked-id-mismatch', {
@@ -209,6 +213,14 @@ export function useExerciseSubmit({
     let res: Awaited<ReturnType<typeof updateExerciseAction | typeof createExerciseAction>>;
     try {
       res = await saveExerciseMutation.mutateAsync({ payload, wasEdit, id: form.id });
+      logAdminDebug('submit:result', {
+        wasEdit,
+        formId: form.id ?? null,
+        success: res.success,
+        code: 'code' in res ? res.code ?? null : null,
+        returnedUpdatedAt: 'updatedAt' in res ? res.updatedAt ?? null : null,
+        currentUpdatedAt: 'currentUpdatedAt' in res ? res.currentUpdatedAt ?? null : null,
+      });
     } catch (error) {
       rollbackOptimisticSave();
       setSaving(false);
@@ -282,6 +294,10 @@ export function useExerciseSubmit({
         formId: form.id ?? null,
         selectedId,
         error: res.error ?? null,
+        code: 'code' in res ? res.code ?? null : null,
+        formUpdatedAt: form.updatedAt ?? null,
+        payloadKnownUpdatedAt: payload.knownUpdatedAt ?? null,
+        currentUpdatedAt: 'currentUpdatedAt' in res ? res.currentUpdatedAt ?? null : null,
       });
       storeLocalDraft(form);
       setDatabaseSaveState('local');
