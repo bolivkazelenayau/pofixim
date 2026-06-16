@@ -19,9 +19,9 @@ export type Ege9BlitzCard = {
 };
 
 const MASKED_WORD_RE =
-  /[\p{L}-]*(?:\.{2,}|\u2026+|_+|(?<=[\p{L}])\.(?=[\p{L}]))[\p{L}-]*/gu;
-const GAP_RE = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/u;
-const SPLIT_GAP_RE = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/gu;
+  /[\p{L}-]*(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=[\p{L}])\.(?=[\p{L}]))[\p{L}-]*/gu;
+const GAP_RE = /(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=\p{L})\.(?=\p{L}))/u;
+const SPLIT_GAP_RE = /(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=\p{L})\.(?=\p{L}))/gu;
 const CYRILLIC_LETTER_RE = /^[а-яё]$/iu;
 const COMMON_DISTRACTORS: Record<string, string[]> = {
   а: ['о'],
@@ -35,6 +35,7 @@ const COMMON_DISTRACTORS: Record<string, string[]> = {
   ы: ['и'],
   э: ['е'],
 };
+const SUPPORTED_BLITZ_LETTERS = new Set(Object.keys(COMMON_DISTRACTORS));
 const HUSHING_CONSONANTS_RE = /[жчшщ]$/iu;
 
 export function buildEge9BlitzCards(
@@ -74,13 +75,21 @@ export function buildEge9BlitzCards(
 
       const missingLetter = gap.missingLetter.toLowerCase();
       if (!CYRILLIC_LETTER_RE.test(missingLetter)) continue;
+      if (!SUPPORTED_BLITZ_LETTERS.has(missingLetter)) continue;
+      const effectiveMissingLetter = normalizeContextualCorrectLetter(
+        missingLetter,
+        gap.before,
+        gap.after,
+      );
+      if (!SUPPORTED_BLITZ_LETTERS.has(effectiveMissingLetter)) continue;
 
       const choices = buildChoices({
-        correctLetter: missingLetter,
+        correctLetter: effectiveMissingLetter,
         before: gap.before,
+        after: gap.after,
         seed: `${exercise.seedKey}:${rowIndex}:${wordIndex}`,
       });
-      const correctChoiceIndex = choices[0] === missingLetter ? 0 : 1;
+      const correctChoiceIndex = choices[0] === effectiveMissingLetter ? 0 : 1;
 
       cards.push({
         id: `${exercise.seedKey ?? exercise.id ?? 'ege9'}-${rowIndex}-${wordIndex}-${masked.start}`,
@@ -92,7 +101,7 @@ export function buildEge9BlitzCards(
         correctWord: donorWord,
         contextHint: extractContextHintAfterMatch(cleanOptionLine, masked.end),
         before: gap.before,
-        missingLetter,
+        missingLetter: effectiveMissingLetter,
         after: gap.after,
         choices,
         correctChoiceIndex,
@@ -160,7 +169,7 @@ function findMaskedWordMatches(value: string) {
 
   while ((match = MASKED_WORD_RE.exec(value)) !== null) {
     result.push({
-      value: match[0],
+      value: normalizeMaskedWord(match[0]),
       start: match.index,
       end: match.index + match[0].length,
     });
@@ -168,6 +177,10 @@ function findMaskedWordMatches(value: string) {
 
   MASKED_WORD_RE.lastIndex = 0;
   return result;
+}
+
+function normalizeMaskedWord(value: string) {
+  return value.replace(/(\.{2,}|\u2026+|_+)\s+(?=[\p{L}-])/gu, '$1');
 }
 
 function extractContextHintAfterMatch(value: string, matchEnd: number) {
@@ -239,7 +252,18 @@ function extractSingleLetterGap(maskedWord: string, donorWord: string) {
   const missingEnd = donorWord.length - after.length;
   const missingLetter = donorWord.slice(missingStart, missingEnd);
 
-  if ([...missingLetter].length !== 1) return null;
+  const missingLetters = [...missingLetter];
+
+  if (missingLetters.length !== 1) {
+    const split = splitExpandedGap(missingLetter);
+    if (!split) return null;
+
+    return {
+      before,
+      missingLetter: split.missingLetter,
+      after: `${split.remainder}${after}`,
+    };
+  }
 
   return {
     before,
@@ -260,6 +284,10 @@ function extractSingleLetterGapFuzzy(
     | null = null;
 
   for (let index = 1; index < donorLetters.length; index += 1) {
+    if (!SUPPORTED_BLITZ_LETTERS.has(donorLetters[index].toLowerCase())) {
+      continue;
+    }
+
     const donorBefore = donorLetters.slice(0, index).join('');
     const donorAfter = donorLetters.slice(index + 1).join('');
     const beforeDistance = boundedEditDistance(
@@ -291,6 +319,20 @@ function extractSingleLetterGapFuzzy(
     before,
     missingLetter: donorLetters[best.index],
     after,
+  };
+}
+
+function splitExpandedGap(value: string) {
+  const letters = [...value];
+  const missingIndex = letters.findIndex((letter) =>
+    SUPPORTED_BLITZ_LETTERS.has(letter.toLowerCase()),
+  );
+
+  if (missingIndex === -1) return null;
+
+  return {
+    missingLetter: letters[missingIndex],
+    remainder: `${letters.slice(0, missingIndex).join('')}${letters.slice(missingIndex + 1).join('')}`,
   };
 }
 
@@ -329,16 +371,23 @@ function boundedEditDistance(left: string, right: string, maxDistance: number) {
 function buildChoices({
   correctLetter,
   before,
+  after,
   seed,
 }: {
   correctLetter: string;
   before: string;
+  after: string;
   seed: string;
 }): [string, string] {
-  const distractorPool = getContextualDistractors(correctLetter, before)
-    .filter((letter) => letter !== correctLetter);
+  const normalizedCorrectLetter = normalizeContextualCorrectLetter(
+    correctLetter,
+    before,
+    after,
+  );
+  const distractorPool = getContextualDistractors(normalizedCorrectLetter, before, after)
+    .filter((letter) => letter !== normalizedCorrectLetter);
   const distractor = distractorPool[hashString(seed) % distractorPool.length] ?? 'о';
-  const choices: [string, string] = [correctLetter, distractor];
+  const choices: [string, string] = [normalizedCorrectLetter, distractor];
 
   if (hashString(`${seed}:side`) % 2 === 1) {
     return [choices[1], choices[0]];
@@ -347,12 +396,36 @@ function buildChoices({
   return choices;
 }
 
-function getContextualDistractors(correctLetter: string, before: string) {
+function normalizeContextualCorrectLetter(
+  correctLetter: string,
+  before: string,
+  after: string,
+) {
+  if (HUSHING_CONSONANTS_RE.test(before) && isLikelyForeignOAfterHushing(after)) {
+    return 'о';
+  }
+
+  return correctLetter;
+}
+
+function getContextualDistractors(correctLetter: string, before: string, after: string) {
+  if (
+    correctLetter === 'о' &&
+    HUSHING_CONSONANTS_RE.test(before) &&
+    isLikelyForeignOAfterHushing(after)
+  ) {
+    return ['а'];
+  }
+
   if (correctLetter === 'о' && HUSHING_CONSONANTS_RE.test(before)) {
     return ['ё'];
   }
 
   return COMMON_DISTRACTORS[correctLetter] ?? ['о'];
+}
+
+function isLikelyForeignOAfterHushing(after: string) {
+  return /^(?:кей|кет|колад|колат|кол|ссе|рты|рник|рный|рство)/iu.test(after);
 }
 
 

@@ -6,6 +6,7 @@ import type {
 
 export type ExerciseEditorInput = {
   id?: number;
+  knownUpdatedAt?: string | null;
   type: Extract<
     ExerciseType,
     | 'multiple_choice'

@@ -30,6 +30,8 @@ export function mapExerciseRowToEditorResult(row: ExerciseRow): {
 
   const base = {
     id: row.id,
+    updatedAt:
+      row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt ?? ''),
     type: row.type,
     seedKey: row.seedKey ?? '',
     category: row.category,

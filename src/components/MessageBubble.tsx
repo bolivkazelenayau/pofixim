@@ -17,6 +17,7 @@ type MessageBubbleProps = {
   isLastInGroup?: boolean;
   holdTail?: boolean;
   suppressTail?: boolean;
+  exerciseSeedKey?: string | null;
 };
 
 type FeedbackSections = {
@@ -170,7 +171,7 @@ function shouldRenderTrustedHtml(content: string) {
   );
 }
 
-export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup, holdTail = false, suppressTail = false }: MessageBubbleProps) {
+export default function MessageBubble({ content, isBot, isQuestion, createdAt, isFirstInGroup, isLastInGroup, holdTail = false, suppressTail = false, exerciseSeedKey }: MessageBubbleProps) {
   const [bubbleRef, bubbleSize] = useElementSize<HTMLDivElement>();
   const markdownContent = content.replace(/[\u00ad\u200b\u200c\u200d\ufeff]/g, '');
   const timeString = useMemo(() => {
@@ -212,8 +213,8 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
     bubbleClasses = 'bg-primary text-white shadow-sm';
   } else if (isFeedback) {
     bubbleClasses = feedbackTone === 'correct'
-      ? 'border border-emerald-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-emerald-400/70 dark:before:bg-emerald-300/65 [&>div>p:first-child]:text-emerald-700 [&>div>p:first-child]:dark:text-emerald-200'
-      : 'border border-amber-300/25 bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-amber-400/75 dark:before:bg-amber-300/70 [&>div>p:first-child]:text-amber-700 [&>div>p:first-child]:dark:text-amber-200';
+      ? 'bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-emerald-400/70 dark:before:bg-emerald-300/65 [&>div>p:first-child]:text-emerald-700 [&>div>p:first-child]:dark:text-emerald-200'
+      : 'bg-[var(--surface-strong)] text-foreground shadow-sm before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-amber-400/75 dark:before:bg-amber-300/70 [&>div>p:first-child]:text-amber-700 [&>div>p:first-child]:dark:text-amber-200';
   } else if (isBot) {
     bubbleClasses = 'message-bubble message-bubble--bot text-foreground';
     if (!first) bubbleClasses += ' rounded-tl-[6px]';
@@ -278,13 +279,17 @@ export default function MessageBubble({ content, isBot, isQuestion, createdAt, i
           style={usesSvgShape ? { position: 'relative', zIndex: 1 } : undefined}
         >
           {sections ? (
-            <FeedbackSectionsCard sections={sections} />
+            <FeedbackSectionsCard
+              sections={sections}
+              collapseExplanationByDefault={feedbackTone === 'correct'}
+              seedKey={exerciseSeedKey}
+            />
           ) : (
             <div className="relative">
             <div className={!isBot ? 'pr-12' : 'pr-10'}>
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                {trustedHtml ? markdownContent : renderEditorMarkdown(markdownContent)}
-              </ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                  {trustedHtml ? markdownContent : renderEditorMarkdown(markdownContent)}
+                </ReactMarkdown>
             </div>
             {!isBot ? (
               <div className="absolute -bottom-1 -right-2 flex items-center gap-1 text-[11px] font-semibold text-[#5f9f4b] dark:text-amber-200/80">

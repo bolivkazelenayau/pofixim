@@ -22,6 +22,9 @@ export default function AdminForm({
   initialTotalItems,
   initialSelectedId = null,
   initialSelectedExercise = null,
+  initialTypeFilter = 'all',
+  initialStatusFilter = 'all',
+  initialExamTypeFilter = 'all',
   initialSortBy = 'id',
   initialSortDir = 'desc',
 }: AdminFormProps) {
@@ -69,6 +72,9 @@ export default function AdminForm({
   } = useExerciseList({
     initialItems,
     initialTotalItems,
+    initialTypeFilter,
+    initialStatusFilter,
+    initialExamTypeFilter,
     initialSortBy,
     initialSortDir,
     setIsError,

@@ -8,6 +8,7 @@ import { logoutAdminAction } from '@/app/admin/login/actions';
 import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
 import type { ExerciseListResponse } from '@/components/admin-form/types';
 import { requireAdminPageSession } from '@/lib/admin-auth';
+import { EXERCISE_TYPES } from '@/features/exercises/types';
 
 const ADMIN_INITIAL_LIST_LIMIT = 15;
 
@@ -39,9 +40,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const cookieStore = await cookies();
   const initialListFilters = {
     query: '',
-    type: 'all',
-    qualityStatus: 'all',
-    examType: 'all',
+    type: parseAdminTypeFilter(cookieStore.get('admin_list_type_filter')?.value),
+    qualityStatus: parseAdminStatusFilter(cookieStore.get('admin_list_status_filter')?.value),
+    examType: parseAdminExamTypeFilter(cookieStore.get('admin_list_exam_type_filter')?.value),
     sortBy: parseAdminListSortBy(cookieStore.get('admin_list_sort_by')?.value),
     sortDir: parseAdminListSortDir(cookieStore.get('admin_list_sort_dir')?.value),
   } satisfies AdminExerciseListFilters;
@@ -106,6 +107,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <AdminFormClient
           initialSelectedId={initialSelectedId}
           initialSelectedExercise={initialSelectedExercise}
+          initialTypeFilter={initialListFilters.type}
+          initialStatusFilter={initialListFilters.qualityStatus}
+          initialExamTypeFilter={initialListFilters.examType}
           initialSortBy={initialListFilters.sortBy}
           initialSortDir={initialListFilters.sortDir}
         />
@@ -121,6 +125,23 @@ function parseAdminListSortBy(value: string | undefined) {
 
 function parseAdminListSortDir(value: string | undefined) {
   return value === 'asc' ? 'asc' : 'desc';
+}
+
+function parseAdminTypeFilter(value: string | undefined) {
+  if (!value || value === 'all') return 'all';
+  return (EXERCISE_TYPES as readonly string[]).includes(value) ? value : 'all';
+}
+
+function parseAdminStatusFilter(value: string | undefined) {
+  if (value === 'draft' || value === 'review' || value === 'approved' || value === 'archived') {
+    return value;
+  }
+  return 'all';
+}
+
+function parseAdminExamTypeFilter(value: string | undefined) {
+  if (!value || value === 'all') return 'all';
+  return /^(?:9|1[0-9]|2[01])$/.test(value) ? value : 'all';
 }
 
 

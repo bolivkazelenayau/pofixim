@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { exercises } from '@/db/schema';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
@@ -64,15 +64,46 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
         ...payload.values,
         updatedAt: sql`now()::timestamp`,
       })
-      .where(eq(exercises.id, input.id))
-      .returning({ id: exercises.id });
+      .where(
+        input.knownUpdatedAt
+          ? and(
+              eq(exercises.id, input.id),
+              sql`${exercises.updatedAt} = ${input.knownUpdatedAt}::timestamp`,
+            )
+          : eq(exercises.id, input.id),
+      )
+      .returning({
+        id: exercises.id,
+        updatedAt: sql<string>`${exercises.updatedAt}::text`,
+      });
 
     if (updated.length === 0) {
+      if (input.knownUpdatedAt) {
+        const current = await db
+          .select({
+            id: exercises.id,
+            updatedAt: sql<string>`${exercises.updatedAt}::text`,
+          })
+          .from(exercises)
+          .where(eq(exercises.id, input.id))
+          .limit(1);
+
+        if (current.length > 0) {
+          return {
+            success: false,
+            code: 'STALE_EXERCISE_VERSION',
+            error:
+              'Задание уже изменилось в БД. Локальная версия сохранена как черновик: обновите запись из базы или сравните изменения перед повторным сохранением.',
+            currentUpdatedAt: current[0]?.updatedAt ?? null,
+          };
+        }
+      }
+
       return { success: false, error: 'Exercise not found' };
     }
 
     refreshExerciseAdminCaches();
-    return { success: true };
+    return { success: true, updatedAt: updated[0]?.updatedAt ?? null };
   } catch (error) {
     console.error('Failed to update exercise:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unexpected error' };

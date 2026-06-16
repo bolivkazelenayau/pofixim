@@ -101,6 +101,9 @@ export type AdminFormProps = {
   initialTotalItems?: number | null;
   initialSelectedId?: number | null;
   initialSelectedExercise?: Record<string, unknown> | null;
+  initialTypeFilter?: string;
+  initialStatusFilter?: string;
+  initialExamTypeFilter?: string;
   initialSortBy?: ExerciseListSortBy;
   initialSortDir?: 'asc' | 'desc';
 };
@@ -113,6 +116,7 @@ export type DraftRecoveryState = {
 
 export type Form = {
   id?: number;
+  updatedAt?: string | null;
   type: ExerciseEditorInput['type'];
   seedKey: string;
   category: ExerciseCategory;

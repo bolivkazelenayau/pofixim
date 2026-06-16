@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import ExpandableContent from '@/components/ExpandableContent';
 import FeedbackSectionsCard from '@/components/FeedbackSectionsCard';
 import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 import ExerciseRenderer from '@/features/exercises/renderers/ExerciseRenderer';
@@ -146,17 +147,34 @@ export default function AdminPreviewPanel({
            : 'border-amber-200 bg-amber-50 text-amber-900 before:bg-amber-400 dark:border-amber-300/25 dark:bg-surface-strong dark:text-foreground dark:before:bg-amber-300/70 [&>p:first-child]:dark:text-amber-200'
         }`}
       >
-       {previewFeedbackSections ? (
-        <FeedbackSectionsCard sections={previewFeedbackSections} />
+        {previewFeedbackSections ? (
+         <FeedbackSectionsCard
+          sections={previewFeedbackSections}
+          collapseExplanationByDefault={previewCheckResult.isCorrect}
+          seedKey={preview.exercise?.seedKey}
+         />
        ) : (
-        <div className="whitespace-pre-wrap">
-         <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-          {isTrustedPreviewHtml(previewCheckResult.text)
-           ? previewCheckResult.text
-           : renderEditorMarkdown(previewCheckResult.text)}
-         </ReactMarkdown>
-        </div>
-       )}
+         <ExpandableContent
+          text={previewCheckResult.text}
+          collapsedMaxHeight={280}
+          minCharacters={620}
+          minLines={9}
+          className="whitespace-pre-wrap"
+          fadeClassName={
+           previewCheckResult.isCorrect
+            ? 'from-emerald-50 dark:from-[var(--surface-strong)]'
+            : preview.exercise.type === 'dictation'
+             ? 'from-amber-50 dark:from-[var(--surface-strong)]'
+             : 'from-amber-50 dark:from-[var(--surface-strong)]'
+          }
+         >
+          <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+           {isTrustedPreviewHtml(previewCheckResult.text)
+            ? previewCheckResult.text
+            : renderEditorMarkdown(previewCheckResult.text)}
+          </ReactMarkdown>
+         </ExpandableContent>
+        )}
       </div>
      )}
     </div>

@@ -1,6 +1,7 @@
 import type { Form } from './types';
 
 export const EMPTY: Form = {
+  updatedAt: null,
   type: 'multiple_choice',
   seedKey: '',
   category: 'orthography',

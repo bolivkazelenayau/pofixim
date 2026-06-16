@@ -1,5 +1,7 @@
 'use client';
 
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import {
   Command,
   CommandDialog,
@@ -11,6 +13,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command';
+import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
 import type { ListItem } from './types';
 
 type AdminCommandPaletteProps = {
@@ -63,8 +66,12 @@ export default function AdminCommandPalette({
         {selectedItem ? (
           <div className="border-b border-stroke px-3 py-2 text-xs text-foreground/55">
             <span className="font-semibold text-foreground/75">Current:</span>{' '}
-            <span className="font-mono">#{selectedItem.id}</span>{' '}
-            <span className="truncate">{selectedItem.prompt}</span>
+            <span className="font-mono text-xs font-semibold text-foreground">#{selectedItem.id}</span>
+            <div className="text-pretty mt-0.5 [&_p]:inline">
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                {renderEditorMarkdown(selectedItem.prompt)}
+              </ReactMarkdown>
+            </div>
           </div>
         ) : null}
         <CommandList>
@@ -117,16 +124,21 @@ export default function AdminCommandPalette({
             <>
               <CommandSeparator />
               <CommandGroup heading="Open exercise">
-                {visibleItems.map((item) => (
+                {visibleItems.map((item, index) => (
                   <CommandItem
                     key={item.id}
                     value={`${item.id} ${item.seedKey ?? ''} ${item.type} ${item.qualityStatus} ${item.prompt}`}
                     onSelect={() => run(() => onOpenExercise(item.id))}
                     data-checked={selectedId === item.id}
+                    className={index > 0 ? 'border-t border-stroke/50' : ''}
                   >
-                    <span className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">#{item.id}</span>
-                      <span className="truncate">{item.prompt}</span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-mono text-xs font-semibold text-foreground">#{item.id}</span>
+                      <span className="text-pretty [&_p]:inline">
+                        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                          {renderEditorMarkdown(item.prompt)}
+                        </ReactMarkdown>
+                      </span>
                     </span>
                     <CommandShortcut>
                       {selectedId === item.id ? 'open' : item.qualityStatus}

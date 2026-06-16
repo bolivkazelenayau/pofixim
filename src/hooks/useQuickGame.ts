@@ -28,6 +28,7 @@ interface QuickGameConfig<Card> {
 
 interface UseQuickGameReturn<Card, Result> {
   cards: Card[];
+  instanceKey: number;
   isOpen: boolean;
   isLoading: boolean;
   mode: 'normal' | 'inspect';
@@ -42,6 +43,7 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
 ): UseQuickGameReturn<Card, Result> {
   const { seenExerciseIds, addMessage, recordBlitzScore } = useChatStore();
   const [cards, setCards] = useState<Card[]>([]);
+  const [instanceKey, setInstanceKey] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'normal' | 'inspect'>('normal');
@@ -62,6 +64,7 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
         if (res.success && res.cards.length > 0) {
           const shuffled = config.shuffleCards(res.cards, String(Date.now()));
           setCards(shuffled);
+          setInstanceKey((key) => key + 1);
           setMode('normal');
           setIsOpen(true);
           return;
@@ -89,6 +92,7 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
 
   const openWithCards = useCallback((nextCards: Card[], options?: { mode?: 'normal' | 'inspect' }) => {
     setCards(nextCards);
+    setInstanceKey((key) => key + 1);
     setMode(options?.mode ?? 'normal');
     setIsOpen(nextCards.length > 0);
   }, []);
@@ -109,5 +113,5 @@ export function useQuickGame<Card, Result extends QuickGameResult>(
     [config.skillTag, mode, recordBlitzScore, addMessage, close]
   );
 
-  return { cards, isOpen, isLoading, mode, open, openWithCards, close, onFinish };
+  return { cards, instanceKey, isOpen, isLoading, mode, open, openWithCards, close, onFinish };
 }

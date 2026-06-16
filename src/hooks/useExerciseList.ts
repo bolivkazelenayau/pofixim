@@ -21,10 +21,16 @@ const FIRST_PAGE_PARAM: ExerciseListPageParam = {
 };
 const ADMIN_LIST_SORT_BY_COOKIE = 'admin_list_sort_by';
 const ADMIN_LIST_SORT_DIR_COOKIE = 'admin_list_sort_dir';
+const ADMIN_LIST_TYPE_FILTER_COOKIE = 'admin_list_type_filter';
+const ADMIN_LIST_STATUS_FILTER_COOKIE = 'admin_list_status_filter';
+const ADMIN_LIST_EXAM_TYPE_FILTER_COOKIE = 'admin_list_exam_type_filter';
 
 type UseExerciseListConfig = {
   initialItems: ListItem[];
   initialTotalItems: number | null | undefined;
+  initialTypeFilter: string;
+  initialStatusFilter: string;
+  initialExamTypeFilter: string;
   initialSortBy: 'id' | 'updatedAt' | 'type' | 'status';
   initialSortDir: 'asc' | 'desc';
   setIsError: (value: boolean) => void;
@@ -80,6 +86,9 @@ function buildInitialData(
 export function useExerciseList({
   initialItems,
   initialTotalItems,
+  initialTypeFilter,
+  initialStatusFilter,
+  initialExamTypeFilter,
   initialSortBy,
   initialSortDir,
   setIsError,
@@ -90,9 +99,9 @@ export function useExerciseList({
   const [matchingItems, setMatchingItems] = useState<number | null>(null);
   const [listQuery, setListQuery] = useState('');
   const [serverListQuery, setServerListQuery] = useState('');
-  const [listTypeFilter, setListTypeFilter] = useState<string>('all');
-  const [listStatusFilter, setListStatusFilter] = useState<string>('all');
-  const [listExamTypeFilter, setListExamTypeFilter] = useState<string>('all');
+  const [listTypeFilter, setListTypeFilter] = useState<string>(initialTypeFilter);
+  const [listStatusFilter, setListStatusFilter] = useState<string>(initialStatusFilter);
+  const [listExamTypeFilter, setListExamTypeFilter] = useState<string>(initialExamTypeFilter);
   const [listSortBy, setListSortBy] = useState<'id' | 'updatedAt' | 'type' | 'status'>(initialSortBy);
   const [listSortDir, setListSortDir] = useState<'asc' | 'desc'>(initialSortDir);
   const [sortPrefsReady] = useState(true);
@@ -138,6 +147,17 @@ export function useExerciseList({
       persistAdminListSortCookie(ADMIN_LIST_SORT_DIR_COOKIE, listSortDir);
     } catch {}
   }, [listSortBy, listSortDir]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('admin_list_type_filter', listTypeFilter);
+      localStorage.setItem('admin_list_status_filter', listStatusFilter);
+      localStorage.setItem('admin_list_exam_type_filter', listExamTypeFilter);
+      persistAdminListSortCookie(ADMIN_LIST_TYPE_FILTER_COOKIE, listTypeFilter);
+      persistAdminListSortCookie(ADMIN_LIST_STATUS_FILTER_COOKIE, listStatusFilter);
+      persistAdminListSortCookie(ADMIN_LIST_EXAM_TYPE_FILTER_COOKIE, listExamTypeFilter);
+    } catch {}
+  }, [listTypeFilter, listStatusFilter, listExamTypeFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -196,6 +216,9 @@ export function useExerciseList({
         : undefined,
     placeholderData: (previousData) => previousData,
   });
+  const isServerQuerySettling =
+    normalizeSearchText(listQuery) !== normalizeSearchText(serverListQuery) ||
+    (listQueryResult.isPlaceholderData && normalizeSearchText(listQuery).length > 0);
 
   const items = useMemo(() => {
     const merged: ListItem[] = [];
@@ -299,9 +322,7 @@ export function useExerciseList({
   const filteredItems = useMemo(() => {
     const q = normalizeSearchText(listQuery);
     const serverQ = normalizeSearchText(serverListQuery);
-    const shouldApplyClientTextFilter = Boolean(
-      q && (q !== serverQ || listQueryResult.isPlaceholderData),
-    );
+    const shouldApplyClientTextFilter = Boolean(q && (q !== serverQ || listQueryResult.isPlaceholderData));
     const filtered = items.filter((item) => {
       if (listTypeFilter !== 'all' && item.type !== listTypeFilter) return false;
       if (listStatusFilter !== 'all' && item.qualityStatus !== listStatusFilter) return false;
@@ -364,7 +385,9 @@ export function useExerciseList({
     setTotalItems,
     matchingItems: displayedMatchingItems,
     setMatchingItems,
-    initialListPending: !sortPrefsReady || (items.length === 0 && listQueryResult.isPending),
+    initialListPending:
+      !sortPrefsReady ||
+      (items.length === 0 && listQueryResult.isPending && !listQueryResult.isPlaceholderData),
     hasActiveListFilter,
     filteredItems,
     groupedItems,
@@ -383,7 +406,7 @@ export function useExerciseList({
     setListSortDir,
     sortPrefsReady,
     hasMore: Boolean(
-      listQueryResult.hasNextPage && !isSearchDebouncing && !isListRefreshing,
+      listQueryResult.hasNextPage && !isServerQuerySettling && !isListRefreshing,
     ),
     loadingMore: listQueryResult.isFetchingNextPage,
     refreshList,

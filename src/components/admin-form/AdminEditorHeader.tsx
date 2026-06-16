@@ -1,3 +1,9 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Bean } from 'lucide-react';
+import { copyTextToClipboard } from '@/lib/clipboard';
+
 type AdminEditorHeaderProps = {
   isEdit: boolean;
   hasUnsavedChanges: boolean;
@@ -21,6 +27,19 @@ export default function AdminEditorHeader({
   onRedo,
   onNewDraft,
 }: AdminEditorHeaderProps) {
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!copyToast) return;
+    const timer = window.setTimeout(() => setCopyToast(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copyToast]);
+
+  async function copySeed() {
+    const didCopy = await copyTextToClipboard(formMeta.seedKey);
+    setCopyToast(didCopy ? 'Seed скопирован' : 'Не удалось скопировать');
+  }
+
   return (
     <div className="mb-5 grid gap-3 border-b border-stroke pb-4 lg:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0">
@@ -37,9 +56,29 @@ export default function AdminEditorHeader({
           </HeaderBadge>
           {hasUnsavedChanges ? <HeaderBadge tone="amber">unsaved</HeaderBadge> : null}
         </div>
-        <div className="mt-1 max-w-3xl truncate font-mono text-[11px] text-foreground/70">
-          {formMeta.seedKey || 'seed key not set'}
-        </div>
+        {formMeta.seedKey ? (
+          <p className="relative mt-1 flex items-center gap-1.5 font-mono text-[11px] text-foreground/70">
+            <Bean className="h-3 w-3" aria-hidden="true" />
+            <span>seed:</span>
+            <button
+              type="button"
+              onClick={copySeed}
+              className="max-w-[50ch] truncate font-mono transition-colors duration-150 ease-out hover:text-primary focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary/30"
+              title="Скопировать seed key"
+            >
+              {formMeta.seedKey}
+            </button>
+            {copyToast && (
+              <span className="pointer-events-none absolute left-0 top-full mt-1 animate-[feedback-explanation-in_180ms_cubic-bezier(0.2,0,0,1)] rounded-full bg-foreground px-2 py-0.5 text-[10px] font-bold text-background shadow-lg">
+                {copyToast}
+              </span>
+            )}
+          </p>
+        ) : (
+          <div className="mt-1 max-w-3xl truncate font-mono text-[11px] text-foreground/70">
+            seed key not set
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-foreground/70">
           <ShortcutKeys keys="Ctrl + S" label="save" />
           <ShortcutKeys keys="Ctrl + K" label="command" />

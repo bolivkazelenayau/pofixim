@@ -57,8 +57,8 @@ interface UseExerciseSubmitOptions {
   markDatabaseSaveSucceeded: (f: Form, snapshot: string) => void;
 }
 
-function updateSavedListItem(item: ListItem, form: Form): ListItem {
-  const updatedAt = new Date().toISOString();
+function updateSavedListItem(item: ListItem, form: Form, savedUpdatedAt?: string | null): ListItem {
+  const updatedAt = savedUpdatedAt ?? form.updatedAt ?? new Date().toISOString();
   return {
     ...item,
     type: form.type,
@@ -154,6 +154,7 @@ export function useExerciseSubmit({
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     cancelPendingExerciseLoad('manual-submit');
+    cancelPendingAutosaves();
     setSaving(true);
     setDatabaseSaveState('saving');
     setMessage('');
@@ -237,10 +238,11 @@ export function useExerciseSubmit({
       if (savedExerciseId) {
         publishExerciseUpdated(savedExerciseId);
       }
-      const nextForm = wasEdit ? form : loadFormState(null, EMPTY);
+      const savedUpdatedAt = 'updatedAt' in res ? res.updatedAt ?? null : null;
+      const nextForm = wasEdit ? { ...form, updatedAt: savedUpdatedAt ?? form.updatedAt ?? null } : loadFormState(null, EMPTY);
       setForm(nextForm);
       if (wasEdit) {
-        markDatabaseSaveSucceeded(form, JSON.stringify(form));
+        markDatabaseSaveSucceeded(nextForm, JSON.stringify(nextForm));
         if (form.id) {
           await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.detail(form.id) });
         }
@@ -257,7 +259,7 @@ export function useExerciseSubmit({
         window.setTimeout(() => setExerciseUrlSelection(form.id!, 'submit-success-edit-posttick'), 0);
         window.setTimeout(() => setExerciseUrlSelection(form.id!, 'submit-success-edit-settle'), 250);
         setItems((current) =>
-          current.map((item) => (item.id === form.id ? updateSavedListItem(item, form) : item)),
+          current.map((item) => (item.id === form.id ? updateSavedListItem(item, nextForm, savedUpdatedAt) : item)),
         );
         logAdminDebug('submit:preserve-list-order', {
           formId: form.id,
@@ -284,7 +286,24 @@ export function useExerciseSubmit({
       storeLocalDraft(form);
       setDatabaseSaveState('local');
       setIsError(true);
-      if (res.error === 'Unauthorized') {
+      if ('code' in res && res.code === 'STALE_EXERCISE_VERSION') {
+        let versionWasRefreshed = false;
+        if (form.id && 'currentUpdatedAt' in res && res.currentUpdatedAt) {
+          const nextForm = { ...form, updatedAt: res.currentUpdatedAt };
+          setForm(nextForm);
+          storeLocalDraft(nextForm);
+          versionWasRefreshed = true;
+        }
+        setMessage(
+          versionWasRefreshed
+            ? 'Версия задания в БД обновилась. Локальный черновик сохранён; нажмите «Сохранить» ещё раз, чтобы записать именно эту версию.'
+            : res.error ||
+                'Задание уже изменилось в БД. Локальная версия сохранена как черновик: обновите запись из базы или сравните изменения перед повторным сохранением.',
+        );
+        if (form.id) {
+          await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.detail(form.id) });
+        }
+      } else if (res.error === 'Unauthorized') {
         setMessage('Сессия истекла. Изменения сохранены локально. Войдите снова, чтобы записать их в базу.');
       } else {
         setMessage(`Изменения сохранены локально, но не записаны в базу: ${res.error || 'ошибка сохранения'}.`);

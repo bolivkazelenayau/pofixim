@@ -17,6 +17,7 @@ export type Message = {
   feedbackForExerciseId?: number;
   feedbackForExerciseMessageId?: string;
   submittedAnswer?: SubmittedAnswer;
+  seedKey?: string;
   createdAt?: number;
 };
 
@@ -37,6 +38,7 @@ type ChatState = {
     messageId?: string;
     exerciseId?: number;
     content: string;
+    seedKey?: string;
   }>) => void;
   markExercisePresented: (exerciseId: number) => void;
   setTyping: (typing: boolean) => void;
@@ -220,6 +222,16 @@ export const useChatStore = create<ChatState>()(
               .filter((feedback) => typeof feedback.messageId === 'string')
               .map((feedback) => [feedback.messageId!, feedback.content]),
           );
+          const seedByExerciseId = new Map(
+            feedbacks
+              .filter((feedback) => typeof feedback.exerciseId === 'number' && feedback.seedKey)
+              .map((feedback) => [feedback.exerciseId!, feedback.seedKey!]),
+          );
+          const seedByMessageId = new Map(
+            feedbacks
+              .filter((feedback) => typeof feedback.messageId === 'string' && feedback.seedKey)
+              .map((feedback) => [feedback.messageId!, feedback.seedKey!]),
+          );
           let didUpdate = false;
           const messages = state.messages.map((message) => {
             const content =
@@ -227,9 +239,14 @@ export const useChatStore = create<ChatState>()(
               (message.feedbackForExerciseId
                 ? contentByExerciseId.get(message.feedbackForExerciseId)
                 : undefined);
+            const seedKey =
+              seedByMessageId.get(message.id) ??
+              (message.feedbackForExerciseId
+                ? seedByExerciseId.get(message.feedbackForExerciseId)
+                : undefined);
             if (!content || content === message.content) return message;
             didUpdate = true;
-            return { ...message, content };
+            return { ...message, content, ...(seedKey ? { seedKey } : {}) };
           });
 
           return didUpdate ? { messages } : state;

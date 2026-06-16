@@ -15,8 +15,16 @@ import {
 import type { Form, PMark } from './types';
 
 export function formFromExerciseItem(item: Record<string, unknown>): Form {
+  const rawUpdatedAt = item.updatedAt;
+
   return {
     id: item.id as number,
+    updatedAt:
+      rawUpdatedAt instanceof Date
+        ? rawUpdatedAt.toISOString()
+        : typeof rawUpdatedAt === 'string'
+          ? rawUpdatedAt
+          : null,
     type: item.type as Form['type'],
     seedKey: String(item.seedKey ?? ''),
     category: item.category as ExerciseCategory,
@@ -168,6 +176,7 @@ export function buildPayloadFromForm(source: Form): ExerciseEditorInput {
   const steps = source.algorithmSteps.split('\n').map((value) => value.trim()).filter(Boolean);
   return {
     id: source.id,
+    knownUpdatedAt: source.id ? source.updatedAt ?? null : null,
     type: source.type,
     seedKey: source.seedKey || undefined,
     category: source.category,

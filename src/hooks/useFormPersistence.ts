@@ -127,6 +127,9 @@ export function useFormPersistence({
         return true;
       }
       setDatabaseSaveState('local');
+      if ('code' in res && res.code === 'STALE_EXERCISE_VERSION') {
+        return false;
+      }
       setIsError(true);
       setMessage(saveError(res.error));
       return false;
