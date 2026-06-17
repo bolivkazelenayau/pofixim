@@ -425,6 +425,7 @@ export function useExerciseList({
     listSortDir,
     setListSortDir,
     sortPrefsReady,
+    isRefreshing: isListRefreshing,
     hasMore: Boolean(
       listQueryResult.hasNextPage && !isServerQuerySettling && !isListRefreshing,
     ),

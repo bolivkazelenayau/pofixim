@@ -34,6 +34,7 @@ type AdminSidebarContainerProps = {
     sortPrefsReady: boolean;
     hasMore: boolean;
     loadingMore: boolean;
+    isRefreshing: boolean;
     setQuery: (value: string) => void;
     setTypeFilter: (value: string) => void;
     setStatusFilter: (value: string) => void;
@@ -162,6 +163,7 @@ export default function AdminSidebarContainer({
         selectedId,
         hasMore: list.hasMore,
         loadingMore: list.loadingMore,
+        isRefreshing: list.isRefreshing,
         onRefresh: () => void list.refresh({ includeTotal: true, force: true }),
         onPrefetchExercise: prefetchExercise,
         onOpenExercise: (id) => void onOpenExercise(id),

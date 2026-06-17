@@ -70,6 +70,7 @@ type AdminExerciseSidebarProps = {
     selectedId: number | null;
     hasMore: boolean;
     loadingMore: boolean;
+    isRefreshing: boolean;
     onRefresh: () => void;
     onPrefetchExercise: (id: number) => void;
     onOpenExercise: (id: number) => void;
@@ -87,6 +88,13 @@ export default function AdminExerciseSidebar({
   filters,
   list,
 }: AdminExerciseSidebarProps) {
+  const countLabel =
+    stats.hasActiveListFilter && stats.matchingItems !== null
+      ? stats.totalItems !== null
+        ? `${stats.matchingItems} / ${stats.totalItems}`
+        : String(stats.matchingItems)
+      : String(stats.totalItems ?? stats.shownCount);
+
   return (
     <aside
       ref={sidebarRef}
@@ -96,11 +104,8 @@ export default function AdminExerciseSidebar({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-balance text-xl font-bold">Задания</h3>
-            <span className="inline-flex h-5 items-center justify-center rounded-full bg-primary/15 px-2 text-[11px] font-semibold text-primary">
-              {stats.hasActiveListFilter && stats.matchingItems !== null
-                ? `${stats.matchingItems} / `
-                : ''}
-              {stats.totalItems ?? '...'}
+            <span className="inline-flex h-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-primary/15 px-2 text-[11px] font-semibold tabular-nums text-primary">
+              {countLabel}
             </span>
           </div>
           <p className="mt-0.5 text-[11px] font-medium tabular-nums text-foreground/65">
@@ -209,6 +214,7 @@ export default function AdminExerciseSidebar({
         multiSelectedSet={selection.selectedIds}
         hasMore={list.hasMore}
         loadingMore={list.loadingMore}
+        isRefreshing={list.isRefreshing}
         onToggleSelection={selection.onToggle}
         onPrefetchExercise={list.onPrefetchExercise}
         onOpenExercise={list.onOpenExercise}

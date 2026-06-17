@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
@@ -11,6 +11,7 @@ type AdminExerciseListProps = {
   multiSelectedSet: Set<number>;
   hasMore: boolean;
   loadingMore: boolean;
+  isRefreshing: boolean;
   onToggleSelection: (id: number, event: MouseEvent<HTMLButtonElement>) => void;
   onPrefetchExercise: (id: number) => void;
   onOpenExercise: (id: number) => void;
@@ -32,6 +33,7 @@ export default function AdminExerciseList({
   multiSelectedSet,
   hasMore,
   loadingMore,
+  isRefreshing,
   onToggleSelection,
   onPrefetchExercise,
   onOpenExercise,
@@ -40,13 +42,22 @@ export default function AdminExerciseList({
   onClearFilters,
 }: AdminExerciseListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const lastStableGroupedItemsRef = useRef(groupedItems);
+  useEffect(() => {
+    if (isRefreshing || groupedItems.length === 0) return;
+    lastStableGroupedItemsRef.current = groupedItems;
+  }, [groupedItems, isRefreshing]);
+  const displayedGroupedItems =
+    isRefreshing && lastStableGroupedItemsRef.current.length > 0
+      ? lastStableGroupedItemsRef.current
+      : groupedItems;
   const rows = useMemo<ExerciseListRow[]>(
     () =>
-      groupedItems.flatMap(([type, typeItems]) => [
+      displayedGroupedItems.flatMap(([type, typeItems]) => [
         { kind: 'group' as const, key: `group:${type}`, label: type, count: typeItems.length },
         ...typeItems.map((item) => ({ kind: 'item' as const, key: `item:${item.id}`, item })),
       ]),
-    [groupedItems],
+    [displayedGroupedItems],
   );
   const rowSignature = useMemo(() => rows.map((row) => row.key).join('|'), [rows]);
   // TanStack Virtual returns a stateful virtualizer; React Compiler cannot memoize it safely.
@@ -128,7 +139,7 @@ export default function AdminExerciseList({
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
         </div>
-      ) : groupedItems.length === 0 && (
+      ) : displayedGroupedItems.length === 0 && (
         <div className="rounded-[20px] border border-dashed border-stroke bg-surface px-3 py-4 text-sm text-foreground/70">
           <div className="font-semibold text-foreground">Ничего не найдено</div>
           <p className="mt-1 text-pretty text-xs leading-5 text-foreground/55">
