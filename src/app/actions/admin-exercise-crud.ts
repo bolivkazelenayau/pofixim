@@ -84,14 +84,38 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
               )
             : eq(exercises.id, input.id),
         )
-        .returning();
-      const row = rows[0];
-      if (row) {
+        .returning({
+          id: exercises.id,
+          seedKey: exercises.seedKey,
+          type: exercises.type,
+          category: exercises.category,
+          difficulty: exercises.difficulty,
+          skillTags: exercises.skillTags,
+          prompt: exercises.prompt,
+          payload: exercises.payload,
+          answer: exercises.answer,
+          explanation: exercises.explanation,
+          searchBlob: exercises.searchBlob,
+          searchBlobNormalized: exercises.searchBlobNormalized,
+          sourceAlignment: exercises.sourceAlignment,
+          typicalMistake: exercises.typicalMistake,
+          mistakeModel: exercises.mistakeModel,
+          algorithmSteps: exercises.algorithmSteps,
+          transferGroup: exercises.transferGroup,
+          qualityStatus: exercises.qualityStatus,
+          visualHint: exercises.visualHint,
+          isActive: exercises.isActive,
+          createdAt: exercises.createdAt,
+          updatedAt: exercises.updatedAt,
+          updatedAtText: sql<string>`${exercises.updatedAt}::text`,
+        });
+      const updatedRow = rows[0];
+      if (updatedRow) {
         await recordExerciseRevision(tx, {
-          exerciseId: row.id,
+          exerciseId: updatedRow.id,
           action: 'update',
           before,
-          after: row,
+          after: updatedRow,
         });
       }
       return rows;
@@ -134,10 +158,9 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
     }
 
     refreshExerciseAdminCaches();
-    const updatedAt = updated[0]?.updatedAt;
     return {
       success: true,
-      updatedAt: updatedAt instanceof Date ? updatedAt.toISOString() : String(updatedAt ?? ''),
+      updatedAt: updated[0]?.updatedAtText ?? null,
     };
   } catch (error) {
     console.error('Failed to update exercise:', error);

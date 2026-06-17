@@ -4,6 +4,7 @@ import { Manrope, JetBrains_Mono, Geist } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import QueryProvider from '@/components/query-provider';
+import AppToaster from '@/components/AppToaster';
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -41,7 +42,10 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            {children}
+            <AppToaster />
+          </ThemeProvider>
         </QueryProvider>
       </body>
     </html>
