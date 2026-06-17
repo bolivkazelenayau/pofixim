@@ -24,6 +24,7 @@ type AdminExerciseHistoryProps = {
 };
 
 const ACTION_LABELS: Record<string, string> = {
+  baseline: 'baseline',
   create: 'создание',
   update: 'сохранение',
   delete: 'удаление',

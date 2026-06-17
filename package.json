@@ -23,6 +23,7 @@
     "db:apply:admin-search-indexes": "node scripts/apply-admin-search-indexes.mjs",
     "db:apply:skill-tags-index": "node scripts/apply-skill-tags-index.mjs",
     "db:apply:exercise-revisions": "node scripts/apply-exercise-revisions-table.mjs",
+    "db:backfill:exercise-revisions": "node scripts/backfill-exercise-revision-baseline.mjs",
     "db:seed:word-bank-cloze:ege14": "node scripts/seed-word-bank-cloze-from-ege14.mjs",
     "db:seed:orthography-repair": "node scripts/seed-orthography-repair-from-md.mjs",
     "db:seed:dictations": "node scripts/seed-dictations-from-md.mjs",

@@ -7,7 +7,7 @@ import { assertAdminAuthorized } from '@/lib/admin-auth';
 type ExerciseRow = InferSelectModel<typeof exercises>;
 type RevisionWriter = Pick<typeof db, 'insert'>;
 
-export type ExerciseRevisionAction = 'create' | 'update' | 'delete' | 'batch_update';
+export type ExerciseRevisionAction = 'baseline' | 'create' | 'update' | 'delete' | 'batch_update';
 
 type ExerciseRevisionSnapshot = Record<string, unknown> | null;
 
