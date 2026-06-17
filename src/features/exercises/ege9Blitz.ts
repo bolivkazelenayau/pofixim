@@ -1,5 +1,10 @@
 import type { EgeMultiSelectExercise } from './schemas';
 import { hashString, xorshift } from '@/lib/hash';
+import {
+  findMaskedWordMatches,
+  getDonorWordsOutsideParentheses,
+  resolveBestUnusedDonorForMaskedWord,
+} from './maskedWordResolver';
 
 export type Ege9BlitzCard = {
   id: string;
@@ -16,12 +21,18 @@ export type Ege9BlitzCard = {
   choices: [string, string];
   correctChoiceIndex: 0 | 1;
   explanationSnippet?: string;
+  resolution: Ege9BlitzResolution;
 };
 
-const MASKED_WORD_RE =
-  /[\p{L}-]*(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=[\p{L}])\.(?=[\p{L}]))[\p{L}-]*/gu;
-const GAP_RE = /(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=\p{L})\.(?=\p{L}))/u;
-const SPLIT_GAP_RE = /(?:(?:\.{2,}|\u2026+|_+)\s*|(?<=\p{L})\.(?=\p{L}))/gu;
+export type Ege9BlitzResolution = {
+  kind: 'exact' | 'fuzzy';
+  donorWord: string;
+  displayMaskedWord: string;
+  distance: number;
+};
+
+const NORMAL_POOL_MAX_FUZZY_DISTANCE = 1;
+
 const CYRILLIC_LETTER_RE = /^[а-яё]$/iu;
 const COMMON_DISTRACTORS: Record<string, string[]> = {
   а: ['о'],
@@ -38,6 +49,10 @@ const COMMON_DISTRACTORS: Record<string, string[]> = {
 const SUPPORTED_BLITZ_LETTERS = new Set(Object.keys(COMMON_DISTRACTORS));
 const HUSHING_CONSONANTS_RE = /[жчшщ]$/iu;
 
+function isSupportedBlitzLetter(letter: string) {
+  return SUPPORTED_BLITZ_LETTERS.has(letter.toLowerCase());
+}
+
 export function buildEge9BlitzCards(
   exercise: EgeMultiSelectExercise,
 ): Ege9BlitzCard[] {
@@ -46,14 +61,14 @@ export function buildEge9BlitzCards(
   }
 
   const explanationRows = extractExplanationRows(exercise.explanation);
-  const fallbackDonors = getDonorWordsOutsideParentheses(exercise.explanation);
+  const fallbackDonors = getDonorWordsOutsideParentheses(exercise.explanation, stripMarkdown);
   const cards: Ege9BlitzCard[] = [];
 
   exercise.payload.options.slice(0, 5).forEach((optionLine, optionIndex) => {
     const rowIndex = optionIndex + 1;
     const explanationRow = explanationRows.get(rowIndex) ?? '';
     const donorWords = explanationRow
-      ? getDonorWordsOutsideParentheses(explanationRow)
+      ? getDonorWordsOutsideParentheses(explanationRow, stripMarkdown)
       : fallbackDonors;
     const usedDonorIndexes = new Set<number>();
     let wordIndex = 0;
@@ -63,30 +78,28 @@ export function buildEge9BlitzCards(
     for (const masked of findMaskedWordMatches(cleanOptionLine)) {
       wordIndex += 1;
 
-      const donorWord = findBestUnusedDonorWordForMaskedWord(
+      const resolution = resolveBestUnusedDonorForMaskedWord(
         masked.value,
         donorWords,
         usedDonorIndexes,
+        { isMissingLetterCandidate: isSupportedBlitzLetter },
       );
-      if (!donorWord) continue;
+      if (!resolution) continue;
 
-      const gap = extractSingleLetterGap(masked.value, donorWord);
-      if (!gap) continue;
-
-      const missingLetter = gap.missingLetter.toLowerCase();
+      const missingLetter = resolution.gap.missingLetter.toLowerCase();
       if (!CYRILLIC_LETTER_RE.test(missingLetter)) continue;
       if (!SUPPORTED_BLITZ_LETTERS.has(missingLetter)) continue;
       const effectiveMissingLetter = normalizeContextualCorrectLetter(
         missingLetter,
-        gap.before,
-        gap.after,
+        resolution.gap.before,
+        resolution.gap.after,
       );
       if (!SUPPORTED_BLITZ_LETTERS.has(effectiveMissingLetter)) continue;
 
       const choices = buildChoices({
         correctLetter: effectiveMissingLetter,
-        before: gap.before,
-        after: gap.after,
+        before: resolution.gap.before,
+        after: resolution.gap.after,
         seed: `${exercise.seedKey}:${rowIndex}:${wordIndex}`,
       });
       const correctChoiceIndex = choices[0] === effectiveMissingLetter ? 0 : 1;
@@ -98,14 +111,20 @@ export function buildEge9BlitzCards(
         rowIndex,
         wordIndex,
         maskedWord: masked.value,
-        correctWord: donorWord,
+        correctWord: resolution.donorWord,
         contextHint: extractContextHintAfterMatch(cleanOptionLine, masked.end),
-        before: gap.before,
+        before: resolution.gap.before,
         missingLetter: effectiveMissingLetter,
-        after: gap.after,
+        after: resolution.gap.after,
         choices,
         correctChoiceIndex,
         explanationSnippet: explanationRow || undefined,
+        resolution: {
+          kind: resolution.gap.kind,
+          donorWord: resolution.donorWord,
+          displayMaskedWord: masked.value,
+          distance: resolution.gap.distance,
+        },
       });
     }
   });
@@ -127,6 +146,13 @@ export function shuffleBlitzCards(
   }
 
   return result;
+}
+
+export function isEge9BlitzCardEligibleForNormalPool(card: Ege9BlitzCard) {
+  return (
+    card.resolution.kind === 'exact' ||
+    card.resolution.distance <= NORMAL_POOL_MAX_FUZZY_DISTANCE
+  );
 }
 
 function extractExplanationRows(explanation: string) {
@@ -158,214 +184,11 @@ function stripMarkdown(value: string): string {
     .trim();
 }
 
-function getDonorWordsOutsideParentheses(value: string): string[] {
-  const withoutParentheses = stripMarkdown(value).replace(/\([^)]*\)/g, ' ');
-  return withoutParentheses.match(/[\p{L}-]+/gu) ?? [];
-}
-
-function findMaskedWordMatches(value: string) {
-  const result: Array<{ value: string; start: number; end: number }> = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = MASKED_WORD_RE.exec(value)) !== null) {
-    result.push({
-      value: normalizeMaskedWord(match[0]),
-      start: match.index,
-      end: match.index + match[0].length,
-    });
-  }
-
-  MASKED_WORD_RE.lastIndex = 0;
-  return result;
-}
-
-function normalizeMaskedWord(value: string) {
-  return value.replace(/(\.{2,}|\u2026+|_+)\s+(?=[\p{L}-])/gu, '$1');
-}
-
 function extractContextHintAfterMatch(value: string, matchEnd: number) {
   const rest = value.slice(matchEnd);
   const match = rest.match(/^\s*\(([^)]+)\)/u);
   const context = match?.[1]?.replace(/\s+/g, ' ').trim();
   return context || undefined;
-}
-
-function findBestUnusedDonorWordForMaskedWord(
-  maskedWord: string,
-  donorWords: string[],
-  usedDonorIndexes: Set<number>,
-) {
-  const knownParts = maskedWord.split(SPLIT_GAP_RE).filter(Boolean);
-
-  for (let i = 0; i < donorWords.length; i += 1) {
-    if (usedDonorIndexes.has(i)) continue;
-
-    const donorWord = donorWords[i];
-    if (extractSingleLetterGap(maskedWord, donorWord)) {
-      usedDonorIndexes.add(i);
-      return donorWord;
-    }
-
-    let cursor = 0;
-    let matches = true;
-
-    for (const part of knownParts) {
-      const foundAt = donorWord.toLowerCase().indexOf(part.toLowerCase(), cursor);
-      if (foundAt === -1) {
-        matches = false;
-        break;
-      }
-      cursor = foundAt + part.length;
-    }
-
-    if (matches) {
-      usedDonorIndexes.add(i);
-      return donorWord;
-    }
-  }
-
-  return null;
-}
-
-function extractSingleLetterGap(maskedWord: string, donorWord: string) {
-  if (!GAP_RE.test(maskedWord)) return null;
-
-  const parts = maskedWord.split(SPLIT_GAP_RE);
-  if (parts.length !== 2) return null;
-
-  const [before, after] = parts;
-  const lowerDonor = donorWord.toLowerCase();
-  const lowerBefore = before.toLowerCase();
-  const lowerAfter = after.toLowerCase();
-
-  if (!lowerDonor.startsWith(lowerBefore) || !lowerDonor.endsWith(lowerAfter)) {
-    const fuzzyGap = extractSingleLetterGapFuzzy(
-      before,
-      after,
-      donorWord,
-    );
-    if (fuzzyGap) return fuzzyGap;
-    return null;
-  }
-
-  const missingStart = before.length;
-  const missingEnd = donorWord.length - after.length;
-  const missingLetter = donorWord.slice(missingStart, missingEnd);
-
-  const missingLetters = [...missingLetter];
-
-  if (missingLetters.length !== 1) {
-    const split = splitExpandedGap(missingLetter);
-    if (!split) return null;
-
-    return {
-      before,
-      missingLetter: split.missingLetter,
-      after: `${split.remainder}${after}`,
-    };
-  }
-
-  return {
-    before,
-    missingLetter,
-    after,
-  };
-}
-
-function extractSingleLetterGapFuzzy(
-  before: string,
-  after: string,
-  donorWord: string,
-) {
-  const donorLetters = [...donorWord];
-  const beforeLength = [...before].length;
-  let best:
-    | { index: number; distance: number }
-    | null = null;
-
-  for (let index = 1; index < donorLetters.length; index += 1) {
-    if (!SUPPORTED_BLITZ_LETTERS.has(donorLetters[index].toLowerCase())) {
-      continue;
-    }
-
-    const donorBefore = donorLetters.slice(0, index).join('');
-    const donorAfter = donorLetters.slice(index + 1).join('');
-    const beforeDistance = boundedEditDistance(
-      before.toLowerCase(),
-      donorBefore.toLowerCase(),
-      1,
-    );
-    if (beforeDistance === null) continue;
-
-    const afterDistance = boundedEditDistance(
-      after.toLowerCase(),
-      donorAfter.toLowerCase(),
-      2,
-    );
-    if (afterDistance === null) continue;
-
-    const distance = beforeDistance + afterDistance;
-    if (distance > 3) continue;
-    if (Math.abs(beforeLength - index) > 1) continue;
-
-    if (!best || distance < best.distance) {
-      best = { index, distance };
-    }
-  }
-
-  if (!best) return null;
-
-  return {
-    before,
-    missingLetter: donorLetters[best.index],
-    after,
-  };
-}
-
-function splitExpandedGap(value: string) {
-  const letters = [...value];
-  const missingIndex = letters.findIndex((letter) =>
-    SUPPORTED_BLITZ_LETTERS.has(letter.toLowerCase()),
-  );
-
-  if (missingIndex === -1) return null;
-
-  return {
-    missingLetter: letters[missingIndex],
-    remainder: `${letters.slice(0, missingIndex).join('')}${letters.slice(missingIndex + 1).join('')}`,
-  };
-}
-
-function boundedEditDistance(left: string, right: string, maxDistance: number) {
-  const leftLetters = [...left];
-  const rightLetters = [...right];
-  if (Math.abs(leftLetters.length - rightLetters.length) > maxDistance) {
-    return null;
-  }
-
-  let previous = Array.from({ length: rightLetters.length + 1 }, (_, index) => index);
-
-  for (let leftIndex = 1; leftIndex <= leftLetters.length; leftIndex += 1) {
-    const current = [leftIndex];
-    let rowMin = current[0];
-
-    for (let rightIndex = 1; rightIndex <= rightLetters.length; rightIndex += 1) {
-      const cost = leftLetters[leftIndex - 1] === rightLetters[rightIndex - 1] ? 0 : 1;
-      const next = Math.min(
-        previous[rightIndex] + 1,
-        current[rightIndex - 1] + 1,
-        previous[rightIndex - 1] + cost,
-      );
-      current[rightIndex] = next;
-      rowMin = Math.min(rowMin, next);
-    }
-
-    if (rowMin > maxDistance) return null;
-    previous = current;
-  }
-
-  const distance = previous[rightLetters.length];
-  return distance <= maxDistance ? distance : null;
 }
 
 function buildChoices({

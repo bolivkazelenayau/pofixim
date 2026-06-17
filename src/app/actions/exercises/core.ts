@@ -11,9 +11,14 @@ import {
   submittedAnswerSchema,
   type Exercise,
 } from '@/features/exercises/schemas';
-import { buildEge9BlitzCards, shuffleBlitzCards } from '@/features/exercises/ege9Blitz';
+import {
+  buildEge9BlitzCards,
+  isEge9BlitzCardEligibleForNormalPool,
+  shuffleBlitzCards,
+} from '@/features/exercises/ege9Blitz';
 import {
   buildEge13QuickCards,
+  isEge13QuickCardEligibleForNormalPool,
   shuffleEge13QuickCards,
 } from '@/features/exercises/ege13Quick';
 import {
@@ -501,7 +506,9 @@ export async function getBlitzPoolAction(input: GetBlitzPoolInput = {}) {
     const cards = rows
       .map(dbExerciseToDomainExercise)
       .flatMap((exercise) =>
-        exercise?.type === 'ege_multi_select' ? buildEge9BlitzCards(exercise) : [],
+        exercise?.type === 'ege_multi_select'
+          ? buildEge9BlitzCards(exercise).filter(isEge9BlitzCardEligibleForNormalPool)
+          : [],
       );
 
     return {
@@ -543,7 +550,9 @@ export async function getEge13QuickPoolAction(input: GetEge13QuickPoolInput = {}
     const cards = rows
       .map(dbExerciseToDomainExercise)
       .flatMap((exercise) =>
-        exercise?.type === 'ege_multi_select' ? buildEge13QuickCards(exercise) : [],
+        exercise?.type === 'ege_multi_select'
+          ? buildEge13QuickCards(exercise).filter(isEge13QuickCardEligibleForNormalPool)
+          : [],
       );
 
     return {

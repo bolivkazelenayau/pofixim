@@ -1,5 +1,29 @@
 import { normalizeNumberAnswerSignature } from '@/lib/exercise-type-conversion';
 import type { EgeMultiSelectExercise, Exercise } from '../schemas';
+import {
+  findMaskedWordMatches,
+  getDonorWordsOutsideParentheses,
+  renderMaskedWordResolutionWithBold,
+  resolveBestUnusedDonorForMaskedWord,
+} from '../maskedWordResolver';
+
+export type StructuredFeedbackSource =
+  | 'dictation'
+  | 'ege18_fill_blank'
+  | 'generated_rows'
+  | 'payload_feedback'
+  | 'none';
+
+export type StructuredFeedbackDiagnostics = {
+  source: StructuredFeedbackSource;
+  correctAnswerLines: string[];
+  detailedExplanationLines: string[];
+  targetIndexes: number[];
+  extractedRowIndexes: number[];
+  missingTargetRows: number[];
+  unresolvedRows: string[];
+  warnings: string[];
+};
 
 export function extractStructuredFeedback(
   exercise: Exercise,
@@ -62,6 +86,80 @@ export function extractStructuredFeedback(
   return { correctAnswer, detailedExplanation };
 }
 
+export function buildStructuredFeedbackDiagnostics(
+  exercise: Exercise | null,
+): StructuredFeedbackDiagnostics | null {
+  if (!exercise) return null;
+
+  if (exercise.type === 'dictation') {
+    const feedback = extractStructuredFeedback(exercise);
+    return buildDiagnosticsResult({
+      source: 'dictation',
+      correctAnswerLines: feedback?.correctAnswer ? [feedback.correctAnswer] : [],
+      detailedExplanationLines: feedback?.detailedExplanation ? [feedback.detailedExplanation] : [],
+    });
+  }
+
+  if (exercise.type === 'fill_blank' && exercise.skillTags.includes('ege.18')) {
+    const feedback = extractStructuredFeedback(exercise);
+    return buildDiagnosticsResult({
+      source: 'ege18_fill_blank',
+      correctAnswerLines: feedback?.correctAnswer.split(/\n{2,}/u).filter(Boolean) ?? [],
+      detailedExplanationLines: feedback?.detailedExplanation.split(/\n+/u).filter(Boolean) ?? [],
+    });
+  }
+
+  if (exercise.type !== 'ege_multi_select') return null;
+
+  const rowsByIndex = extractRowsFromExplanation(exercise.explanation);
+  const extractedRowIndexes = Object.keys(rowsByIndex).map(Number).sort((a, b) => a - b);
+  const targetIndexes = [...new Set(exercise.answer.targetSet)].sort((a, b) => a - b);
+  const isGeneratedRowExercise =
+    exercise.skillTags.includes('ege.10') ||
+    exercise.skillTags.includes('ege.9') ||
+    exercise.skillTags.includes('ege.11') ||
+    extractedRowIndexes.length > 0;
+
+  if (isGeneratedRowExercise) {
+    const correctAnswerLines = buildCorrectAnswerDisplayRows(exercise);
+    const detailedExplanationLines = (exercise.payload.feedback?.explanation ?? [exercise.explanation])
+      .map((line) => String(line ?? '').trim())
+      .filter(Boolean);
+    const missingTargetRows = targetIndexes.filter((index) => !rowsByIndex[index]);
+    const unresolvedRows = correctAnswerLines.filter((line) => /(?:\.\.|…|_)/u.test(line));
+
+    return buildDiagnosticsResult({
+      source: 'generated_rows',
+      correctAnswerLines,
+      detailedExplanationLines,
+      targetIndexes,
+      extractedRowIndexes,
+      missingTargetRows,
+      unresolvedRows,
+    });
+  }
+
+  if (exercise.payload.feedback) {
+    return buildDiagnosticsResult({
+      source: 'payload_feedback',
+      correctAnswerLines: exercise.payload.feedback.correctAnswer
+        .map((line) => String(line ?? '').trim())
+        .filter(Boolean),
+      detailedExplanationLines: exercise.payload.feedback.explanation
+        .map((line) => String(line ?? '').trim())
+        .filter(Boolean),
+      targetIndexes,
+    });
+  }
+
+  return buildDiagnosticsResult({
+    source: 'none',
+    correctAnswerLines: [],
+    detailedExplanationLines: [],
+    targetIndexes,
+  });
+}
+
 function buildCorrectAnswerDisplayRows(exercise: EgeMultiSelectExercise): string[] {
   const rowsByIndex = extractRowsFromExplanation(exercise.explanation);
 
@@ -89,17 +187,6 @@ function buildCorrectAnswerDisplayRows(exercise: EgeMultiSelectExercise): string
       return displayRow;
     })
     .filter(Boolean);
-
-  if (exercise.seedKey === 'ege11-bank-18210' || exercise.id === 18210) {
-    console.debug('correctAnswerDisplay debug ege11-bank-18210', {
-      exerciseId: exercise.id,
-      seedKey: exercise.seedKey,
-      targetSet: exercise.answer.targetSet,
-      optionSkeletons,
-      extractedRows: rowsByIndex,
-      displayRows: rows,
-    });
-  }
 
   return rows;
 }
@@ -149,7 +236,7 @@ function stripMarkdown(value: string): string {
 }
 
 function fillGapsInOptionRowWithBold(optionLine: string, explanationRowText: string) {
-  const donorWords = getDonorWordsOutsideParentheses(explanationRowText);
+  const donorWords = getDonorWordsOutsideParentheses(explanationRowText, stripMarkdown);
 
   return replaceMaskedWordsInText(optionLine, donorWords)
     .replace(/\s+([,;:])/g, '$1')
@@ -172,13 +259,13 @@ function replaceMaskedWordsInText(optionText: string, donorWords: string[]): str
   const usedDonorIndexes = new Set<number>();
 
   for (const maskedMatch of maskedMatches) {
-    const donorWord = findBestUnusedDonorWordForMaskedWord(
+    const resolution = resolveBestUnusedDonorForMaskedWord(
       maskedMatch.value,
       donorWords,
       usedDonorIndexes,
     );
 
-    if (!donorWord) {
+    if (!resolution) {
       console.warn('No donor word for masked word', {
         maskedWord: maskedMatch.value,
         donorWords,
@@ -187,7 +274,7 @@ function replaceMaskedWordsInText(optionText: string, donorWords: string[]): str
       continue;
     }
 
-    const filledWord = fillMaskedWordWithBold(maskedMatch.value, donorWord);
+    const filledWord = renderMaskedWordResolutionWithBold(resolution);
     const start = maskedMatch.start + offset;
     const end = maskedMatch.end + offset;
     result = result.slice(0, start) + filledWord + result.slice(end);
@@ -197,91 +284,38 @@ function replaceMaskedWordsInText(optionText: string, donorWords: string[]): str
   return result;
 }
 
-function findMaskedWordMatches(value: string): Array<{ value: string; start: number; end: number }> {
-  const regex = /[\p{L}-]*(?:\.{2,}|\u2026+|_+|(?<=[\p{L}])\.(?=[\p{L}]))[\p{L}-]*/gu;
-  const result: Array<{ value: string; start: number; end: number }> = [];
+function buildDiagnosticsResult({
+  source,
+  correctAnswerLines,
+  detailedExplanationLines,
+  targetIndexes = [],
+  extractedRowIndexes = [],
+  missingTargetRows = [],
+  unresolvedRows = [],
+}: {
+  source: StructuredFeedbackSource;
+  correctAnswerLines: string[];
+  detailedExplanationLines: string[];
+  targetIndexes?: number[];
+  extractedRowIndexes?: number[];
+  missingTargetRows?: number[];
+  unresolvedRows?: string[];
+}): StructuredFeedbackDiagnostics {
+  const warnings = [
+    ...(correctAnswerLines.length === 0 ? ['no_correct_answer'] : []),
+    ...(detailedExplanationLines.length === 0 ? ['no_detailed_explanation'] : []),
+    ...(missingTargetRows.length > 0 ? ['missing_target_rows'] : []),
+    ...(unresolvedRows.length > 0 ? ['unresolved_gaps'] : []),
+  ];
 
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(value)) !== null) {
-    if (match.index == null) continue;
-    result.push({
-      value: match[0],
-      start: match.index,
-      end: match.index + match[0].length,
-    });
-  }
-
-  return result;
-}
-
-function getDonorWordsOutsideParentheses(value: string): string[] {
-  const withoutParentheses = stripMarkdown(value).replace(/\([^)]*\)/g, ' ');
-  return withoutParentheses.match(/[\p{L}-]+/gu) ?? [];
-}
-
-function findBestUnusedDonorWordForMaskedWord(
-  maskedWord: string,
-  donorWords: string[],
-  usedDonorIndexes: Set<number>,
-): string | null {
-  const knownParts = maskedWord
-    .split(/\.{2,}|\u2026+|_+/u)
-    .filter(Boolean);
-
-  for (let i = 0; i < donorWords.length; i++) {
-    if (usedDonorIndexes.has(i)) continue;
-    const donorWord = donorWords[i];
-    let cursor = 0;
-    let matches = true;
-    for (const part of knownParts) {
-      const foundAt = donorWord.indexOf(part, cursor);
-      if (foundAt === -1) {
-        matches = false;
-        break;
-      }
-      cursor = foundAt + part.length;
-    }
-    if (matches) {
-      usedDonorIndexes.add(i);
-      return donorWord;
-    }
-  }
-  return null;
-}
-
-function fillMaskedWordWithBold(maskedWord: string, donorWord: string): string {
-  const gapRegex = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/u;
-  if (!gapRegex.test(maskedWord)) {
-    return maskedWord;
-  }
-
-  const splitGapRegex = /(?:\.{2,}|\u2026+|_+|(?<=\p{L})\.(?=\p{L}))/gu;
-  const parts = maskedWord.split(splitGapRegex);
-
-  let result = parts[0];
-  let cursor = parts[0].length;
-
-  if (!donorWord.startsWith(parts[0])) {
-    return donorWord;
-  }
-
-  for (let i = 1; i < parts.length; i++) {
-    const nextKnownPart = parts[i];
-    const nextIndex = nextKnownPart
-      ? donorWord.indexOf(nextKnownPart, cursor)
-      : donorWord.length;
-
-    if (nextIndex === -1) {
-      return donorWord;
-    }
-
-    const missingLetters = donorWord.slice(cursor, nextIndex);
-    if (missingLetters.length > 0) {
-      result += `**${missingLetters}**`;
-    }
-    result += nextKnownPart;
-    cursor = nextIndex + nextKnownPart.length;
-  }
-
-  return result;
+  return {
+    source,
+    correctAnswerLines,
+    detailedExplanationLines,
+    targetIndexes,
+    extractedRowIndexes,
+    missingTargetRows,
+    unresolvedRows,
+    warnings,
+  };
 }

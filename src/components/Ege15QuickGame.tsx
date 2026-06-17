@@ -75,6 +75,11 @@ export default function Ege15QuickGame({
       ? `${currentCard.seedKey} · pos ${currentCard.positionIndex}`
       : `${currentCard.seedKey} · card`
     : `id:${currentCard?.sourceExerciseId ?? 'n/a'}`;
+  const resolutionLabel = currentCard
+    ? currentCard.resolution.kind === 'numbered_gap'
+      ? `numbered_gap · prompt ${currentCard.resolution.promptKind}`
+      : 'simple_fill_blank · direct'
+    : '';
   const wordLength = currentCard ? currentCard.before.length + 1 + currentCard.after.length : 0;
   const tokenFontClass = wordLength > 18
     ? 'text-[clamp(1.25rem,5.7vw,2rem)] sm:text-[2rem]'
@@ -363,6 +368,11 @@ export default function Ege15QuickGame({
                 <Copy className="size-3.5" aria-hidden="true" />
               </button>
             </div>
+            {isInspectMode ? (
+              <div className="mt-1 truncate font-mono text-[10px] text-foreground/45 sm:text-[11px]">
+                {resolutionLabel}
+              </div>
+            ) : null}
           </div>
         )}
 

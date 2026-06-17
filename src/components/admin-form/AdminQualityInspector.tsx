@@ -1,9 +1,14 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, CircleDot, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CircleDot, Copy, Info } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
-import { buildEge15QuickCards } from '@/features/exercises/ege15Quick';
+import { buildEge13QuickCards } from '@/features/exercises/ege13Quick';
+import { buildEge9BlitzCards } from '@/features/exercises/ege9Blitz';
+import { buildEge15QuickDiagnostics } from '@/features/exercises/ege15Quick';
+import { buildStructuredFeedbackDiagnostics } from '@/features/exercises/checkers/structuredFeedback';
 import type { Exercise } from '@/features/exercises/schemas';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import CompactMarkdown from './markdown/CompactMarkdown';
 import type { Form } from './types';
 
 type AdminQualityInspectorProps = {
@@ -31,7 +36,10 @@ export default function AdminQualityInspector({
   preview,
 }: AdminQualityInspectorProps) {
   const checks = buildQualityChecks(form, preview);
+  const ege9Diagnostics = buildEge9Diagnostics(preview.exercise);
+  const ege13Diagnostics = buildEge13Diagnostics(preview.exercise);
   const ege15Diagnostics = buildEge15Diagnostics(preview.exercise);
+  const structuredFeedbackDiagnostics = buildStructuredFeedbackDiagnostics(preview.exercise);
   const hasInvisibleText = containsInvisibleText(form);
   const errorCount = checks.filter((check) => check.level === 'error').length;
   const warningCount = checks.filter((check) => check.level === 'warning').length;
@@ -102,17 +110,135 @@ export default function AdminQualityInspector({
         </div>
       ) : null}
 
+      {ege9Diagnostics ? (
+        <div className="mt-4 border-t border-stroke pt-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">ЕГЭ 9 blitz parse</h4>
+              <p className="mt-0.5 text-[11px] text-foreground/70">
+                {ege9Diagnostics.cards.length} cards · {ege9Diagnostics.exactCount} exact ·{' '}
+                {ege9Diagnostics.fuzzyCount} fuzzy
+              </p>
+            </div>
+            <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-foreground/70">
+              max d={ege9Diagnostics.maxDistance}
+            </span>
+          </div>
+          {ege9Diagnostics.suspiciousCards.length > 0 ? (
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-stroke bg-surface">
+              {ege9Diagnostics.suspiciousCards.map((card) => {
+                const command = buildEge9QuickSeedCommand(card);
+                return (
+                  <div
+                    key={card.id}
+                    className="grid grid-cols-[minmax(0,1fr)_2rem] items-start gap-2 border-b border-stroke px-2.5 py-2 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-foreground">
+                        row {card.rowIndex} · word {card.wordIndex} · d={card.resolution.distance}
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-[11px] text-foreground/70">
+                        {card.resolution.displayMaskedWord} -&gt; {card.resolution.donorWord}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void copyTextToClipboard(command)}
+                      className="inline-flex size-7 items-center justify-center justify-self-end rounded-lg text-foreground/45 transition-[background-color,color,transform] duration-150 ease-out hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
+                      aria-label={`Скопировать qseed для ряда ${card.rowIndex}, слова ${card.wordIndex}`}
+                      title={command}
+                    >
+                      <Copy className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/70">
+              Подозрительных fuzzy-карточек нет.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {ege13Diagnostics ? (
+        <div className="mt-4 border-t border-stroke pt-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">ЕГЭ 13 quick parse</h4>
+              <p className="mt-0.5 text-[11px] text-foreground/70">
+                {ege13Diagnostics.cards.length} cards · {ege13Diagnostics.rowCount} row ·{' '}
+                {ege13Diagnostics.fallbackCount} fallback
+              </p>
+            </div>
+            <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-foreground/70">
+              {ege13Diagnostics.mediumCount} medium
+            </span>
+          </div>
+          {ege13Diagnostics.fallbackCards.length > 0 ? (
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-stroke bg-surface">
+              {ege13Diagnostics.fallbackCards.map((card) => {
+                const command = buildEge13QuickSeedCommand(card);
+                return (
+                  <div
+                    key={card.id}
+                    className="grid grid-cols-[minmax(0,1fr)_2rem] items-start gap-2 border-b border-stroke px-2.5 py-2 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-foreground">
+                        row {card.rowIndex} · {card.resolution.kind}
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-[11px] text-foreground/70">
+                        {card.token} · {card.correctChoice === 'joined' ? 'слитно' : 'раздельно'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void copyTextToClipboard(command)}
+                      className="inline-flex size-7 items-center justify-center justify-self-end rounded-lg text-foreground/45 transition-[background-color,color,transform] duration-150 ease-out hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
+                      aria-label={`Скопировать qseed для ЕГЭ 13, ряда ${card.rowIndex}`}
+                      title={command}
+                    >
+                      <Copy className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/70">
+              Fallback-карточек нет.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       {ege15Diagnostics ? (
         <div className="mt-4 border-t border-stroke pt-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h4 className="text-xs font-semibold text-foreground">ЕГЭ 15 quick parse</h4>
               <p className="mt-0.5 text-[11px] text-foreground/70">
-                {ege15Diagnostics.cards.length} cards · accepted {ege15Diagnostics.accepted || 'empty'}
+                {ege15Diagnostics.cards.length} cards · {ege15Diagnostics.numberedCount} numbered ·{' '}
+                {ege15Diagnostics.simpleCount} simple
               </p>
             </div>
-            <span className="font-mono text-[11px] text-foreground/70">
-              {ege15Diagnostics.positions.join(', ') || 'no positions'}
+            <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5 font-mono text-[11px] text-foreground/70">
+              {ege15Diagnostics.promptKind ? `prompt ${ege15Diagnostics.promptKind}` : 'no prompt'}
+            </span>
+          </div>
+          {ege15Diagnostics.skippedReasons.length > 0 ? (
+            <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 font-mono text-[11px] text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100">
+              {ege15Diagnostics.skippedReasons.join(' · ')}
+            </p>
+          ) : null}
+          <div className="mb-2 flex flex-wrap gap-1.5 text-[11px] text-foreground/65">
+            <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5">
+              positions {ege15Diagnostics.positions.join(', ') || '-'}
+            </span>
+            <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5">
+              accepted {ege15Diagnostics.accepted || 'empty'}
             </span>
           </div>
           {ege15Diagnostics.cards.length > 0 ? (
@@ -131,6 +257,12 @@ export default function AdminQualityInspector({
                       <span className="mx-0.5 text-primary">?</span>
                       {card.after}
                     </div>
+                    <div className="mt-0.5 truncate font-mono text-[11px] text-foreground/55">
+                      {card.resolution.kind}
+                      {card.resolution.kind === 'numbered_gap'
+                        ? ` · prompt ${card.resolution.promptKind}`
+                        : ' · direct'}
+                    </div>
                     {card.explanationSnippet ? (
                       <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-foreground/70">
                         {card.explanationSnippet}
@@ -146,6 +278,70 @@ export default function AdminQualityInspector({
           ) : (
             <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/70">
               Quick-карточки не собираются из текущего preview.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {structuredFeedbackDiagnostics ? (
+        <div className="mt-4 border-t border-stroke pt-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">Structured feedback</h4>
+              <p className="mt-0.5 text-[11px] text-foreground/70">
+                {structuredFeedbackDiagnostics.source} ·{' '}
+                {structuredFeedbackDiagnostics.correctAnswerLines.length} answer lines ·{' '}
+                {structuredFeedbackDiagnostics.detailedExplanationLines.length} explanation lines
+              </p>
+            </div>
+            <span
+              className={`rounded-md border px-1.5 py-0.5 font-mono text-[11px] ${
+                structuredFeedbackDiagnostics.warnings.length > 0
+                  ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100'
+                  : 'border-stroke bg-surface text-foreground/70'
+              }`}
+            >
+              {structuredFeedbackDiagnostics.warnings.length > 0
+                ? `${structuredFeedbackDiagnostics.warnings.length} warn`
+                : 'ok'}
+            </span>
+          </div>
+          {structuredFeedbackDiagnostics.warnings.length > 0 ? (
+            <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 font-mono text-[11px] text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100">
+              {structuredFeedbackDiagnostics.warnings.join(' · ')}
+            </p>
+          ) : null}
+          <div className="mb-2 flex flex-wrap gap-1.5 text-[11px] text-foreground/65">
+            {structuredFeedbackDiagnostics.targetIndexes.length > 0 ? (
+              <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5">
+                target {structuredFeedbackDiagnostics.targetIndexes.join(', ')}
+              </span>
+            ) : null}
+            {structuredFeedbackDiagnostics.extractedRowIndexes.length > 0 ? (
+              <span className="rounded-md border border-stroke bg-surface px-1.5 py-0.5">
+                rows {structuredFeedbackDiagnostics.extractedRowIndexes.join(', ')}
+              </span>
+            ) : null}
+            {structuredFeedbackDiagnostics.missingTargetRows.length > 0 ? (
+              <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100">
+                missing {structuredFeedbackDiagnostics.missingTargetRows.join(', ')}
+              </span>
+            ) : null}
+          </div>
+          {structuredFeedbackDiagnostics.correctAnswerLines.length > 0 ? (
+            <div className="max-h-40 overflow-y-auto rounded-lg border border-stroke bg-surface">
+              {structuredFeedbackDiagnostics.correctAnswerLines.slice(0, 5).map((line, index) => (
+                <div
+                  key={`${index}:${line}`}
+                  className="border-b border-stroke px-2.5 py-2 text-xs leading-5 text-foreground/78 last:border-b-0"
+                >
+                  <CompactMarkdown>{line}</CompactMarkdown>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-stroke px-3 py-2 text-xs text-foreground/70">
+              Structured feedback не собирается из текущего preview.
             </p>
           )}
         </div>
@@ -250,6 +446,18 @@ function buildQualityChecks(
     });
   }
 
+  const structuredFeedbackDiagnostics = buildStructuredFeedbackDiagnostics(preview.exercise);
+  if (structuredFeedbackDiagnostics && structuredFeedbackDiagnostics.source !== 'none') {
+    checks.push({
+      level: structuredFeedbackDiagnostics.warnings.length > 0 ? 'warning' : 'ok',
+      label: 'Structured feedback',
+      detail:
+        structuredFeedbackDiagnostics.warnings.length > 0
+          ? structuredFeedbackDiagnostics.warnings.join(' · ')
+          : `${structuredFeedbackDiagnostics.correctAnswerLines.length} answer lines · ${structuredFeedbackDiagnostics.detailedExplanationLines.length} explanation lines.`,
+    });
+  }
+
   if (isEge15FillBlank(form)) {
     const diagnostics = buildEge15Diagnostics(preview.exercise);
     const rawPositions = extractPositions(`${form.fillBefore}${form.fillAfter}`);
@@ -285,7 +493,106 @@ function buildQualityChecks(
     }
   }
 
+  if (isEge9MultiSelect(form)) {
+    const diagnostics = buildEge9Diagnostics(preview.exercise);
+    if (!diagnostics || diagnostics.cards.length === 0) {
+      checks.push({
+        level: 'warning',
+        label: 'ЕГЭ 9: blitz-карточки не собираются',
+        detail: 'Проверь options и строки объяснения.',
+      });
+    } else {
+      checks.push({
+        level: diagnostics.suspiciousCards.length > 0 ? 'warning' : 'ok',
+        label: 'ЕГЭ 9 blitz parse',
+        detail: `${diagnostics.cards.length} cards · ${diagnostics.exactCount} exact · ${diagnostics.fuzzyCount} fuzzy.`,
+      });
+      if (diagnostics.suspiciousCards.length > 0) {
+        checks.push({
+          level: 'warning',
+          label: 'ЕГЭ 9: есть подозрительные fuzzy-карточки',
+          detail: diagnostics.suspiciousCards
+            .slice(0, 3)
+            .map(
+              (card) =>
+                `row ${card.rowIndex} word ${card.wordIndex}: ${card.resolution.displayMaskedWord} -> ${card.resolution.donorWord}, d=${card.resolution.distance}`,
+            )
+            .join(' · '),
+        });
+      }
+    }
+  }
+
+  if (isEge13MultiSelect(form)) {
+    const diagnostics = buildEge13Diagnostics(preview.exercise);
+    if (!diagnostics || diagnostics.cards.length === 0) {
+      checks.push({
+        level: 'warning',
+        label: 'ЕГЭ 13: quick-карточки не собираются',
+        detail: 'Проверь options с (НЕ)/(НИ) и строки объяснения.',
+      });
+    } else {
+      checks.push({
+        level: diagnostics.fallbackCards.length > 0 ? 'warning' : 'ok',
+        label: 'ЕГЭ 13 quick parse',
+        detail: `${diagnostics.cards.length} cards · ${diagnostics.rowCount} row · ${diagnostics.fallbackCount} fallback.`,
+      });
+      if (diagnostics.fallbackCards.length > 0) {
+        checks.push({
+          level: 'warning',
+          label: 'ЕГЭ 13: есть fallback-карточки',
+          detail: diagnostics.fallbackCards
+            .slice(0, 3)
+            .map((card) => `row ${card.rowIndex}: ${card.token}, ${card.resolution.kind}`)
+            .join(' · '),
+        });
+      }
+    }
+  }
+
   return checks;
+}
+
+function buildEge9Diagnostics(exercise: Exercise | null) {
+  if (!exercise || exercise.type !== 'ege_multi_select' || !exercise.skillTags.includes('ege.9')) {
+    return null;
+  }
+
+  const cards = buildEge9BlitzCards(exercise);
+  const exactCount = cards.filter((card) => card.resolution.kind === 'exact').length;
+  const fuzzyCount = cards.length - exactCount;
+  const suspiciousCards = cards.filter(
+    (card) => card.resolution.kind === 'fuzzy' && card.resolution.distance >= 2,
+  );
+
+  return {
+    cards,
+    exactCount,
+    fuzzyCount,
+    suspiciousCards,
+    maxDistance: cards.reduce(
+      (maxDistance, card) => Math.max(maxDistance, card.resolution.distance),
+      0,
+    ),
+  };
+}
+
+function buildEge13Diagnostics(exercise: Exercise | null) {
+  if (!exercise || exercise.type !== 'ege_multi_select' || !exercise.skillTags.includes('ege.13')) {
+    return null;
+  }
+
+  const cards = buildEge13QuickCards(exercise);
+  const fallbackCards = cards.filter((card) => card.resolution.source === 'fallback');
+  const rowCount = cards.length - fallbackCards.length;
+
+  return {
+    cards,
+    fallbackCards,
+    rowCount,
+    fallbackCount: fallbackCards.length,
+    mediumCount: cards.filter((card) => card.resolution.confidence === 'medium').length,
+  };
 }
 
 function buildEge15Diagnostics(exercise: Exercise | null) {
@@ -293,11 +600,10 @@ function buildEge15Diagnostics(exercise: Exercise | null) {
     return null;
   }
 
-  const cards = buildEge15QuickCards(exercise);
+  const diagnostics = buildEge15QuickDiagnostics(exercise);
   return {
-    cards,
+    ...diagnostics,
     accepted: exercise.answer.accepted.join(', '),
-    positions: extractPositions(`${exercise.payload.before}${exercise.payload.after}`),
   };
 }
 
@@ -322,6 +628,26 @@ function parseCsv(value: string) {
 
 function isEge15FillBlank(form: Form) {
   return form.type === 'fill_blank' && parseCsv(form.skillTags).includes('ege.15');
+}
+
+function isEge9MultiSelect(form: Form) {
+  return form.type === 'ege_multi_select' && parseCsv(form.skillTags).includes('ege.9');
+}
+
+function isEge13MultiSelect(form: Form) {
+  return form.type === 'ege_multi_select' && parseCsv(form.skillTags).includes('ege.13');
+}
+
+function buildEge9QuickSeedCommand(
+  card: ReturnType<typeof buildEge9BlitzCards>[number],
+) {
+  return `/qseed blitz ${card.seedKey ?? ''} row=${card.rowIndex} word=${card.wordIndex}`;
+}
+
+function buildEge13QuickSeedCommand(
+  card: ReturnType<typeof buildEge13QuickCards>[number],
+) {
+  return `/qseed ege13 ${card.seedKey ?? ''} row=${card.rowIndex}`;
 }
 
 function containsInvisibleText(form: Form) {

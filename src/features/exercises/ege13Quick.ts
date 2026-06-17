@@ -14,6 +14,13 @@ export type Ege13QuickCard = {
   choices: ['Слитно', 'Раздельно'];
   correctChoiceIndex: 0 | 1;
   explanationSnippet?: string;
+  resolution: Ege13QuickResolution;
+};
+
+export type Ege13QuickResolution = {
+  kind: 'row_keyword' | 'row_spelling' | 'fallback_keyword' | 'fallback_spelling';
+  source: 'row' | 'fallback';
+  confidence: 'high' | 'medium';
 };
 
 const MARKER_RE =
@@ -39,12 +46,12 @@ export function buildEge13QuickCards(
     if (!marker || !NE_NI_RE.test(marker)) return;
 
     const explanationRow = explanationRows.get(rowIndex) ?? '';
-    const correctChoice = classifyWriting({
+    const resolution = classifyWriting({
       marker,
       explanationRow,
       fallbackExplanation: exercise.explanation,
     });
-    if (!correctChoice) return;
+    if (!resolution) return;
 
     const choices: ['Слитно', 'Раздельно'] = ['Слитно', 'Раздельно'];
 
@@ -55,10 +62,11 @@ export function buildEge13QuickCards(
       rowIndex,
       token: marker,
       context,
-      correctChoice,
+      correctChoice: resolution.choice,
       choices,
-      correctChoiceIndex: correctChoice === 'joined' ? 0 : 1,
+      correctChoiceIndex: resolution.choice === 'joined' ? 0 : 1,
       explanationSnippet: buildExplanationSnippet(explanationRow),
+      resolution: resolution.resolution,
     });
   });
 
@@ -81,6 +89,10 @@ export function shuffleEge13QuickCards(
   return result;
 }
 
+export function isEge13QuickCardEligibleForNormalPool(card: Ege13QuickCard) {
+  return card.resolution.source === 'row';
+}
+
 function classifyWriting({
   marker,
   explanationRow,
@@ -89,15 +101,40 @@ function classifyWriting({
   marker: string;
   explanationRow: string;
   fallbackExplanation: string;
-}): Ege13QuickChoice | null {
-  const cleanRow = stripMarkdown(explanationRow || fallbackExplanation);
+}): { choice: Ege13QuickChoice; resolution: Ege13QuickResolution } | null {
+  const rowResult = explanationRow
+    ? classifyWritingInText(marker, explanationRow, 'row')
+    : null;
+  if (rowResult) return rowResult;
+
+  return classifyWritingInText(marker, fallbackExplanation, 'fallback');
+}
+
+function classifyWritingInText(
+  marker: string,
+  sourceText: string,
+  source: 'row' | 'fallback',
+): { choice: Ege13QuickChoice; resolution: Ege13QuickResolution } | null {
+  const cleanRow = stripMarkdown(sourceText);
   const firstJoinedAt = cleanRow.search(/слитн[оа-я]*/iu);
   const firstSeparateAt = cleanRow.search(/раздельн[оа-я]*/iu);
+  const confidence = source === 'row' ? 'high' : 'medium';
 
   if (firstJoinedAt >= 0 || firstSeparateAt >= 0) {
-    if (firstSeparateAt === -1) return 'joined';
-    if (firstJoinedAt === -1) return 'separate';
-    return firstJoinedAt < firstSeparateAt ? 'joined' : 'separate';
+    const choice =
+      firstSeparateAt === -1
+        ? 'joined'
+        : firstJoinedAt === -1
+          ? 'separate'
+          : firstJoinedAt < firstSeparateAt ? 'joined' : 'separate';
+    return {
+      choice,
+      resolution: {
+        kind: source === 'row' ? 'row_keyword' : 'fallback_keyword',
+        source,
+        confidence,
+      },
+    };
   }
 
   const markerParts = marker.match(/\((НЕ|НИ)\)\s*([\p{Script=Cyrillic}-]+)/u);
@@ -115,8 +152,26 @@ function classifyWriting({
     'iu',
   );
 
-  if (separate.test(row)) return 'separate';
-  if (joined.test(row)) return 'joined';
+  if (separate.test(row)) {
+    return {
+      choice: 'separate',
+      resolution: {
+        kind: source === 'row' ? 'row_spelling' : 'fallback_spelling',
+        source,
+        confidence,
+      },
+    };
+  }
+  if (joined.test(row)) {
+    return {
+      choice: 'joined',
+      resolution: {
+        kind: source === 'row' ? 'row_spelling' : 'fallback_spelling',
+        source,
+        confidence,
+      },
+    };
+  }
   return null;
 }
 

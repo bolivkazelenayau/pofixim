@@ -3,6 +3,18 @@ import { hashString, xorshift } from '@/lib/hash';
 
 export type Ege15QuickChoice = 'n' | 'nn';
 
+export type Ege15QuickResolution =
+  | {
+      kind: 'numbered_gap';
+      promptKind: Ege15QuickChoice;
+      acceptedSource: 'digit_set';
+    }
+  | {
+      kind: 'simple_fill_blank';
+      promptKind: null;
+      acceptedSource: 'direct_choice';
+    };
+
 export type Ege15QuickCard = {
   id: string;
   sourceExerciseId?: number;
@@ -16,7 +28,19 @@ export type Ege15QuickCard = {
   correctChoice: Ege15QuickChoice;
   choices: ['Одна Н', 'НН'];
   correctChoiceIndex: 0 | 1;
+  resolution: Ege15QuickResolution;
   explanationSnippet?: string;
+};
+
+export type Ege15QuickDiagnostics = {
+  cards: Ege15QuickCard[];
+  promptKind: Ege15QuickChoice | null;
+  acceptedDigitPositions: number[];
+  directAcceptedChoice: Ege15QuickChoice | null;
+  positions: number[];
+  numberedCount: number;
+  simpleCount: number;
+  skippedReasons: string[];
 };
 
 const NUMBERED_GAP_RE = /[\p{Script=Cyrillic}-]*\s?\(\d+\)\s?[\p{Script=Cyrillic}-]*/gu;
@@ -41,6 +65,45 @@ export function buildEge15QuickCards(exercise: FillBlankExercise): Ege15QuickCar
   }
 
   return buildCardsFromSimpleFillBlank(exercise);
+}
+
+export function buildEge15QuickDiagnostics(exercise: FillBlankExercise): Ege15QuickDiagnostics {
+  const text = stripMarkdown(`${exercise.payload.before}${exercise.payload.after}`);
+  const cards = buildEge15QuickCards(exercise);
+  const promptKind = getPromptKind(exercise.prompt);
+  const acceptedDigits = acceptedDigitSet(exercise.answer.accepted);
+  const directAcceptedChoice = getDirectAcceptedChoice(exercise.answer.accepted);
+  const positions = extractNumberedPositions(text);
+  const numberedCount = cards.filter((card) => card.resolution.kind === 'numbered_gap').length;
+  const simpleCount = cards.length - numberedCount;
+  const skippedReasons: string[] = [];
+
+  if (!exercise.skillTags.includes('ege.15')) {
+    skippedReasons.push('not_ege15');
+  }
+  if (positions.length > 0 && !promptKind) {
+    skippedReasons.push('no_prompt_kind');
+  }
+  if (positions.length > 0 && acceptedDigits.size === 0) {
+    skippedReasons.push('no_accepted_digits');
+  }
+  if (positions.length === 0 && !directAcceptedChoice) {
+    skippedReasons.push('no_direct_n_answer');
+  }
+  if (cards.length === 0) {
+    skippedReasons.push('no_cards');
+  }
+
+  return {
+    cards,
+    promptKind,
+    acceptedDigitPositions: [...acceptedDigits],
+    directAcceptedChoice,
+    positions,
+    numberedCount,
+    simpleCount,
+    skippedReasons,
+  };
 }
 
 export function shuffleEge15QuickCards(
@@ -100,6 +163,11 @@ function buildCardsFromNumberedGaps({
       correctChoice,
       choices: ['Одна Н', 'НН'],
       correctChoiceIndex: correctChoice === 'n' ? 0 : 1,
+      resolution: {
+        kind: 'numbered_gap',
+        promptKind,
+        acceptedSource: 'digit_set',
+      },
       explanationSnippet: extractExplanationSnippet(exercise.explanation, {
         index,
         correctWord,
@@ -140,6 +208,11 @@ function buildCardsFromSimpleFillBlank(exercise: FillBlankExercise): Ege15QuickC
       correctChoice: accepted,
       choices: ['Одна Н', 'НН'],
       correctChoiceIndex: accepted === 'n' ? 0 : 1,
+      resolution: {
+        kind: 'simple_fill_blank',
+        promptKind: null,
+        acceptedSource: 'direct_choice',
+      },
       explanationSnippet: extractExplanationSnippet(exercise.explanation, {
         correctWord,
       }),
@@ -161,6 +234,16 @@ function getPromptKind(prompt: string): Ege15QuickChoice | null {
 function acceptedDigitSet(accepted: string[]) {
   const signature = accepted.find((item) => /\d/u.test(item)) ?? '';
   return new Set([...signature].filter((char) => /\d/u.test(char)).map(Number));
+}
+
+function getDirectAcceptedChoice(accepted: string[]) {
+  return accepted
+    .map((item) => normalizeNAnswer(item))
+    .find((item): item is Ege15QuickChoice => item === 'n' || item === 'nn') ?? null;
+}
+
+function extractNumberedPositions(value: string) {
+  return [...value.matchAll(/\((\d+)\)/gu)].map((match) => Number(match[1]));
 }
 
 function normalizeNAnswer(value: string) {

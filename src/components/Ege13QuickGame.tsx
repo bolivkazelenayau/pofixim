@@ -71,6 +71,9 @@ export default function Ege13QuickGame({
   const quickSeedLabel = currentCard?.seedKey
     ? `${currentCard.seedKey} · row ${currentCard.rowIndex}`
     : `id:${currentCard?.sourceExerciseId ?? 'n/a'}`;
+  const resolutionLabel = currentCard
+    ? `${currentCard.resolution.kind} · ${currentCard.resolution.confidence}`
+    : '';
 
   const tokenFontClass = currentCard && currentCard.token.length > 14
     ? 'text-[clamp(1.5rem,7vw,2.4rem)] sm:text-[2.25rem]'
@@ -353,6 +356,11 @@ export default function Ege13QuickGame({
                 <Copy className="size-3.5" aria-hidden="true" />
               </button>
             </div>
+            {isInspectMode && (
+              <div className="mt-1 min-w-0 truncate font-mono text-[10px] text-foreground/45 sm:text-[11px]">
+                {resolutionLabel}
+              </div>
+            )}
           </div>
         )}
 

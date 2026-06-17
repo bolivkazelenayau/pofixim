@@ -87,6 +87,11 @@ export function BlitzGameRunningPanel({
     event.stopPropagation();
   }
 
+  const resolutionLabel =
+    currentCard.resolution.kind === 'exact'
+      ? `exact · donor: ${currentCard.resolution.donorWord}`
+      : `fuzzy · distance ${currentCard.resolution.distance} · donor: ${currentCard.resolution.donorWord}`;
+
   return (
     <div className="flex flex-1 flex-col p-3 sm:block sm:p-5">
       <div className="relative mb-2 flex min-h-8 items-center justify-between gap-2 sm:mb-3">
@@ -275,6 +280,11 @@ export function BlitzGameRunningPanel({
           <Copy className="size-3.5" aria-hidden="true" />
         </button>
       </div>
+      {isInspectMode && (
+        <div className="mt-1 min-w-0 truncate font-mono text-[10px] text-foreground/45 sm:text-[11px]">
+          {resolutionLabel}
+        </div>
+      )}
     </div>
   );
 }
