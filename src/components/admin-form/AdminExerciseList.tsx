@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import type { VirtualItem } from '@tanstack/react-virtual';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
 
@@ -31,6 +31,51 @@ type FrozenVirtualSnapshot = {
   totalSize: number;
   activeGroup: ExerciseGroupRow | null;
 };
+type RenderVirtualItem = Pick<VirtualItem, 'end' | 'index' | 'key' | 'size' | 'start'>;
+
+function estimateRowSize(row: ExerciseListRow | undefined) {
+  return row?.kind === 'group' ? 30 : 120;
+}
+
+function buildFallbackVirtualItems(
+  rows: ExerciseListRow[],
+  scrollOffset: number,
+): RenderVirtualItem[] {
+  if (rows.length === 0) return [];
+
+  let offset = 0;
+  let anchorIndex = 0;
+  for (let index = 0; index < rows.length; index += 1) {
+    const size = estimateRowSize(rows[index]);
+    if (offset + size > scrollOffset) {
+      anchorIndex = index;
+      break;
+    }
+    offset += size;
+  }
+
+  while (anchorIndex > 0 && rows[anchorIndex]?.kind !== 'group') {
+    anchorIndex -= 1;
+    offset -= estimateRowSize(rows[anchorIndex]);
+  }
+
+  const items: RenderVirtualItem[] = [];
+  let renderedItems = 0;
+  for (let index = anchorIndex; index < rows.length && renderedItems < 8; index += 1) {
+    const size = estimateRowSize(rows[index]);
+    items.push({
+      end: offset + size,
+      index,
+      key: rows[index]?.key ?? index,
+      size,
+      start: offset,
+    });
+    if (rows[index]?.kind === 'item') renderedItems += 1;
+    offset += size;
+  }
+
+  return items;
+}
 
 export default function AdminExerciseList({
   groupedItems,
@@ -58,14 +103,38 @@ export default function AdminExerciseList({
     [groupedItems],
   );
   const rowSignature = useMemo(() => rows.map((row) => row.key).join('|'), [rows]);
+  const rangeExtractor = useMemo(
+    () => (range: Parameters<typeof defaultRangeExtractor>[0]) => {
+      const indexes = new Set(defaultRangeExtractor(range));
+      const hasItem = [...indexes].some((index) => rows[index]?.kind === 'item');
+      if (hasItem) return [...indexes].sort((left, right) => left - right);
+
+      let groupIndex = Math.min(Math.max(range.startIndex, 0), Math.max(rows.length - 1, 0));
+      while (groupIndex > 0 && rows[groupIndex]?.kind !== 'group') {
+        groupIndex -= 1;
+      }
+
+      indexes.add(groupIndex);
+      let addedItems = 0;
+      for (let index = groupIndex + 1; index < rows.length && addedItems < 8; index += 1) {
+        if (rows[index]?.kind === 'group') break;
+        indexes.add(index);
+        addedItems += 1;
+      }
+
+      return [...indexes].sort((left, right) => left - right);
+    },
+    [rows],
+  );
   // TanStack Virtual returns a stateful virtualizer; React Compiler cannot memoize it safely.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => (rows[index]?.kind === 'group' ? 30 : 120),
+    estimateSize: (index) => estimateRowSize(rows[index]),
     getItemKey: (index) => rows[index]?.key ?? index,
     overscan: 6,
+    rangeExtractor,
   });
   useLayoutEffect(() => {
     rowVirtualizer.measure();
@@ -100,7 +169,13 @@ export default function AdminExerciseList({
 
   const frozenSnapshot = shouldFreezeVirtualLayer ? frozenVirtualSnapshotRef.current : null;
   const renderedRows = frozenSnapshot?.rows ?? rows;
-  const renderedVirtualItems = frozenSnapshot?.virtualItems ?? virtualItems;
+  const baseRenderedVirtualItems = frozenSnapshot?.virtualItems ?? virtualItems;
+  const needsFallbackVirtualItems =
+    renderedRows.some((row) => row.kind === 'item') &&
+    !baseRenderedVirtualItems.some((item) => renderedRows[item.index]?.kind === 'item');
+  const renderedVirtualItems = needsFallbackVirtualItems
+    ? buildFallbackVirtualItems(renderedRows, rowVirtualizer.scrollOffset ?? 0)
+    : baseRenderedVirtualItems;
   const renderedTotalSize = frozenSnapshot?.totalSize ?? rowVirtualizer.getTotalSize();
   const renderedActiveGroup = frozenSnapshot ? frozenSnapshot.activeGroup : activeGroup;
   const isFrozenVirtualLayer = Boolean(frozenSnapshot);
