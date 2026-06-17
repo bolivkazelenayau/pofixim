@@ -25,7 +25,6 @@ import { useAutoBlitzPrompt } from '@/hooks/useAutoBlitzPrompt';
 import { useChatCommandInput } from '@/hooks/useChatCommandInput';
 import { useChatExerciseSubmit } from '@/hooks/useChatExerciseSubmit';
 import { useChatStatsMessage } from '@/hooks/useChatStatsMessage';
-import { submittedAnswerFromText } from '@/lib/chatFeedback';
 import { createMessageId } from '@/lib/message-id';
 import {
   looksLikeBareSeedKey,
@@ -128,7 +127,7 @@ export default function ChatContainer() {
     hasHydrated,
     messageEnterDurationMs: MESSAGE_ENTER_DURATION_MS,
   });
-  const { refreshRenderedExercises } = useRenderedExerciseRefresh({
+  useRenderedExerciseRefresh({
     messages,
     hasHydrated,
     pollMs: RENDERED_EXERCISE_REFRESH_POLL_MS,
@@ -526,7 +525,7 @@ export default function ChatContainer() {
       </div>
 
       <ChatInputBar
-        commandInput={commandInput}
+        {...commandInput}
         supportsGlobalInput={supportsGlobalInput}
         hasHydrated={hasHydrated}
         onSubmit={handleGlobalSubmit}

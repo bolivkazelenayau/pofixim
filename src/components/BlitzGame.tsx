@@ -144,16 +144,18 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   }
 
   useEffect(() => {
-    setLocalCards(cards);
+    queueMicrotask(() => setLocalCards(cards));
   }, [cards]);
 
   useEffect(() => {
-    if (isInspectMode) {
-      setStatus('running');
-      return;
-    }
+    queueMicrotask(() => {
+      if (isInspectMode) {
+        setStatus('running');
+        return;
+      }
 
-    setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+      setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+    });
   }, [isInspectMode]);
 
   async function copySeedKey() {
@@ -283,7 +285,8 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
 
   useEffect(() => {
     if (!isInspectMode && status === 'running' && timeLeftMs <= 0) {
-      finish();
+      const id = window.setTimeout(finish, 0);
+      return () => window.clearTimeout(id);
     }
   }, [finish, isInspectMode, status, timeLeftMs]);
 

@@ -1,13 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Field, inputClass } from '@/components/admin-form/constants';
 import type { Form } from '@/components/admin-form/types';
+import type { AdminFieldErrors } from '@/components/admin-form/validation';
 
 type AdminFillBlankFieldsProps = {
   form: Form;
   setForm: Dispatch<SetStateAction<Form>>;
+  fieldErrors?: AdminFieldErrors;
 };
 
-export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFieldsProps) {
+export default function AdminFillBlankFields({ form, setForm, fieldErrors = {} }: AdminFillBlankFieldsProps) {
   if (form.type !== 'fill_blank') return null;
 
   return (
@@ -33,11 +35,19 @@ export default function AdminFillBlankFields({ form, setForm }: AdminFillBlankFi
         label="Допустимые ответы (через запятую)"
       >
         <input
+          id="admin-field-fill-accepted-control"
           name="fillAccepted"
           className={inputClass}
           value={form.fillAccepted}
+          aria-invalid={Boolean(fieldErrors.fillAccepted)}
+          aria-describedby={fieldErrors.fillAccepted ? 'admin-field-fill-accepted-error' : undefined}
           onChange={(e) => setForm((f) => ({ ...f, fillAccepted: e.target.value }))}
         />
+        {fieldErrors.fillAccepted ? (
+          <p id="admin-field-fill-accepted-error" className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+            {fieldErrors.fillAccepted}
+          </p>
+        ) : null}
       </Field>
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import AdminEditorContainer from '@/components/admin-form/AdminEditorContainer';
 import AdminSidebarContainer from '@/components/admin-form/AdminSidebarContainer';
 import { EMPTY } from '@/components/admin-form/defaults';
@@ -9,6 +9,8 @@ import { loadFormState } from '@/components/admin-form/draftStorage';
 import { formFromExerciseItem } from '@/components/admin-form/formMapping';
 import type { AdminFormProps, Form } from '@/components/admin-form/types';
 import { useAdminEditorController } from '@/hooks/useAdminEditorController';
+import { useAdminTanStackForm } from '@/hooks/useAdminTanStackForm';
+import { useAppShortcut } from '@/hooks/useAppShortcut';
 import { useExerciseList } from '@/hooks/useExerciseList';
 import { EXERCISE_TYPES } from '@/features/exercises/types';
 
@@ -28,12 +30,18 @@ export default function AdminForm({
   initialSortBy = 'id',
   initialSortDir = 'desc',
 }: AdminFormProps) {
-  const [form, setForm] = useState<Form>(() => {
+  const initialForm = useMemo<Form>(() => {
     if (initialSelectedId && initialSelectedExercise) {
       return loadFormState(initialSelectedId, formFromExerciseItem(initialSelectedExercise));
     }
     return EMPTY;
-  });
+  }, [initialSelectedExercise, initialSelectedId]);
+  const {
+    adminFormApi,
+    form,
+    setForm,
+    validation: formValidation,
+  } = useAdminTanStackForm(initialForm);
   const isDraftLoaded = true;
   const [typeOptions] = useState<Form['type'][]>(
     Array.from(EXERCISE_TYPES) as Form['type'][],
@@ -118,43 +126,18 @@ export default function AdminForm({
     setListExamTypeFilter('all');
   }
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target;
-      const isEditableTarget =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        (target instanceof HTMLElement && target.isContentEditable);
-
-      if ((event.ctrlKey || event.metaKey) && isShortcutKey(event, ['k', 'л'])) {
-        event.preventDefault();
-        event.stopPropagation();
-        setCommandOpen((value) => !value);
-        return;
-      }
-
-      if ((event.ctrlKey || event.metaKey) && isShortcutKey(event, ['s', 'ы'])) {
-        event.preventDefault();
-        event.stopPropagation();
-        editor.formRef.current?.requestSubmit();
-        return;
-      }
-
-      if (isEditableTarget || event.ctrlKey || event.metaKey || event.shiftKey) return;
-
-      if (event.altKey && event.key === 'ArrowDown') {
-        event.preventDefault();
-        openAdjacentExercise(1);
-      }
-      if (event.altKey && event.key === 'ArrowUp') {
-        event.preventDefault();
-        openAdjacentExercise(-1);
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [editor, flatFilteredItems, openAdjacentExercise]);
+  useAppShortcut('admin.commandPalette', () => {
+    setCommandOpen((value) => !value);
+  });
+  useAppShortcut('admin.save', () => {
+    editor.formRef.current?.requestSubmit();
+  });
+  useAppShortcut('admin.nextExercise', () => {
+    openAdjacentExercise(1);
+  });
+  useAppShortcut('admin.previousExercise', () => {
+    openAdjacentExercise(-1);
+  });
 
   return (
     <>
@@ -211,11 +194,13 @@ export default function AdminForm({
         <AdminEditorContainer
           status={editor.status}
           formState={{
+            adminFormApi,
             formRef: editor.formRef,
             form,
             isDraftLoaded,
             typeOptions,
             setForm,
+            validation: formValidation,
             mainSaveAnchorRef: editor.mainSaveAnchorRef,
           }}
           recovery={editor.recovery}
@@ -225,9 +210,4 @@ export default function AdminForm({
       </div>
     </>
   );
-}
-
-function isShortcutKey(event: KeyboardEvent, keys: string[]) {
-  const key = event.key.toLowerCase();
-  return keys.includes(key);
 }

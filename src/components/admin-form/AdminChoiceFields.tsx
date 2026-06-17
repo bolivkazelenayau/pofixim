@@ -1,13 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { inputClass } from '@/components/admin-form/constants';
 import type { Form } from '@/components/admin-form/types';
+import type { AdminFieldErrors } from '@/components/admin-form/validation';
 
 type AdminChoiceFieldsProps = {
  form: Form;
  setForm: Dispatch<SetStateAction<Form>>;
+ fieldErrors?: AdminFieldErrors;
 };
 
-export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsProps) {
+export default function AdminChoiceFields({ form, setForm, fieldErrors = {} }: AdminChoiceFieldsProps) {
  if (form.type !== 'multiple_choice' && form.type !== 'ege_multi_select') {
   return null;
  }
@@ -34,6 +36,8 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
       name={`option-${index + 1}`}
       className={inputClass}
       aria-label={`Option ${index + 1}`}
+      aria-invalid={Boolean(fieldErrors.options)}
+      aria-describedby={fieldErrors.options ? 'admin-field-options-error' : undefined}
       value={option}
       onChange={(event) =>
        setForm((current) => ({
@@ -74,6 +78,11 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
    >
     Добавить вариант
    </button>
+   {fieldErrors.options ? (
+    <p id="admin-field-options-error" className="text-xs font-medium text-red-600 dark:text-red-300">
+     {fieldErrors.options}
+    </p>
+   ) : null}
    {form.type === 'ege_multi_select' ? (
     <label className="mt-2 block">
      <div className="mb-1 text-sm font-medium text-foreground/80 ">Правильные номера (через запятую)</div>
@@ -81,10 +90,17 @@ export default function AdminChoiceFields({ form, setForm }: AdminChoiceFieldsPr
       name="multiCorrectOptionIndexes"
       className={inputClass}
       value={form.multiCorrectOptionIndexes}
+      aria-invalid={Boolean(fieldErrors.multiCorrectOptionIndexes)}
+      aria-describedby={fieldErrors.multiCorrectOptionIndexes ? 'admin-field-multi-correct-error' : undefined}
       onChange={(event) =>
        setForm((current) => ({ ...current, multiCorrectOptionIndexes: event.target.value }))
       }
      />
+     {fieldErrors.multiCorrectOptionIndexes ? (
+      <p id="admin-field-multi-correct-error" className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+       {fieldErrors.multiCorrectOptionIndexes}
+      </p>
+     ) : null}
     </label>
    ) : null}
   </div>

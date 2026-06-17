@@ -1,11 +1,13 @@
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
 import { inputClass, qualityStatuses } from '@/components/admin-form/constants';
 import type { Form } from '@/components/admin-form/types';
+import type { AdminFieldErrors } from '@/components/admin-form/validation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type AdminMetaFieldsProps = {
  form: Form;
  setForm: Dispatch<SetStateAction<Form>>;
+ fieldErrors?: AdminFieldErrors;
  mainSaveAnchorRef: RefObject<HTMLDivElement | null>;
  saving: boolean;
  deleting: boolean;
@@ -17,6 +19,7 @@ type AdminMetaFieldsProps = {
 export default function AdminMetaFields({
  form,
  setForm,
+ fieldErrors = {},
  mainSaveAnchorRef,
  saving,
  deleting,
@@ -27,30 +30,39 @@ export default function AdminMetaFields({
  return (
   <>
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-    <Field id="admin-field-source-alignment" label="Source alignment">
+    <Field id="admin-field-source-alignment" label="Source alignment" error={fieldErrors.sourceAlignment}>
      <input
+      id="admin-field-source-alignment-control"
       name="sourceAlignment"
       className={inputClass}
       value={form.sourceAlignment}
+      aria-invalid={Boolean(fieldErrors.sourceAlignment)}
+      aria-describedby={fieldErrors.sourceAlignment ? 'admin-field-source-alignment-error' : undefined}
       onChange={(event) => setForm((current) => ({ ...current, sourceAlignment: event.target.value }))}
      />
     </Field>
-    <Field id="admin-field-typical-mistake" label="Типичная ошибка">
+    <Field id="admin-field-typical-mistake" label="Типичная ошибка" error={fieldErrors.typicalMistake}>
      <input
+      id="admin-field-typical-mistake-control"
       name="typicalMistake"
       className={inputClass}
       value={form.typicalMistake}
+      aria-invalid={Boolean(fieldErrors.typicalMistake)}
+      aria-describedby={fieldErrors.typicalMistake ? 'admin-field-typical-mistake-error' : undefined}
       onChange={(event) => setForm((current) => ({ ...current, typicalMistake: event.target.value }))}
      />
     </Field>
    </div>
 
-   <Field id="admin-field-algorithm-steps" label="Algorithm steps (по строкам)" className="mt-3">
+   <Field id="admin-field-algorithm-steps" label="Algorithm steps (по строкам)" className="mt-3" error={fieldErrors.algorithmSteps}>
     <textarea
+     id="admin-field-algorithm-steps-control"
      name="algorithmSteps"
      className={inputClass}
      rows={3}
      value={form.algorithmSteps}
+     aria-invalid={Boolean(fieldErrors.algorithmSteps)}
+     aria-describedby={fieldErrors.algorithmSteps ? 'admin-field-algorithm-steps-error' : undefined}
      onChange={(event) => setForm((current) => ({ ...current, algorithmSteps: event.target.value }))}
     />
    </Field>
@@ -131,16 +143,25 @@ function Field({
  label,
  children,
  className = '',
+ error,
 }: {
  id?: string;
  label: string;
  children: ReactNode;
  className?: string;
+ error?: string;
 }) {
+ const controlId = id ? `${id}-control` : undefined;
+ const errorId = id ? `${id}-error` : undefined;
  return (
-  <label id={id} className={`block ${className}`}>
-   <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
+  <div id={id} className={`block ${className}`}>
+   <label htmlFor={controlId} className="mb-1 block text-sm font-medium text-foreground/80 ">{label}</label>
    {children}
-  </label>
+   {error && errorId ? (
+    <p id={errorId} className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+     {error}
+    </p>
+   ) : null}
+  </div>
  );
 }

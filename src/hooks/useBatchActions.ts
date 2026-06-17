@@ -1,6 +1,12 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import { useEffect, useMemo, useState } from 'react';
 import { batchUpdateExercisesMetaAction } from '@/app/actions/admin';
 import { previewRawNormalizationAction } from '@/app/actions/admin-preview';
@@ -22,6 +28,10 @@ type UseBatchActionsConfig = {
   setIsError: (value: boolean) => void;
   setMessage: (value: string) => void;
 };
+
+const BATCH_SELECTION_COLUMNS: ColumnDef<ListItem>[] = [
+  { id: 'id', accessorKey: 'id' },
+];
 
 export function useBatchActions({
   flatFilteredItems,
@@ -47,6 +57,30 @@ export function useBatchActions({
   });
 
   const multiSelectedSet = useMemo(() => new Set(multiSelectedIds), [multiSelectedIds]);
+  const rowSelection = useMemo<RowSelectionState>(
+    () => Object.fromEntries(multiSelectedIds.map((id) => [String(id), true])),
+    [multiSelectedIds],
+  );
+  // TanStack Table returns a stateful table instance; React Compiler cannot memoize it safely.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const selectionTable = useReactTable({
+    data: flatFilteredItems,
+    columns: BATCH_SELECTION_COLUMNS,
+    state: { rowSelection },
+    onRowSelectionChange: (updater) => {
+      setMultiSelectedIds((current) => {
+        const currentState = Object.fromEntries(current.map((id) => [String(id), true]));
+        const nextState = typeof updater === 'function' ? updater(currentState) : updater;
+        return Object.keys(nextState)
+          .filter((id) => nextState[id])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id));
+      });
+    },
+    getRowId: (row) => String(row.id),
+    getCoreRowModel: getCoreRowModel(),
+    enableRowSelection: true,
+  });
   const batchSaving = batchUpdateMutation.isPending;
 
   function toggleMultiSelectionByClick(itemId: number, event: React.MouseEvent<HTMLButtonElement>) {
@@ -63,7 +97,7 @@ export function useBatchActions({
 
     const anchorId = lastMultiSelectedId ?? selectedId;
     if (isShift && anchorId != null) {
-      const ids = flatFilteredItems.map((i) => i.id);
+      const ids = selectionTable.getRowModel().rows.map((row) => row.original.id);
       const from = ids.indexOf(anchorId);
       const to = ids.indexOf(itemId);
       if (from >= 0 && to >= 0) {
@@ -103,7 +137,7 @@ export function useBatchActions({
   }
 
   function selectAllShownItems() {
-    const visibleIds = flatFilteredItems.map((item) => item.id);
+    const visibleIds = selectionTable.getRowModel().rows.map((row) => row.original.id);
     setMultiSelectedIds(visibleIds);
     setLastMultiSelectedId(visibleIds[visibleIds.length - 1] ?? null);
     setSelectionMode(true);

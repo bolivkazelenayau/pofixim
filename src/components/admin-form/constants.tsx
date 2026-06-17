@@ -19,10 +19,11 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
+  const controlId = id ? `${id}-control` : undefined;
   return (
-    <label id={id} className={`block ${className}`}>
-      <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
+    <div id={id} className={`block ${className}`}>
+      <label htmlFor={controlId} className="mb-1 block text-sm font-medium text-foreground/80 ">{label}</label>
       {children}
-    </label>
+    </div>
   );
 }

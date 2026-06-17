@@ -9,6 +9,11 @@
 - PostgreSQL + Drizzle ORM
 - Zod
 - TanStack Query
+- TanStack Form
+- TanStack Pacer
+- TanStack Table
+- TanStack Virtual
+- TanStack Hotkeys
 - Zustand
 - Tailwind/CSS
 
@@ -89,6 +94,11 @@ Blitz-парсер допускает небольшой fuzzy mismatch вокр
 - фильтры по type/status/exam type;
 - поиск;
 - сортировки;
+- headless row/selection model через TanStack Table;
+- виртуализированный список с sticky group header через TanStack Virtual;
+- editor form lifecycle через TanStack Form;
+- debounce поиска, draft autosave и preview через TanStack Pacer;
+- admin shortcuts через локальный adapter над TanStack Hotkeys;
 - optimistic edit/delete/batch updates;
 - optimistic concurrency guard по `updatedAt`: устаревшая форма не перезаписывает свежую запись в БД, а остаётся локальным draft-ом;
 - DB autosave синхронизирует новый `updatedAt` обратно в форму, чтобы следующий ручной save не ловил ложный stale conflict;
@@ -99,13 +109,16 @@ Blitz-парсер допускает небольшой fuzzy mismatch вокр
 
 Важные UX-детали админки:
 
-- поиск по списку сохраняет стабильную структуру загрузки и сортировку по `updatedAt` показывает свежие изменения без группировки, которая прячет новые записи среди старых дат;
+- список остаётся сгруппированным по `ЕГЭ · тип`, даже если строки отсортированы по `updatedAt`;
+- sticky-заголовок активной группы в виртуализированном списке рисуется отдельным overlay;
 - preview использует общий рендер feedback sections (`Правильный ответ` / `Объяснение`) там, где checker возвращает structured feedback;
 - dictation preview и chat feedback используют отдельный diff-render: группы замен показываются цельно, пропущенная пунктуация не превращается в квадратные скобки, а explanation выводится отдельным смысловым блоком;
 - fill_blank поля вокруг пропуска редактируются как многострочный текст, а не как узкие однострочные поля;
 - draft recovery показывает локальную страхующую копию, когда браузерная версия отличается от БД, и даёт явно выбрать версию из БД или восстановить локальные изменения;
 - локальный draft пишется в `localStorage` с коротким debounce, чтобы markdown editor не лагал от синхронной записи на каждый микрошаг; критичные ошибки save/stale всё равно пишут draft сразу;
 - `adminDebug=true` включает общие admin-логи, а шумные draft-логи включаются отдельно через `adminDraftDebug=true`.
+
+TanStack Store пока сознательно не используется: persistent client/session/chat state уже покрыт Zustand, а замена store-слоя без конкретной продуктовой проблемы не нужна.
 
 Контракт обновлений: `updatedAt` считается версией упражнения. Главная и quick-модалки точечно обновляют уже отрендеренные карточки по версии, а админка отправляет известную версию при save, чтобы не затирать изменения из другой вкладки.
 

@@ -1,6 +1,13 @@
 'use client';
 
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useDebouncedValue } from '@tanstack/react-pacer';
+import {
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table';
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { fetchExerciseList } from '@/components/admin-form/api';
 import { adminExerciseKeys, type AdminExerciseListFilters } from '@/components/admin-form/queryKeys';
@@ -24,6 +31,13 @@ const ADMIN_LIST_SORT_DIR_COOKIE = 'admin_list_sort_dir';
 const ADMIN_LIST_TYPE_FILTER_COOKIE = 'admin_list_type_filter';
 const ADMIN_LIST_STATUS_FILTER_COOKIE = 'admin_list_status_filter';
 const ADMIN_LIST_EXAM_TYPE_FILTER_COOKIE = 'admin_list_exam_type_filter';
+
+const EXERCISE_LIST_COLUMNS: ColumnDef<ListItem>[] = [
+  { id: 'id', accessorKey: 'id' },
+  { id: 'updatedAt', accessorKey: 'updatedAtCursor' },
+  { id: 'type', accessorKey: 'type' },
+  { id: 'status', accessorKey: 'qualityStatus' },
+];
 
 type UseExerciseListConfig = {
   initialItems: ListItem[];
@@ -98,7 +112,10 @@ export function useExerciseList({
   const [totalItems, setTotalItems] = useState<number | null>(initialTotalItems ?? null);
   const [matchingItems, setMatchingItems] = useState<number | null>(null);
   const [listQuery, setListQuery] = useState('');
-  const [serverListQuery, setServerListQuery] = useState('');
+  const [serverListQuery] = useDebouncedValue(listQuery, {
+    key: 'admin-exercise-list-search',
+    wait: 500,
+  });
   const [listTypeFilter, setListTypeFilter] = useState<string>(initialTypeFilter);
   const [listStatusFilter, setListStatusFilter] = useState<string>(initialStatusFilter);
   const [listExamTypeFilter, setListExamTypeFilter] = useState<string>(initialExamTypeFilter);
@@ -128,9 +145,6 @@ export function useExerciseList({
     [serverListQuery, listTypeFilter, listStatusFilter, listExamTypeFilter, serverSortBy, listSortDir],
   );
   const queryKey = adminExerciseKeys.list(listFilters);
-  const normalizedListQuery = normalizeSearchText(listQuery);
-  const normalizedServerListQuery = normalizeSearchText(serverListQuery);
-  const isSearchDebouncing = normalizedListQuery !== normalizedServerListQuery;
   const isDefaultInitialListQuery =
     serverListQuery === '' &&
     listTypeFilter === 'all' &&
@@ -158,13 +172,6 @@ export function useExerciseList({
       persistAdminListSortCookie(ADMIN_LIST_EXAM_TYPE_FILTER_COOKIE, listExamTypeFilter);
     } catch {}
   }, [listTypeFilter, listStatusFilter, listExamTypeFilter]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setServerListQuery(listQuery);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [listQuery]);
 
   const listQueryResult = useInfiniteQuery<
     ExerciseListResponse,
@@ -319,7 +326,7 @@ export function useExerciseList({
     }
   }
 
-  const filteredItems = useMemo(() => {
+  const sortedFilteredItems = useMemo(() => {
     const q = normalizeSearchText(listQuery);
     const serverQ = normalizeSearchText(serverListQuery);
     const shouldApplyClientTextFilter = Boolean(q && (q !== serverQ || listQueryResult.isPlaceholderData));
@@ -358,23 +365,36 @@ export function useExerciseList({
     listSortDir,
   ]);
 
-  const groupedItems = useMemo(() => {
-    if (listSortBy === 'updatedAt') {
-      return filteredItems.length > 0
-        ? [['По дате изменения', filteredItems] satisfies [string, ListItem[]]]
-        : [];
-    }
+  const tableSorting = useMemo<SortingState>(
+    () => [{ id: listSortBy, desc: listSortDir === 'desc' }],
+    [listSortBy, listSortDir],
+  );
+  // TanStack Table returns a stateful table instance; React Compiler cannot memoize it safely.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const exerciseListTable = useReactTable({
+    data: sortedFilteredItems,
+    columns: EXERCISE_LIST_COLUMNS,
+    state: {
+      sorting: tableSorting,
+    },
+    getRowId: (row) => String(row.id),
+    getCoreRowModel: getCoreRowModel(),
+    manualFiltering: true,
+    manualPagination: true,
+    manualSorting: true,
+  });
+  const flatFilteredItems = exerciseListTable.getRowModel().rows.map((row) => row.original);
+  const filteredItems = flatFilteredItems;
 
+  const groupedItems = useMemo(() => {
     const groups = new Map<string, ListItem[]>();
-    for (const item of filteredItems) {
+    for (const item of flatFilteredItems) {
       const key = `ЕГЭ ${examTypeOf(item)} · ${item.type}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(item);
     }
     return [...groups.entries()];
-  }, [filteredItems, listSortBy]);
-
-  const flatFilteredItems = filteredItems;
+  }, [flatFilteredItems]);
   const isListRefreshing =
     listQueryResult.isFetching && !listQueryResult.isFetchingNextPage;
 

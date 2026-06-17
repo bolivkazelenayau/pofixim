@@ -10,6 +10,22 @@ Use `rtk git status --short --branch`, `rtk git diff --stat`, `rtk git diff`, `r
 Do not use raw `git`, `rg`, `npm`, `npx`, `npm.cmd`, or similar commands for these tasks unless the user explicitly asks for exact raw output.
 <!-- END:mandatory-command-wrapper -->
 
+<!-- BEGIN:cyrillic-encoding-policy -->
+# Cyrillic encoding policy
+
+Do not use PowerShell output as a source of truth for Cyrillic text. In this workspace PowerShell can display UTF-8 text as mojibake (`Ð...`) when console/file encodings disagree.
+
+When reading or patching files that contain Cyrillic:
+
+- Do not use PowerShell `Get-Content` to inspect files that may contain Cyrillic.
+- Use an encoding-safe reader such as Node `fs.readFileSync(path, 'utf8')`, editor/resource views, or `rtk git diff` output instead.
+- Prefer patch contexts anchored on ASCII-only identifiers, function names, props, imports, class names, or structural code.
+- Do not rely on Cyrillic lines copied from PowerShell output for `apply_patch` context.
+- Do not rewrite whole files just because a patch containing Cyrillic context does not match.
+- If exact Cyrillic text must be inspected, use an encoding-safe reader/tool and preserve the original bytes/UTF-8 text.
+- Keep edits minimal and avoid changing Russian copy unless the task explicitly asks for copy changes.
+<!-- END:cyrillic-encoding-policy -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

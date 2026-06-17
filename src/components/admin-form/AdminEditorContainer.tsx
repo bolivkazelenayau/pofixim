@@ -4,6 +4,8 @@ import AdminExerciseEditor from '@/components/admin-form/AdminExerciseEditor';
 import { useExercisePreview } from '@/hooks/useExercisePreview';
 import { useFormHistory } from '@/hooks/useFormHistory';
 import type { DraftRecoveryState, Form } from './types';
+import type { AnyFormApi } from '@tanstack/react-form';
+import type { AdminFormValidation } from './validation';
 
 type AdminEditorContainerProps = {
   status: {
@@ -16,11 +18,13 @@ type AdminEditorContainerProps = {
     showFloatingSave: boolean;
   };
   formState: {
+    adminFormApi: AnyFormApi;
     formRef: React.RefObject<HTMLFormElement | null>;
     form: Form;
     isDraftLoaded: boolean;
     typeOptions: Form['type'][];
     setForm: React.Dispatch<React.SetStateAction<Form>>;
+    validation: AdminFormValidation;
     mainSaveAnchorRef: React.RefObject<HTMLDivElement | null>;
   };
   recovery: {

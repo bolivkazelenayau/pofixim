@@ -205,6 +205,7 @@ type AdminMarkdownEditorProps = {
   colorMode: 'dark' | 'light';
   height?: number;
   id?: string;
+  error?: string;
 };
 
 export default function AdminMarkdownEditor({
@@ -214,6 +215,7 @@ export default function AdminMarkdownEditor({
   colorMode,
   height = 205,
   id,
+  error,
 }: AdminMarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const markdownCommands = useMemo<ICommand[]>(
@@ -258,7 +260,7 @@ export default function AdminMarkdownEditor({
 
   return (
     <div id={id} ref={rootRef} className="mt-3">
-      <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
+      <label htmlFor={id ? `${id}-control` : undefined} className="mb-1 block text-sm font-medium text-foreground/80">{label}</label>
       <MDEditor
         value={value}
         onChange={(nextValue) => onChange(nextValue || '')}
@@ -268,10 +270,18 @@ export default function AdminMarkdownEditor({
         commands={markdownCommands}
         extraCommands={markdownExtraCommands}
         textareaProps={{
+          id: id ? `${id}-control` : undefined,
           name: id,
           'aria-label': label,
+          'aria-invalid': Boolean(error),
+          'aria-describedby': error && id ? `${id}-error` : undefined,
         }}
       />
+      {error && id ? (
+        <p id={`${id}-error`} className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

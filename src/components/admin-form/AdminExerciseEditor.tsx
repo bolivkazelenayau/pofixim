@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState, type FormEvent } from 'react';
+import type { AnyFormApi } from '@tanstack/react-form';
 import AdminCoreFields from '@/components/admin-form/AdminCoreFields';
 import AdminMetaFields from '@/components/admin-form/AdminMetaFields';
 import AdminDraftRecoveryModal from '@/components/admin-form/AdminDraftRecoveryModal';
@@ -11,6 +12,7 @@ import DeleteExerciseConfirmModal from '@/components/admin-form/DeleteExerciseCo
 import FloatingSaveButton from '@/components/admin-form/FloatingSaveButton';
 import SeedRegenerateConfirmModal from '@/components/admin-form/SeedRegenerateConfirmModal';
 import type { DraftRecoveryState, FeedbackSections, Form, PreviewCheckResult } from '@/components/admin-form/types';
+import type { AdminFormValidation } from '@/components/admin-form/validation';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 
 type AdminExerciseEditorProps = {
@@ -24,10 +26,12 @@ type AdminExerciseEditorProps = {
     showFloatingSave: boolean;
   };
   formState: {
+    adminFormApi: AnyFormApi;
     formRef: React.RefObject<HTMLFormElement | null>;
     form: Form;
     typeOptions: Form['type'][];
     setForm: React.Dispatch<React.SetStateAction<Form>>;
+    validation: AdminFormValidation;
     mainSaveAnchorRef: React.RefObject<HTMLDivElement | null>;
   };
   previewState: {
@@ -76,6 +80,7 @@ type AdminExerciseEditorProps = {
 type TypeSpecificFieldsProps = {
   form: Form;
   setForm: React.Dispatch<React.SetStateAction<Form>>;
+  fieldErrors: AdminFormValidation['fieldErrors'];
 };
 
 const typeFieldLoading = () => <EditorSkeletonBlock className="mt-3 h-32 rounded-lg" />;
@@ -261,13 +266,13 @@ function AdminExerciseEditorSkeleton() {
   );
 }
 
-function TypeSpecificFields({ form, setForm }: TypeSpecificFieldsProps) {
+function TypeSpecificFields({ form, setForm, fieldErrors }: TypeSpecificFieldsProps) {
   switch (form.type) {
     case 'multiple_choice':
     case 'ege_multi_select':
-      return <AdminChoiceFields form={form} setForm={setForm} />;
+      return <AdminChoiceFields form={form} setForm={setForm} fieldErrors={fieldErrors} />;
     case 'fill_blank':
-      return <AdminFillBlankFields form={form} setForm={setForm} />;
+      return <AdminFillBlankFields form={form} setForm={setForm} fieldErrors={fieldErrors} />;
     case 'word_bank_cloze':
       return <AdminWordBankClozeFields form={form} setForm={setForm} />;
     case 'word_search':
@@ -300,6 +305,15 @@ export default function AdminExerciseEditor({
   actions,
 }: AdminExerciseEditorProps) {
   const { form, formRef, mainSaveAnchorRef, setForm, typeOptions } = formState;
+  const { validation } = formState;
+  const visibleFieldErrors =
+    status.isEdit || status.hasUnsavedChanges || status.isError
+      ? validation.fieldErrors
+      : {};
+  const visibleValidationSummary =
+    status.isEdit || status.hasUnsavedChanges || status.isError
+      ? validation.summary
+      : [];
   const afterFirstPaint = useAfterFirstPaint();
   const idleReady = useIdleReady();
   const previewHasContent = Boolean(
@@ -338,8 +352,14 @@ export default function AdminExerciseEditor({
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <form
             ref={formRef}
-            onSubmit={actions.onSubmit}
-            aria-describedby={status.isError && status.message ? 'admin-form-error' : undefined}
+            onSubmit={(event) => {
+              void formState.adminFormApi.handleSubmit();
+              void actions.onSubmit(event);
+            }}
+            aria-describedby={[
+              status.isError && status.message ? 'admin-form-error' : null,
+              visibleValidationSummary.length > 0 ? 'admin-form-validation-summary' : null,
+            ].filter(Boolean).join(' ') || undefined}
           >
             {status.isError && status.message ? (
               <div
@@ -350,17 +370,33 @@ export default function AdminExerciseEditor({
                 {status.message}
               </div>
             ) : null}
+            {visibleValidationSummary.length > 0 ? (
+              <div
+                id="admin-form-validation-summary"
+                role="status"
+                aria-live="polite"
+                className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+              >
+                <div className="font-semibold">Form needs attention</div>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {visibleValidationSummary.slice(0, 5).map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <AdminCoreFields
               form={form}
               typeOptions={typeOptions}
               setForm={setForm}
+              fieldErrors={visibleFieldErrors}
               onTypeChange={actions.onTypeChange}
               onGenerateSeedClick={actions.onGenerateSeedClick}
               onSeedManualChange={actions.onSeedManualChange}
             />
 
             {afterFirstPaint ? (
-              <TypeSpecificFields form={form} setForm={setForm} />
+              <TypeSpecificFields form={form} setForm={setForm} fieldErrors={visibleFieldErrors} />
             ) : (
               typeFieldLoading()
             )}
@@ -368,6 +404,7 @@ export default function AdminExerciseEditor({
             <AdminMetaFields
               form={form}
               setForm={setForm}
+              fieldErrors={visibleFieldErrors}
               mainSaveAnchorRef={mainSaveAnchorRef}
               saving={status.saving}
               deleting={status.deleting}

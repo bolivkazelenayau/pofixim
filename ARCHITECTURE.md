@@ -11,7 +11,8 @@
 - matchmaking;
 - быстрые режимы;
 - админку;
-- TanStack Query и SSR hydration;
+- TanStack Query/Form/Pacer/Table/Virtual/Hotkeys в админке;
+- SSR hydration;
 - авторизацию;
 - theme hydration;
 - local proxy/Tailscale;
@@ -20,4 +21,3 @@
 - известные ограничения.
 
 См. `ARCHITECTURE_V2.MD`.
-

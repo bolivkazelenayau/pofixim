@@ -1,7 +1,8 @@
 import type { Form } from '@/components/admin-form/types';
 
 export function getFormContentSnapshot(source: Form) {
-  const { updatedAt: _updatedAt, ...rest } = source;
+  const rest = { ...source };
+  delete rest.updatedAt;
   return JSON.stringify(rest);
 }
 

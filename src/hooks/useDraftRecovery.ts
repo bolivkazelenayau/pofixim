@@ -146,7 +146,7 @@ export function useDraftRecovery(config: UseDraftRecoveryConfig) {
       draftType: localDraft.type,
     });
     setDraftRecovery({ id, serverForm, draftForm: localDraft });
-  }, [setForm, setSelectedId, setDatabaseSaveState, sessionDraftIdsRef, clearPendingDraftMarker]);
+  }, [setForm, setSelectedId, setDatabaseSaveState, sessionDraftIdsRef, clearPendingDraftMarker, setIsError, setMessage]);
 
   const useRecoveredDraft = useCallback(() => {
     if (!draftRecovery) return;

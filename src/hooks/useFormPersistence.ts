@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildPayloadFromForm } from '@/components/admin-form/formMapping';
 import { updateExerciseAction } from '@/app/actions/admin';
@@ -55,7 +56,6 @@ export function useFormPersistence({
   const autosaveInFlightRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveRetryTimerRef = useRef<number | null>(null);
-  const localDraftTimerRef = useRef<number | null>(null);
   const lastLocalDraftSnapshotRef = useRef('');
 
   useEffect(() => {
@@ -68,25 +68,7 @@ export function useFormPersistence({
     lastPersistedSnapshotRef.current = JSON.stringify(form);
   }, [form, isDraftLoaded]);
 
-  useEffect(() => {
-    latestFormRef.current = form;
-    if (!isDraftLoaded) return;
-    const snapshot = JSON.stringify(form);
-    if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) {
-      if (isEdit) {
-        clearLocal(form);
-        setDatabaseSaveState('saved');
-      }
-      return;
-    }
-    scheduleLocalDraftWrite(form);
-    setDatabaseSaveState('local');
-    if (form.id) {
-      document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
-    }
-  }, [form, isDraftLoaded, sessionDraftIdsRef]);
-
-  function writeLocalDraftNow(source: Form) {
+  const writeLocalDraftNow = useCallback((source: Form) => {
     const snapshot = JSON.stringify(source);
     if (snapshot === lastLocalDraftSnapshotRef.current) return;
     writeStoredDraft(source.id ?? null, source);
@@ -95,31 +77,28 @@ export function useFormPersistence({
       sessionDraftIdsRef.current.add(source.id);
       document.cookie = `admin_pending_draft_id=${source.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
     }
-  }
+  }, [sessionDraftIdsRef]);
 
-  function scheduleLocalDraftWrite(source: Form) {
-    if (localDraftTimerRef.current != null) {
-      window.clearTimeout(localDraftTimerRef.current);
-    }
-    localDraftTimerRef.current = window.setTimeout(() => {
-      localDraftTimerRef.current = null;
-      writeLocalDraftNow(source);
-    }, 500);
-  }
+  const localDraftDebouncer = useDebouncer(writeLocalDraftNow, {
+    key: 'admin-local-draft',
+    wait: 500,
+    onUnmount: (debouncer) => debouncer.flush(),
+  });
 
-  function cancelPendingLocalDraftWrite() {
-    if (localDraftTimerRef.current != null) {
-      window.clearTimeout(localDraftTimerRef.current);
-      localDraftTimerRef.current = null;
-    }
-  }
+  const scheduleLocalDraftWrite = useCallback((source: Form) => {
+    localDraftDebouncer.maybeExecute(source);
+  }, [localDraftDebouncer]);
 
-  function storeLocal(source: Form) {
+  const cancelPendingLocalDraftWrite = useCallback(() => {
+    localDraftDebouncer.cancel();
+  }, [localDraftDebouncer]);
+
+  const storeLocal = useCallback((source: Form) => {
     cancelPendingLocalDraftWrite();
     writeLocalDraftNow(source);
-  }
+  }, [cancelPendingLocalDraftWrite, writeLocalDraftNow]);
 
-  function clearLocal(source: Form) {
+  const clearLocal = useCallback((source: Form) => {
     cancelPendingLocalDraftWrite();
     localStorage.removeItem(getDraftKey(source.id));
     lastLocalDraftSnapshotRef.current = '';
@@ -127,7 +106,24 @@ export function useFormPersistence({
       clearPendingDraftCookie(source.id);
       sessionDraftIdsRef.current.delete(source.id);
     }
-  }
+  }, [cancelPendingLocalDraftWrite, sessionDraftIdsRef]);
+
+  useEffect(() => {
+    latestFormRef.current = form;
+    if (!isDraftLoaded) return;
+    if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) {
+      if (isEdit) {
+        clearLocal(form);
+        queueMicrotask(() => setDatabaseSaveState('saved'));
+      }
+      return;
+    }
+    scheduleLocalDraftWrite(form);
+    queueMicrotask(() => setDatabaseSaveState('local'));
+    if (form.id) {
+      document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
+    }
+  }, [form, isDraftLoaded, isEdit, clearLocal, scheduleLocalDraftWrite]);
 
   function markSaveSucceeded(source: Form, snapshot: string) {
     const latestForm = latestFormRef.current;
@@ -217,11 +213,8 @@ export function useFormPersistence({
       window.clearTimeout(autosaveRetryTimerRef.current);
       autosaveRetryTimerRef.current = null;
     }
-    if (localDraftTimerRef.current != null) {
-      window.clearTimeout(localDraftTimerRef.current);
-      localDraftTimerRef.current = null;
-    }
-  }, []);
+    localDraftDebouncer.cancel();
+  }, [localDraftDebouncer]);
 
   const autosaveCurrentToDbIfNeeded = useCallback(
     async (nextId: number) => {

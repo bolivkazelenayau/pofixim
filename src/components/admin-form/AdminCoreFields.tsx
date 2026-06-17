@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { categories, inputClass } from '@/components/admin-form/constants';
 import type { Form } from '@/components/admin-form/types';
+import type { AdminFieldErrors } from '@/components/admin-form/validation';
 import { useTheme } from '@/components/theme-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ExerciseCategory } from '@/features/exercises/types';
@@ -21,6 +22,7 @@ type AdminCoreFieldsProps = {
  onTypeChange: (type: Form['type']) => void;
  onGenerateSeedClick: () => void;
  onSeedManualChange: () => void;
+ fieldErrors?: AdminFieldErrors;
 };
 
 const AdminMarkdownEditor = dynamic(
@@ -41,6 +43,7 @@ type DeferredMarkdownEditorProps = {
  value: string;
  onChange: (value: string) => void;
  colorMode: 'dark' | 'light';
+ error?: string;
 };
 
 function DeferredMarkdownEditor({
@@ -49,6 +52,7 @@ function DeferredMarkdownEditor({
  value,
  onChange,
  colorMode,
+ error,
 }: DeferredMarkdownEditorProps) {
  const [enhanced, setEnhanced] = useState(false);
 
@@ -58,23 +62,31 @@ function DeferredMarkdownEditor({
     id={id}
     label={label}
     value={value}
-    onChange={onChange}
-    colorMode={colorMode}
+   onChange={onChange}
+   colorMode={colorMode}
+   error={error}
    />
   );
  }
 
  return (
   <div id={id} className="mt-3">
-   <div className="mb-1 text-sm font-medium text-foreground/80">{label}</div>
+   <label htmlFor={`${id}-control`} className="mb-1 block text-sm font-medium text-foreground/80">{label}</label>
    <textarea
+    id={`${id}-control`}
     name={id}
     className={`${inputClass} min-h-44 resize-y leading-6`}
     value={value}
+    aria-invalid={Boolean(error)}
+    aria-describedby={error ? `${id}-error` : undefined}
     onChange={(event) => onChange(event.target.value)}
     onFocus={() => setEnhanced(true)}
-    aria-label={label}
    />
+   {error ? (
+    <p id={`${id}-error`} className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+     {error}
+    </p>
+   ) : null}
   </div>
  );
 }
@@ -86,6 +98,7 @@ export default function AdminCoreFields({
  onTypeChange,
  onGenerateSeedClick,
  onSeedManualChange,
+ fieldErrors = {},
 }: AdminCoreFieldsProps) {
  const { resolvedTheme, theme } = useTheme();
  const isClient = useSyncExternalStore(
@@ -159,12 +172,15 @@ export default function AdminCoreFields({
    </div>
 
    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-    <Field id="admin-field-seed-key" label="Seed key">
+    <Field id="admin-field-seed-key" label="Seed key" error={fieldErrors.seedKey}>
      <div className="flex gap-2">
       <input
+       id="admin-field-seed-key-control"
        name="seedKey"
        className={inputClass}
        value={form.seedKey}
+       aria-invalid={Boolean(fieldErrors.seedKey)}
+       aria-describedby={fieldErrors.seedKey ? 'admin-field-seed-key-error' : undefined}
        onChange={(event) => {
         onSeedManualChange();
         setForm((current) => ({ ...current, seedKey: event.target.value }));
@@ -181,11 +197,14 @@ export default function AdminCoreFields({
       </button>
      </div>
     </Field>
-    <Field id="admin-field-skill-tags" label="Skill tags">
+    <Field id="admin-field-skill-tags" label="Skill tags" error={fieldErrors.skillTags}>
      <input
+      id="admin-field-skill-tags-control"
       name="skillTags"
       className={inputClass}
       value={form.skillTags}
+      aria-invalid={Boolean(fieldErrors.skillTags)}
+      aria-describedby={fieldErrors.skillTags ? 'admin-field-skill-tags-error' : undefined}
       onChange={(event) => setForm((current) => ({ ...current, skillTags: event.target.value }))}
      />
     </Field>
@@ -194,16 +213,18 @@ export default function AdminCoreFields({
    <DeferredMarkdownEditor
     id="admin-field-prompt"
     label="Формулировка"
-    value={form.prompt}
-    onChange={(prompt) => setForm((current) => ({ ...current, prompt }))}
-    colorMode={editorColorMode}
+   value={form.prompt}
+   onChange={(prompt) => setForm((current) => ({ ...current, prompt }))}
+   colorMode={editorColorMode}
+   error={fieldErrors.prompt}
    />
    <DeferredMarkdownEditor
     id="admin-field-explanation"
     label="Объяснение"
-    value={form.explanation}
-    onChange={(explanation) => setForm((current) => ({ ...current, explanation }))}
-    colorMode={editorColorMode}
+   value={form.explanation}
+   onChange={(explanation) => setForm((current) => ({ ...current, explanation }))}
+   colorMode={editorColorMode}
+   error={fieldErrors.explanation}
    />
   </>
  );
@@ -213,15 +234,24 @@ function Field({
  id,
  label,
  children,
+ error,
 }: {
  id?: string;
  label: string;
  children: ReactNode;
+ error?: string;
 }) {
+ const controlId = id ? `${id}-control` : undefined;
+ const errorId = id ? `${id}-error` : undefined;
  return (
-  <label id={id} className="block">
-   <div className="mb-1 text-sm font-medium text-foreground/80 ">{label}</div>
+  <div id={id} className="block">
+   <label htmlFor={controlId} className="mb-1 block text-sm font-medium text-foreground/80 ">{label}</label>
    {children}
-  </label>
+   {error && errorId ? (
+    <p id={errorId} className="mt-1 text-xs font-medium text-red-600 dark:text-red-300">
+     {error}
+    </p>
+   ) : null}
+  </div>
  );
 }

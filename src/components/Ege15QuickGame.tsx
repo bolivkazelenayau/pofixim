@@ -123,12 +123,14 @@ export default function Ege15QuickGame({
   }
 
   useEffect(() => {
-    if (isInspectMode) {
-      setStatus('running');
-      return;
-    }
+    queueMicrotask(() => {
+      if (isInspectMode) {
+        setStatus('running');
+        return;
+      }
 
-    setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+      setStatus((currentStatus) => (currentStatus === 'running' ? 'offer' : currentStatus));
+    });
   }, [isInspectMode]);
 
   async function copySeedKey() {
