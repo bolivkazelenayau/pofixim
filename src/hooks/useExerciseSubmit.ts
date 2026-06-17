@@ -249,6 +249,7 @@ export function useExerciseSubmit({
       const savedExerciseId = wasEdit ? form.id : 'id' in res ? res.id : undefined;
       if (savedExerciseId) {
         publishExerciseUpdated(savedExerciseId);
+        await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(savedExerciseId) });
       }
       const savedUpdatedAt = 'updatedAt' in res ? res.updatedAt ?? null : null;
       const nextForm = wasEdit ? { ...form, updatedAt: savedUpdatedAt ?? form.updatedAt ?? null } : loadFormState(null, EMPTY);
@@ -318,6 +319,7 @@ export function useExerciseSubmit({
         );
         if (form.id) {
           await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.detail(form.id) });
+          await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(form.id) });
         }
       } else if (res.error === 'Unauthorized') {
         setMessage('Сессия истекла. Изменения сохранены локально. Войдите снова, чтобы записать их в базу.');
@@ -380,6 +382,7 @@ export function useExerciseSubmit({
         hasActiveListFilter && current !== null ? Math.max(0, current - 1) : current,
       );
       queryClient.removeQueries({ queryKey: adminExerciseKeys.detail(deletedId) });
+      queryClient.removeQueries({ queryKey: adminExerciseKeys.revisions(deletedId) });
       await refreshList({ force: true });
     } else {
       rollbackOptimisticDelete();

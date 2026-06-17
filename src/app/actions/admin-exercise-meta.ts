@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { exercises } from '@/db/schema';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
 import type { ExerciseEditorInput } from './admin-types';
+import { recordExerciseRevision } from './admin-exercise-revisions';
 
 export async function batchUpdateExercisesMeta(input: {
   ids: number[];
@@ -23,9 +24,22 @@ export async function batchUpdateExercisesMeta(input: {
     if (typeof input.qualityStatus !== 'undefined') patch.qualityStatus = input.qualityStatus;
     if (typeof input.isActive !== 'undefined') patch.isActive = input.isActive;
 
-    await db.update(exercises).set(patch).where(inArray(exercises.id, ids));
+    const updated = await db.transaction(async (tx) => {
+      const beforeRows = await tx.select().from(exercises).where(inArray(exercises.id, ids));
+      const beforeById = new Map(beforeRows.map((row) => [row.id, row]));
+      const rows = await tx.update(exercises).set(patch).where(inArray(exercises.id, ids)).returning();
+      for (const row of rows) {
+        await recordExerciseRevision(tx, {
+          exerciseId: row.id,
+          action: 'batch_update',
+          before: beforeById.get(row.id) ?? null,
+          after: row,
+        });
+      }
+      return rows;
+    });
     updateTag('admin:list');
-    return { success: true, updated: ids.length };
+    return { success: true, updated: updated.length };
   } catch (error) {
     console.error('Failed to batch update exercises meta:', error);
     return { success: false, error: 'Unexpected error' };

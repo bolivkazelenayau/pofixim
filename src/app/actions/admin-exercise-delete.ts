@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { exerciseAttempts, exercises } from '@/db/schema';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
 import { logSlowServerAction } from '@/lib/slow-action-log';
+import { recordExerciseRevision } from './admin-exercise-revisions';
 import { refreshExerciseAdminCaches } from './admin-exercise-save';
 
 export async function deleteExercise(id: number) {
@@ -15,8 +16,18 @@ export async function deleteExercise(id: number) {
     }
 
     const deleted = await db.transaction(async (tx) => {
+      const beforeRows = await tx.select().from(exercises).where(eq(exercises.id, id)).limit(1);
+      const before = beforeRows[0] ?? null;
       await tx.delete(exerciseAttempts).where(eq(exerciseAttempts.exerciseId, id));
-      return tx.delete(exercises).where(eq(exercises.id, id)).returning({ id: exercises.id });
+      const rows = await tx.delete(exercises).where(eq(exercises.id, id)).returning({ id: exercises.id });
+      if (rows[0] && before) {
+        await recordExerciseRevision(tx, {
+          exerciseId: id,
+          action: 'delete',
+          before,
+        });
+      }
+      return rows;
     });
 
     if (deleted.length === 0) {

@@ -11,4 +11,5 @@ export const adminExerciseKeys = {
   list: (filters: AdminExerciseListFilters) => [...adminExerciseKeys.lists(), filters] as const,
   details: () => [...adminExerciseKeys.all, 'detail'] as const,
   detail: (id: number) => [...adminExerciseKeys.details(), id] as const,
+  revisions: (id: number) => [...adminExerciseKeys.detail(id), 'revisions'] as const,
 };

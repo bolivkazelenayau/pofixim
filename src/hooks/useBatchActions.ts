@@ -180,6 +180,9 @@ export function useBatchActions({
       return;
     }
     if (res.success) {
+      await Promise.all(
+        ids.map((id) => queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(id) })),
+      );
       setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
       setIsError(false);
       clearMultiSelection();
@@ -247,6 +250,9 @@ export function useBatchActions({
       return;
     }
     if (res.success) {
+      await Promise.all(
+        ids.map((id) => queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(id) })),
+      );
       setMessage(`Обновлено заданий: ${multiSelectedIds.length}.`);
       setIsError(false);
       clearMultiSelection();

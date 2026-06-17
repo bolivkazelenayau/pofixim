@@ -78,6 +78,24 @@ export const exercises = pgTable(
   ],
 );
 
+export const exerciseRevisions = pgTable(
+  'exercise_revisions',
+  {
+    id: serial('id').primaryKey(),
+    exerciseId: integer('exercise_id').notNull(),
+    action: text('action').notNull(),
+    actorLabel: text('actor_label').notNull().default('admin'),
+    changedFields: text('changed_fields').array().notNull(),
+    snapshotBefore: jsonb('snapshot_before'),
+    snapshotAfter: jsonb('snapshot_after'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('exercise_revisions_exercise_created_idx').on(table.exerciseId, table.createdAt),
+    index('exercise_revisions_created_at_idx').on(table.createdAt),
+  ],
+);
+
 export const learningSessions = pgTable(
   'learning_sessions',
   {

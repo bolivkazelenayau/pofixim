@@ -124,6 +124,9 @@ const AdminPreviewPanel = dynamic(() => import('@/components/admin-form/AdminPre
 const AdminQualityInspector = dynamic(() => import('@/components/admin-form/AdminQualityInspector'), {
   loading: () => <QualityInspectorShell />,
 });
+const AdminExerciseHistory = dynamic(() => import('@/components/admin-form/AdminExerciseHistory'), {
+  loading: () => <HistoryShell />,
+});
 
 function EditorSkeletonBlock({ className = '' }: { className?: string }) {
   return <div className={`rounded-md bg-foreground/10 motion-safe:animate-pulse ${className}`} />;
@@ -201,6 +204,24 @@ function QualityInspectorShell() {
         <EditorSkeletonBlock className="h-7 rounded-lg" />
         <EditorSkeletonBlock className="h-7 rounded-lg" />
         <EditorSkeletonBlock className="h-7 rounded-lg" />
+      </div>
+    </section>
+  );
+}
+
+function HistoryShell() {
+  return (
+    <section className="rounded-3xl border border-stroke bg-surface-strong p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <EditorSkeletonBlock className="h-5 w-24" />
+          <EditorSkeletonBlock className="mt-2 h-4 w-44" />
+        </div>
+        <EditorSkeletonBlock className="h-8 w-8 rounded-lg" />
+      </div>
+      <div className="space-y-2" aria-hidden="true">
+        <EditorSkeletonBlock className="h-14 rounded-xl" />
+        <EditorSkeletonBlock className="h-14 rounded-xl" />
       </div>
     </section>
   );
@@ -442,6 +463,7 @@ export default function AdminExerciseEditor({
             ) : (
               <QualityInspectorShell />
             )}
+            {idleReady ? <AdminExerciseHistory exerciseId={form.id ?? null} /> : <HistoryShell />}
           </aside>
         </div>
           </>

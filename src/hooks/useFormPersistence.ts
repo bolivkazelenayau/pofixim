@@ -1,9 +1,11 @@
 'use client';
 
 import { useDebouncer } from '@tanstack/react-pacer';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildPayloadFromForm } from '@/components/admin-form/formMapping';
 import { updateExerciseAction } from '@/app/actions/admin';
+import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
 import { writeStoredDraft, getDraftKey } from '@/components/admin-form/draftStorage';
 import type { Form } from '@/components/admin-form/types';
 import { publishExerciseUpdated } from '@/lib/exercise-update-events';
@@ -46,6 +48,7 @@ export function useFormPersistence({
   setIsError,
   setMessage,
 }: FormPersistenceConfig) {
+  const queryClient = useQueryClient();
   const [databaseSaveState, setDatabaseSaveState] = useState<'draft' | 'local' | 'saving' | 'saved'>(
     isEdit ? 'saved' : 'draft',
   );
@@ -181,6 +184,7 @@ export function useFormPersistence({
         markSaveSucceeded(savedForm, JSON.stringify(savedForm));
         syncSavedVersion(savedForm);
         publishExerciseUpdated(id);
+        await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(id) });
         return true;
       }
       setDatabaseSaveState('local');

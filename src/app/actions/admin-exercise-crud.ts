@@ -8,6 +8,7 @@ import {
   prepareExerciseSave,
   refreshExerciseAdminCaches,
 } from './admin-exercise-save';
+import { recordExerciseRevision } from './admin-exercise-revisions';
 
 export async function createExercise(input: ExerciseEditorInput) {
   try {
@@ -27,10 +28,18 @@ export async function createExercise(input: ExerciseEditorInput) {
       };
     }
 
-    const inserted = await db
-      .insert(exercises)
-      .values(payload.values)
-      .returning({ id: exercises.id });
+    const inserted = await db.transaction(async (tx) => {
+      const rows = await tx.insert(exercises).values(payload.values).returning();
+      const row = rows[0];
+      if (row) {
+        await recordExerciseRevision(tx, {
+          exerciseId: row.id,
+          action: 'create',
+          after: row,
+        });
+      }
+      return rows;
+    });
 
     refreshExerciseAdminCaches();
     return { success: true, id: inserted[0]?.id };
@@ -58,24 +67,35 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
       };
     }
 
-    const updated = await db
-      .update(exercises)
-      .set({
-        ...payload.values,
-        updatedAt: sql`now()::timestamp`,
-      })
-      .where(
-        input.knownUpdatedAt
-          ? and(
-              eq(exercises.id, input.id),
-              sql`${exercises.updatedAt} = ${input.knownUpdatedAt}::timestamp`,
-            )
-          : eq(exercises.id, input.id),
-      )
-      .returning({
-        id: exercises.id,
-        updatedAt: sql<string>`${exercises.updatedAt}::text`,
-      });
+    const updated = await db.transaction(async (tx) => {
+      const beforeRows = await tx.select().from(exercises).where(eq(exercises.id, input.id)).limit(1);
+      const before = beforeRows[0] ?? null;
+      const rows = await tx
+        .update(exercises)
+        .set({
+          ...payload.values,
+          updatedAt: sql`now()::timestamp`,
+        })
+        .where(
+          input.knownUpdatedAt
+            ? and(
+                eq(exercises.id, input.id),
+                sql`${exercises.updatedAt} = ${input.knownUpdatedAt}::timestamp`,
+              )
+            : eq(exercises.id, input.id),
+        )
+        .returning();
+      const row = rows[0];
+      if (row) {
+        await recordExerciseRevision(tx, {
+          exerciseId: row.id,
+          action: 'update',
+          before,
+          after: row,
+        });
+      }
+      return rows;
+    });
 
     if (updated.length === 0) {
       if (input.knownUpdatedAt) {
@@ -114,7 +134,11 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
     }
 
     refreshExerciseAdminCaches();
-    return { success: true, updatedAt: updated[0]?.updatedAt ?? null };
+    const updatedAt = updated[0]?.updatedAt;
+    return {
+      success: true,
+      updatedAt: updatedAt instanceof Date ? updatedAt.toISOString() : String(updatedAt ?? ''),
+    };
   } catch (error) {
     console.error('Failed to update exercise:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unexpected error' };

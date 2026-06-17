@@ -373,6 +373,7 @@ Backdrop-поведение согласовано между blitz/ege13/ege15:
 - сохранять локальный draft при ошибке;
 - восстанавливать draft;
 - показывать preview и quality inspector;
+- показывать историю ревизий упражнения;
 - показывать quick diagnostics и structured feedback diagnostics;
 - валидировать форму редактора на клиенте через общий admin validator;
 - управлять shortcuts через централизованный adapter.
@@ -416,7 +417,7 @@ Structured feedback diagnostics:
 - Diagnostics показывает target rows, извлечённые rows, missing target rows, unresolved gaps и warning codes.
 - Этот слой нужен админке и регрессиям, но не меняет поведение checker result для пользователя.
 
-История изменений упражнений пока не реализована. Рекомендуемый будущий слой - таблица `exercise_revisions` с `exercise_id`, actor/action, snapshot before/after, changed fields и `created_at`. Это отдельная фича после стабилизации текущей миграции, потому что она затрагивает DB schema, CRUD actions, autosave, batch actions и restore UI.
+История изменений упражнений реализована через таблицу `exercise_revisions`: `exercise_id`, `action`, `actor_label`, `changed_fields`, `snapshot_before`, `snapshot_after`, `created_at`. CRUD actions пишут ревизии в тех же транзакциях, что и create/update/delete, batch status/isActive updates пишут отдельную ревизию на каждое фактически изменённое упражнение. DB autosave идёт через `updateExerciseAction`, поэтому попадает в тот же audit trail. UI истории находится в правой колонке редактора и читает последние ревизии через `listExerciseRevisionsAction` + TanStack Query. Restore UI пока не включён намеренно: сначала история работает как audit/read layer, затем откат можно добавить отдельным action с optimistic concurrency.
 
 ## 10. TanStack Query в админке
 
