@@ -40,6 +40,7 @@ const APP_SHORTCUTS: Record<
     description: 'Open previous shown exercise',
   },
 };
+const DISABLED_SECONDARY_HOTKEY: RegisterableHotkey = { key: 'F24' };
 
 type UseAppShortcutOptions = {
   enabled?: boolean;
@@ -57,6 +58,7 @@ export function useAppShortcut(
     handler(event);
   };
   const hotkeyOptions: UseHotkeyOptions = {
+    conflictBehavior: 'replace',
     enabled,
     ignoreInputs: !shortcut.allowInEditable,
     meta: {
@@ -73,7 +75,7 @@ export function useAppShortcut(
     hotkeyOptions,
   );
   useHotkey(
-    shortcut.secondaryHotkey ?? shortcut.hotkey,
+    shortcut.secondaryHotkey ?? DISABLED_SECONDARY_HOTKEY,
     callback,
     {
       ...hotkeyOptions,

@@ -1,4 +1,4 @@
-import { useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
@@ -48,15 +48,19 @@ export default function AdminExerciseList({
       ]),
     [groupedItems],
   );
+  const rowSignature = useMemo(() => rows.map((row) => row.key).join('|'), [rows]);
   // TanStack Virtual returns a stateful virtualizer; React Compiler cannot memoize it safely.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => (rows[index]?.kind === 'group' ? 30 : 114),
+    estimateSize: (index) => (rows[index]?.kind === 'group' ? 30 : 120),
     getItemKey: (index) => rows[index]?.key ?? index,
     overscan: 6,
   });
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowSignature, rowVirtualizer]);
   const virtualItems = rowVirtualizer.getVirtualItems();
   const activeGroup = useMemo<ExerciseGroupRow | null>(() => {
     const scrollOffset = Math.max(0, (rowVirtualizer.scrollOffset ?? 0) - 32);
@@ -191,6 +195,10 @@ function ExerciseListButton({
   return (
     <button
       onClick={(event) => {
+        if (event.detail > 1) {
+          event.preventDefault();
+          return;
+        }
         logAdminDebug('exercise-list:item-click', {
           itemId: item.id,
           selectedId,
@@ -200,9 +208,6 @@ function ExerciseListButton({
           metaKey: event.metaKey,
         });
         onToggleSelection(item.id, event);
-      }}
-      onDoubleClick={() => {
-        onOpenExercise(item.id);
       }}
       onMouseEnter={() => {
         onPrefetchExercise(item.id);
@@ -216,7 +221,7 @@ function ExerciseListButton({
           onOpenExercise(item.id);
         }
       }}
-      className={`w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out [contain-intrinsic-size:114px] [content-visibility:auto] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+      className={`min-h-[114px] w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
         multiSelectedSet.has(item.id)
           ? 'border-primary/50 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_18%,transparent)]'
           : selectedId === item.id

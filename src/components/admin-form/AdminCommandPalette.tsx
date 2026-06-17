@@ -1,7 +1,5 @@
 'use client';
 
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import {
   Command,
   CommandDialog,
@@ -13,7 +11,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command';
-import { renderEditorMarkdown } from '@/components/admin-form/markdown/formatting';
+import CompactMarkdown from '@/components/admin-form/markdown/CompactMarkdown';
 import type { ListItem } from './types';
 
 type AdminCommandPaletteProps = {
@@ -67,11 +65,9 @@ export default function AdminCommandPalette({
           <div className="border-b border-stroke px-3 py-2 text-xs text-foreground/55">
             <span className="font-semibold text-foreground/75">Current:</span>{' '}
             <span className="font-mono text-xs font-semibold text-foreground">#{selectedItem.id}</span>
-            <div className="text-pretty mt-0.5 [&_p]:inline">
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                {renderEditorMarkdown(selectedItem.prompt)}
-              </ReactMarkdown>
-            </div>
+            <CompactMarkdown inline className="text-pretty mt-0.5">
+              {selectedItem.prompt}
+            </CompactMarkdown>
           </div>
         ) : null}
         <CommandList>
@@ -134,11 +130,9 @@ export default function AdminCommandPalette({
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="font-mono text-xs font-semibold text-foreground">#{item.id}</span>
-                      <span className="text-pretty [&_p]:inline">
-                        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                          {renderEditorMarkdown(item.prompt)}
-                        </ReactMarkdown>
-                      </span>
+                      <CompactMarkdown inline className="text-pretty">
+                        {item.prompt}
+                      </CompactMarkdown>
                     </span>
                     <CommandShortcut>
                       {selectedId === item.id ? 'open' : item.qualityStatus}
