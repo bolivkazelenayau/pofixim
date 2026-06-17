@@ -34,14 +34,42 @@ type FrozenVirtualSnapshot = {
 type RenderVirtualItem = Pick<VirtualItem, 'end' | 'index' | 'key' | 'size' | 'start'>;
 
 function estimateRowSize(row: ExerciseListRow | undefined) {
-  return row?.kind === 'group' ? 30 : 120;
+  return row?.kind === 'group' ? 32 : 120;
 }
 
 function buildFallbackVirtualItems(
   rows: ExerciseListRow[],
+  baseItems: VirtualItem[],
   scrollOffset: number,
 ): RenderVirtualItem[] {
   if (rows.length === 0) return [];
+
+  const baseGroup = baseItems.find((item) => rows[item.index]?.kind === 'group');
+  if (baseGroup) {
+    const items: RenderVirtualItem[] = [{
+      end: baseGroup.end,
+      index: baseGroup.index,
+      key: baseGroup.key,
+      size: baseGroup.size,
+      start: baseGroup.start,
+    }];
+    let offset = baseGroup.end;
+    let renderedItems = 0;
+    for (let index = baseGroup.index + 1; index < rows.length && renderedItems < 8; index += 1) {
+      if (rows[index]?.kind === 'group') break;
+      const size = estimateRowSize(rows[index]);
+      items.push({
+        end: offset + size,
+        index,
+        key: rows[index]?.key ?? index,
+        size,
+        start: offset,
+      });
+      renderedItems += 1;
+      offset += size;
+    }
+    return items;
+  }
 
   let offset = 0;
   let anchorIndex = 0;
@@ -136,9 +164,13 @@ export default function AdminExerciseList({
     overscan: 6,
     rangeExtractor,
   });
+  const lastMeasuredRowSignatureRef = useRef<string | null>(null);
   useLayoutEffect(() => {
+    if (isRefreshing) return;
+    if (lastMeasuredRowSignatureRef.current === rowSignature) return;
+    lastMeasuredRowSignatureRef.current = rowSignature;
     rowVirtualizer.measure();
-  }, [rowSignature, rowVirtualizer]);
+  }, [isRefreshing, rowSignature, rowVirtualizer]);
   const virtualItems = rowVirtualizer.getVirtualItems();
   const rowsHaveItems = rows.some((row) => row.kind === 'item');
   const virtualItemsHaveItems = virtualItems.some((item) => rows[item.index]?.kind === 'item');
@@ -174,7 +206,7 @@ export default function AdminExerciseList({
     renderedRows.some((row) => row.kind === 'item') &&
     !baseRenderedVirtualItems.some((item) => renderedRows[item.index]?.kind === 'item');
   const renderedVirtualItems = needsFallbackVirtualItems
-    ? buildFallbackVirtualItems(renderedRows, rowVirtualizer.scrollOffset ?? 0)
+    ? buildFallbackVirtualItems(renderedRows, baseRenderedVirtualItems, rowVirtualizer.scrollOffset ?? 0)
     : baseRenderedVirtualItems;
   const renderedTotalSize = frozenSnapshot?.totalSize ?? rowVirtualizer.getTotalSize();
   const renderedActiveGroup = frozenSnapshot ? frozenSnapshot.activeGroup : activeGroup;
@@ -327,7 +359,7 @@ function ExerciseListButton({
           onOpenExercise(item.id);
         }
       }}
-      className={`min-h-[114px] w-full rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+      className={`h-[114px] w-full overflow-hidden rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
         multiSelectedSet.has(item.id)
           ? 'border-primary/50 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_18%,transparent)]'
           : selectedId === item.id
