@@ -1,4 +1,5 @@
-import { useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import type { VirtualItem } from '@tanstack/react-virtual';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
@@ -24,6 +25,12 @@ type ExerciseListRow =
   | { kind: 'group'; key: string; label: string; count: number }
   | { kind: 'item'; key: string; item: ListItem };
 type ExerciseGroupRow = Extract<ExerciseListRow, { kind: 'group' }>;
+type FrozenVirtualSnapshot = {
+  rows: ExerciseListRow[];
+  virtualItems: VirtualItem[];
+  totalSize: number;
+  activeGroup: ExerciseGroupRow | null;
+};
 
 export default function AdminExerciseList({
   groupedItems,
@@ -66,9 +73,7 @@ export default function AdminExerciseList({
   const virtualItems = rowVirtualizer.getVirtualItems();
   const rowsHaveItems = rows.some((row) => row.kind === 'item');
   const virtualItemsHaveItems = virtualItems.some((item) => rows[item.index]?.kind === 'item');
-  const renderStaticRows = (isRefreshing || !virtualItemsHaveItems) && rowsHaveItems;
   const activeGroup = useMemo<ExerciseGroupRow | null>(() => {
-    if (renderStaticRows) return null;
     const scrollOffset = Math.max(0, (rowVirtualizer.scrollOffset ?? 0) - 32);
     const activeVirtualRow =
       virtualItems.find((item) => item.end > scrollOffset) ?? virtualItems[0];
@@ -78,52 +83,51 @@ export default function AdminExerciseList({
       if (row?.kind === 'group') return row;
     }
     return null;
-  }, [renderStaticRows, rowVirtualizer.scrollOffset, rows, virtualItems]);
+  }, [rowVirtualizer.scrollOffset, rows, virtualItems]);
+  const frozenVirtualSnapshotRef = useRef<FrozenVirtualSnapshot | null>(null);
+  const shouldFreezeVirtualLayer =
+    rowsHaveItems && (isRefreshing || (virtualItems.length > 0 && !virtualItemsHaveItems));
+
+  useEffect(() => {
+    if (shouldFreezeVirtualLayer || !virtualItemsHaveItems) return;
+    frozenVirtualSnapshotRef.current = {
+      rows,
+      virtualItems,
+      totalSize: rowVirtualizer.getTotalSize(),
+      activeGroup,
+    };
+  }, [activeGroup, rows, rowVirtualizer, shouldFreezeVirtualLayer, virtualItems, virtualItemsHaveItems]);
+
+  const frozenSnapshot = shouldFreezeVirtualLayer ? frozenVirtualSnapshotRef.current : null;
+  const renderedRows = frozenSnapshot?.rows ?? rows;
+  const renderedVirtualItems = frozenSnapshot?.virtualItems ?? virtualItems;
+  const renderedTotalSize = frozenSnapshot?.totalSize ?? rowVirtualizer.getTotalSize();
+  const renderedActiveGroup = frozenSnapshot ? frozenSnapshot.activeGroup : activeGroup;
+  const isFrozenVirtualLayer = Boolean(frozenSnapshot);
 
   return (
     <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-y-auto pr-1">
-      {activeGroup ? (
+      {renderedActiveGroup ? (
         <div className="pointer-events-none sticky top-0 z-sticky -mb-[22px]">
-          <GroupHeader label={activeGroup.label} count={activeGroup.count} />
+          <GroupHeader label={renderedActiveGroup.label} count={renderedActiveGroup.count} />
         </div>
       ) : null}
-      {renderStaticRows ? (
-        <div className="space-y-1.5">
-          {groupedItems.map(([groupLabel, typeItems]) => (
-            <div key={groupLabel} className="space-y-1.5">
-              <GroupHeader label={groupLabel} count={typeItems.length} />
-              {typeItems.map((item) => (
-                <ExerciseListButton
-                  key={item.id}
-                  item={item}
-                  selectionMode={selectionMode}
-                  selectedId={selectedId}
-                  multiSelectedSet={multiSelectedSet}
-                  onToggleSelection={onToggleSelection}
-                  onPrefetchExercise={onPrefetchExercise}
-                  onOpenExercise={onOpenExercise}
-                  formatUpdatedAt={formatUpdatedAt}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : rows.length > 0 ? (
+      {renderedRows.length > 0 ? (
         <div
           className="relative w-full"
-          style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          style={{ height: `${renderedTotalSize}px` }}
         >
-          {virtualItems.map((virtualRow) => {
-            const row = rows[virtualRow.index];
+          {renderedVirtualItems.map((virtualRow) => {
+            const row = renderedRows[virtualRow.index];
             if (!row) return null;
 
             return (
               <div
                 key={virtualRow.key}
-                ref={rowVirtualizer.measureElement}
+                ref={isFrozenVirtualLayer ? undefined : rowVirtualizer.measureElement}
                 data-index={virtualRow.index}
                 className={`absolute left-0 top-0 w-full pb-1.5 ${
-                  row.kind === 'group' && row.key === activeGroup?.key ? 'pointer-events-none opacity-0' : ''
+                  row.kind === 'group' && row.key === renderedActiveGroup?.key ? 'pointer-events-none opacity-0' : ''
                 }`}
                 style={{ transform: `translateY(${virtualRow.start}px)` }}
               >
