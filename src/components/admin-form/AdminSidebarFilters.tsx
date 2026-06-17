@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { inputClass, qualityStatuses } from './constants';
 
@@ -20,6 +20,39 @@ type AdminSidebarFiltersProps = {
   onListSortByChange: (value: 'id' | 'updatedAt' | 'type' | 'status') => void;
   onListSortDirChange: (value: 'asc' | 'desc') => void;
 };
+
+function typeLabel(value: string) {
+  return value === 'all' ? 'Все типы' : value;
+}
+
+function examTypeLabel(value: string) {
+  return value === 'all' ? 'ЕГЭ: все' : `ЕГЭ: ${value}`;
+}
+
+function statusLabel(value: string) {
+  return value === 'all' ? 'Все статусы' : value;
+}
+
+function sortByLabel(value: AdminSidebarFiltersProps['listSortBy']) {
+  switch (value) {
+    case 'updatedAt':
+      return 'По дате изменения';
+    case 'type':
+      return 'По типу';
+    case 'status':
+      return 'По статусу';
+    case 'id':
+      return 'По номеру';
+  }
+}
+
+function StableSelectLabel({ children }: { children: string }) {
+  return (
+    <span data-slot="select-value" className="min-w-0 truncate">
+      {children}
+    </span>
+  );
+}
 
 export default function AdminSidebarFilters({
   listQuery,
@@ -108,24 +141,24 @@ export default function AdminSidebarFilters({
       <div className="grid grid-cols-2 gap-2">
         <Select name="listTypeFilter" value={listTypeFilter} onValueChange={onListTypeFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by exercise type">
-            <SelectValue />
+            <StableSelectLabel>{typeLabel(listTypeFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
             {listTypes.map((type) => (
               <SelectItem key={type} value={type}>
-                {type === 'all' ? 'Все типы' : type}
+                {typeLabel(type)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select name="listExamTypeFilter" value={listExamTypeFilter} onValueChange={onListExamTypeFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by exam type">
-            <SelectValue />
+            <StableSelectLabel>{examTypeLabel(listExamTypeFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
             {listExamTypes.map((examType) => (
               <SelectItem key={examType} value={examType}>
-                {examType === 'all' ? 'ЕГЭ: все' : `ЕГЭ: ${examType}`}
+                {examTypeLabel(examType)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -134,7 +167,7 @@ export default function AdminSidebarFilters({
       <div className="grid grid-cols-1 gap-2">
         <Select name="listStatusFilter" value={listStatusFilter} onValueChange={onListStatusFilterChange}>
           <SelectTrigger className={inputClass} aria-label="Filter by quality status">
-            <SelectValue />
+            <StableSelectLabel>{statusLabel(listStatusFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Все статусы</SelectItem>
@@ -179,7 +212,7 @@ export default function AdminSidebarFilters({
                 }
               >
                 <SelectTrigger className={inputClass} aria-label="Sort exercise list by">
-                  <SelectValue />
+                  <StableSelectLabel>{sortByLabel(listSortBy)}</StableSelectLabel>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="id">По номеру</SelectItem>

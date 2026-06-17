@@ -397,6 +397,23 @@ export function useExerciseList({
   }, [flatFilteredItems]);
   const isListRefreshing =
     listQueryResult.isFetching && !listQueryResult.isFetchingNextPage;
+  const lastStableGroupedItemsRef = useRef(groupedItems);
+  const shouldHoldStableList =
+    (isListRefreshing || listQueryResult.isPlaceholderData || isServerQuerySettling) &&
+    lastStableGroupedItemsRef.current.length > 0;
+
+  useEffect(() => {
+    if (shouldHoldStableList || groupedItems.length === 0) return;
+    lastStableGroupedItemsRef.current = groupedItems;
+  }, [groupedItems, shouldHoldStableList]);
+
+  const displayedGroupedItems = shouldHoldStableList
+    ? lastStableGroupedItemsRef.current
+    : groupedItems;
+  const displayedFlatFilteredItems = useMemo(
+    () => displayedGroupedItems.flatMap(([, groupItems]) => groupItems),
+    [displayedGroupedItems],
+  );
 
   return {
     items,
@@ -410,8 +427,8 @@ export function useExerciseList({
       (items.length === 0 && listQueryResult.isPending && !listQueryResult.isPlaceholderData),
     hasActiveListFilter,
     filteredItems,
-    groupedItems,
-    flatFilteredItems,
+    groupedItems: displayedGroupedItems,
+    flatFilteredItems: displayedFlatFilteredItems,
     listQuery,
     setListQuery,
     listTypeFilter,

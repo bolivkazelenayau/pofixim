@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
 import type { ListItem } from './types';
@@ -42,22 +42,13 @@ export default function AdminExerciseList({
   onClearFilters,
 }: AdminExerciseListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const lastStableGroupedItemsRef = useRef(groupedItems);
-  useEffect(() => {
-    if (isRefreshing || groupedItems.length === 0) return;
-    lastStableGroupedItemsRef.current = groupedItems;
-  }, [groupedItems, isRefreshing]);
-  const displayedGroupedItems =
-    isRefreshing && lastStableGroupedItemsRef.current.length > 0
-      ? lastStableGroupedItemsRef.current
-      : groupedItems;
   const rows = useMemo<ExerciseListRow[]>(
     () =>
-      displayedGroupedItems.flatMap(([type, typeItems]) => [
+      groupedItems.flatMap(([type, typeItems]) => [
         { kind: 'group' as const, key: `group:${type}`, label: type, count: typeItems.length },
         ...typeItems.map((item) => ({ kind: 'item' as const, key: `item:${item.id}`, item })),
       ]),
-    [displayedGroupedItems],
+    [groupedItems],
   );
   const rowSignature = useMemo(() => rows.map((row) => row.key).join('|'), [rows]);
   // TanStack Virtual returns a stateful virtualizer; React Compiler cannot memoize it safely.
@@ -73,7 +64,11 @@ export default function AdminExerciseList({
     rowVirtualizer.measure();
   }, [rowSignature, rowVirtualizer]);
   const virtualItems = rowVirtualizer.getVirtualItems();
+  const rowsHaveItems = rows.some((row) => row.kind === 'item');
+  const virtualItemsHaveItems = virtualItems.some((item) => rows[item.index]?.kind === 'item');
+  const renderStaticRows = (isRefreshing || !virtualItemsHaveItems) && rowsHaveItems;
   const activeGroup = useMemo<ExerciseGroupRow | null>(() => {
+    if (renderStaticRows) return null;
     const scrollOffset = Math.max(0, (rowVirtualizer.scrollOffset ?? 0) - 32);
     const activeVirtualRow =
       virtualItems.find((item) => item.end > scrollOffset) ?? virtualItems[0];
@@ -83,7 +78,7 @@ export default function AdminExerciseList({
       if (row?.kind === 'group') return row;
     }
     return null;
-  }, [rowVirtualizer.scrollOffset, rows, virtualItems]);
+  }, [renderStaticRows, rowVirtualizer.scrollOffset, rows, virtualItems]);
 
   return (
     <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-y-auto pr-1">
@@ -92,7 +87,28 @@ export default function AdminExerciseList({
           <GroupHeader label={activeGroup.label} count={activeGroup.count} />
         </div>
       ) : null}
-      {rows.length > 0 ? (
+      {renderStaticRows ? (
+        <div className="space-y-1.5">
+          {groupedItems.map(([groupLabel, typeItems]) => (
+            <div key={groupLabel} className="space-y-1.5">
+              <GroupHeader label={groupLabel} count={typeItems.length} />
+              {typeItems.map((item) => (
+                <ExerciseListButton
+                  key={item.id}
+                  item={item}
+                  selectionMode={selectionMode}
+                  selectedId={selectedId}
+                  multiSelectedSet={multiSelectedSet}
+                  onToggleSelection={onToggleSelection}
+                  onPrefetchExercise={onPrefetchExercise}
+                  onOpenExercise={onOpenExercise}
+                  formatUpdatedAt={formatUpdatedAt}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : rows.length > 0 ? (
         <div
           className="relative w-full"
           style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
@@ -139,7 +155,7 @@ export default function AdminExerciseList({
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
         </div>
-      ) : displayedGroupedItems.length === 0 && (
+      ) : groupedItems.length === 0 && (
         <div className="rounded-[20px] border border-dashed border-stroke bg-surface px-3 py-4 text-sm text-foreground/70">
           <div className="font-semibold text-foreground">Ничего не найдено</div>
           <p className="mt-1 text-pretty text-xs leading-5 text-foreground/55">
