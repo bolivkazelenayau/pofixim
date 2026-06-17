@@ -34,7 +34,7 @@ type FrozenVirtualSnapshot = {
 type RenderVirtualItem = Pick<VirtualItem, 'end' | 'index' | 'key' | 'size' | 'start'>;
 
 function estimateRowSize(row: ExerciseListRow | undefined) {
-  return row?.kind === 'group' ? 32 : 120;
+  return row?.kind === 'group' ? 32 : 122;
 }
 
 function buildFallbackVirtualItems(
@@ -258,7 +258,7 @@ export default function AdminExerciseList({
         </div>
       ) : null}
       {initialListPending ? (
-        <div className="space-y-2" aria-hidden="true">
+        <div className="space-y-2.5" aria-hidden="true">
           <div className="h-[26px] rounded-md border border-stroke bg-surface motion-safe:animate-pulse" />
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
           <div className="h-[114px] rounded-[18px] border border-stroke bg-surface motion-safe:animate-pulse" />
