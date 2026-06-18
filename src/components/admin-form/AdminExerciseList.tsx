@@ -34,7 +34,7 @@ type FrozenVirtualSnapshot = {
 type RenderVirtualItem = Pick<VirtualItem, 'end' | 'index' | 'key' | 'size' | 'start'>;
 
 function estimateRowSize(row: ExerciseListRow | undefined) {
-  return row?.kind === 'group' ? 32 : 122;
+  return row?.kind === 'group' ? 34 : 122;
 }
 
 function buildFallbackVirtualItems(
@@ -233,7 +233,7 @@ export default function AdminExerciseList({
                 key={virtualRow.key}
                 ref={isFrozenVirtualLayer ? undefined : rowVirtualizer.measureElement}
                 data-index={virtualRow.index}
-                className={`absolute left-0 top-0 w-full pb-1.5 ${
+                className={`absolute left-0 top-0 w-full pb-2 ${
                   row.kind === 'group' && row.key === renderedActiveGroup?.key ? 'pointer-events-none opacity-0' : ''
                 }`}
                 style={{ transform: `translateY(${virtualRow.start}px)` }}

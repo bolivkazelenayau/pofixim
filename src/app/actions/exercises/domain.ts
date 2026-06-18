@@ -46,6 +46,7 @@ export function dbExerciseToDomainExercise(row: typeof exercises.$inferSelect | 
     qualityStatus: normalizeQualityStatus(row.qualityStatus),
     visualHint: row.visualHint ?? undefined,
     isActive: row.isActive,
+    updatedAt: row.updatedAt.toISOString(),
   });
 
   if (!parsed.success) {

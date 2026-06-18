@@ -168,7 +168,7 @@ export function Slot({
                         event.stopPropagation();
                         onMoveMark(slotIndex, index, -1);
                       }}
-                      className="inline-flex size-5 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
+                      className="inline-flex size-8 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
                       aria-label={`Move ${MARK_META[placement.mark].label} left`}
                     >
                       ‹
@@ -180,7 +180,7 @@ export function Slot({
                         event.stopPropagation();
                         onMoveMark(slotIndex, index, 1);
                       }}
-                      className="inline-flex size-5 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
+                      className="inline-flex size-8 items-center justify-center rounded text-[10px] text-amber-950 transition-colors duration-150 ease-out hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50 dark:hover:bg-amber-300/20"
                       aria-label={`Move ${MARK_META[placement.mark].label} right`}
                     >
                       ›
@@ -194,7 +194,7 @@ export function Slot({
                     event.stopPropagation();
                     onRemoveMark(slotIndex, index);
                   }}
-                  className="inline-flex size-5 items-center justify-center rounded text-[11px] leading-none text-amber-950/70 transition-colors duration-150 ease-out hover:bg-amber-100 hover:text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50/70 dark:hover:bg-amber-300/20 dark:hover:text-amber-50"
+                  className="inline-flex size-8 items-center justify-center rounded text-[11px] leading-none text-amber-950/70 transition-colors duration-150 ease-out hover:bg-amber-100 hover:text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-30 dark:text-amber-50/70 dark:hover:bg-amber-300/20 dark:hover:text-amber-50"
                   aria-label={`Удалить знак ${MARK_META[placement.mark].label}`}
                   title="Удалить знак"
                 >

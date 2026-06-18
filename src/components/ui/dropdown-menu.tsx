@@ -36,7 +36,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "z-popover min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-lg border border-stroke bg-surface-strong p-1 text-foreground shadow-sm duration-100 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "z-popover min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-lg border border-stroke bg-surface-strong p-1 text-foreground shadow-sm duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className
         )}
         {...props}

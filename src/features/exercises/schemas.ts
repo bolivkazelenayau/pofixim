@@ -33,6 +33,7 @@ const baseExerciseSchema = z
     qualityStatus: qualityStatusSchema.default('draft'),
     visualHint: z.unknown().optional(),
     isActive: z.boolean().default(true),
+    updatedAt: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.qualityStatus !== 'approved') {

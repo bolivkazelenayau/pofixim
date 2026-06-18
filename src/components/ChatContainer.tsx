@@ -44,7 +44,7 @@ import Ege15QuickGame from './Ege15QuickGame';
 import MessageBubble, { MESSAGE_ENTER_DURATION_MS } from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 
-const RENDERED_EXERCISE_REFRESH_POLL_MS = 5000;
+const RENDERED_EXERCISE_REFRESH_POLL_MS = 90_000;
 
 function isFeedbackMessage(message: Message | undefined) {
   return Boolean(

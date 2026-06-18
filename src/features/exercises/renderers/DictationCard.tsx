@@ -17,6 +17,8 @@ const FALLBACK_WAVEFORM = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, index) 
 });
 const SCRUB_FADE_OUT_MS = 12;
 const SCRUB_FADE_IN_MS = 28;
+const waveformCache = new Map<string, Promise<number[] | null>>();
+let sharedWaveformContext: AudioContext | null = null;
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '00:00';
@@ -35,6 +37,11 @@ function waveformBarHeight(value: number) {
   return `${Math.max(4, value * 30).toFixed(3)}px`;
 }
 
+function easeOutExpo(progress: number) {
+  if (progress >= 1) return 1;
+  return 1 - Math.pow(2, -10 * progress);
+}
+
 function getMediaDuration(audio: HTMLAudioElement | null, fallback = 0) {
   if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
     return audio.duration;
@@ -48,14 +55,22 @@ function getMediaDuration(audio: HTMLAudioElement | null, fallback = 0) {
   return fallback;
 }
 
-async function buildWaveform(audioSrc: string, barCount: number) {
+function getWaveformAudioContext() {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextCtor) return null;
+  sharedWaveformContext ??= new AudioContextCtor();
+  return sharedWaveformContext;
+}
 
-  const response = await fetch(audioSrc);
-  const bytes = await response.arrayBuffer();
-  const context = new AudioContextCtor();
-  try {
+async function buildWaveform(audioSrc: string, barCount: number) {
+  const cached = waveformCache.get(audioSrc);
+  if (cached) return cached;
+
+  const build = (async () => {
+    const context = getWaveformAudioContext();
+    if (!context) return null;
+    const response = await fetch(audioSrc);
+    const bytes = await response.arrayBuffer();
     const buffer = await context.decodeAudioData(bytes.slice(0));
     const data = buffer.getChannelData(0);
     const blockSize = Math.max(1, Math.floor(data.length / barCount));
@@ -73,9 +88,13 @@ async function buildWaveform(audioSrc: string, barCount: number) {
 
     const max = Math.max(...peaks, 0.001);
     return peaks.map((peak) => Math.max(0.08, Math.min(1, peak / max)));
-  } finally {
-    void context.close();
-  }
+  })().catch((error) => {
+    waveformCache.delete(audioSrc);
+    throw error;
+  });
+
+  waveformCache.set(audioSrc, build);
+  return build;
 }
 
 export default function DictationCard({ exercise }: Props) {
@@ -171,7 +190,7 @@ export default function DictationCard({ exercise }: Props) {
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / durationMs);
-      audio.volume = clampVolume(from + (target - from) * progress);
+      audio.volume = clampVolume(from + (target - from) * easeOutExpo(progress));
       if (progress < 1) {
         fadeFrameRef.current = window.requestAnimationFrame(tick);
       } else {

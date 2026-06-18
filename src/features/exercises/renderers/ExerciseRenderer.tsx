@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
 import { Bean } from 'lucide-react';
 import type { Exercise, SubmittedAnswer } from '../schemas';
 import MultipleChoiceCard from './MultipleChoiceCard';
@@ -170,34 +169,13 @@ export default function ExerciseRenderer({
 
   return (
     <div className="relative">
-      <motion.div
+      <div
         data-exercise-message-id={highlightId}
-        className="rounded-[28px]"
-        animate={
-          highlight
-            ? {
-                opacity: [1, 0.86, 1, 1],
-                boxShadow: [
-                  '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
-                  '0 0 0 3px color-mix(in srgb, var(--primary) 42%, transparent), 0 12px 34px color-mix(in srgb, var(--primary) 18%, transparent)',
-                  '0 0 0 2px color-mix(in srgb, var(--primary) 24%, transparent), 0 9px 26px color-mix(in srgb, var(--primary) 10%, transparent)',
-                  '0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent), 0 5px 16px color-mix(in srgb, var(--primary) 4%, transparent)',
-                  '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
-                ],
-              }
-            : {
-                opacity: 1,
-                boxShadow: '0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent)',
-              }
-        }
-        transition={{
-          duration: 0.9,
-          ease: [0.16, 1, 0.3, 1],
-          times: [0, 0.16, 0.38, 0.68, 1],
-        }}
+        data-highlighted={highlight ? 'true' : undefined}
+        className="exercise-highlight-shell rounded-[28px]"
       >
         {content}
-      </motion.div>
+      </div>
       <p className="-mt-1 mb-2 ml-2 flex items-center gap-1.5 text-[11px] text-foreground/60">
         <Bean className="h-3 w-3" aria-hidden="true" />
         <span>seed:</span>

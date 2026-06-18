@@ -247,11 +247,11 @@ export function useExerciseSubmit({
       localStorage.removeItem(getDraftKey(form.id));
       if (form.id) clearPendingDraftMarker(form.id);
       const savedExerciseId = wasEdit ? form.id : 'id' in res ? res.id : undefined;
+      const savedUpdatedAt = 'updatedAt' in res ? res.updatedAt ?? null : null;
       if (savedExerciseId) {
-        publishExerciseUpdated(savedExerciseId);
+        publishExerciseUpdated(savedExerciseId, savedUpdatedAt);
         await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(savedExerciseId) });
       }
-      const savedUpdatedAt = 'updatedAt' in res ? res.updatedAt ?? null : null;
       const nextForm = wasEdit ? { ...form, updatedAt: savedUpdatedAt ?? form.updatedAt ?? null } : loadFormState(null, EMPTY);
       setForm(nextForm);
       if (wasEdit) {

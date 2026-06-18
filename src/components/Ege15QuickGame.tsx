@@ -208,7 +208,7 @@ export default function Ege15QuickGame({
     const refresh = () => {
       void handleRefresh();
     };
-    const refreshTimer = window.setInterval(refresh, 5000);
+    const refreshTimer = window.setInterval(refresh, 90_000);
 
     window.addEventListener('focus', refresh);
     return () => {
@@ -220,8 +220,8 @@ export default function Ege15QuickGame({
   useEffect(() => {
     if (!currentCard?.sourceExerciseId) return;
 
-    return subscribeToExerciseUpdates((exerciseId) => {
-      if (exerciseId === currentCard.sourceExerciseId) {
+    return subscribeToExerciseUpdates((event) => {
+      if (event.exerciseId === currentCard.sourceExerciseId) {
         void handleRefresh();
       }
     });

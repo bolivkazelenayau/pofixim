@@ -114,6 +114,7 @@ export function useFormPersistence({
   useEffect(() => {
     latestFormRef.current = form;
     if (!isDraftLoaded) return;
+    if (switchingExerciseRef.current) return;
     if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) {
       if (isEdit) {
         clearLocal(form);
@@ -126,7 +127,7 @@ export function useFormPersistence({
     if (form.id) {
       document.cookie = `admin_pending_draft_id=${form.id}; Path=/admin; Max-Age=31536000; SameSite=Lax`;
     }
-  }, [form, isDraftLoaded, isEdit, clearLocal, scheduleLocalDraftWrite]);
+  }, [form, isDraftLoaded, isEdit, clearLocal, scheduleLocalDraftWrite, switchingExerciseRef]);
 
   function markSaveSucceeded(source: Form, snapshot: string) {
     const latestForm = latestFormRef.current;
@@ -183,7 +184,7 @@ export function useFormPersistence({
         const savedForm = { ...targetForm, updatedAt: savedUpdatedAt };
         markSaveSucceeded(savedForm, JSON.stringify(savedForm));
         syncSavedVersion(savedForm);
-        publishExerciseUpdated(id);
+        publishExerciseUpdated(id, savedUpdatedAt);
         await queryClient.invalidateQueries({ queryKey: adminExerciseKeys.revisions(id) });
         return true;
       }
@@ -224,15 +225,11 @@ export function useFormPersistence({
     async (nextId: number) => {
       if (!isEdit || !form.id || form.id === nextId || saving || deleting) return true;
       if (deletedExerciseIdsRef.current.has(form.id)) return true;
-      const snapshot = JSON.stringify(form);
       if (persistedSnapshotMatchesForm(lastPersistedSnapshotRef.current, form)) return true;
-      const saved = await performSave(form, snapshot, form.id);
-      if (!saved && form.id) scheduleRetry(form, snapshot, form.id);
-      return saved;
+      storeLocal(form);
+      return true;
     },
-    // performSave and scheduleRetry intentionally close over this autosave cycle snapshot.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [form, isEdit, saving, deleting],
+    [form, isEdit, saving, deleting, deletedExerciseIdsRef, storeLocal],
   );
 
   useEffect(() => {

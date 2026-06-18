@@ -292,6 +292,27 @@ ins.du {
   text-decoration-skip-ink: none;
 }
 
+.exercise-highlight-shell {
+  position: relative;
+}
+
+.exercise-highlight-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--primary) 34%, transparent),
+    0 10px 28px color-mix(in srgb, var(--primary) 14%, transparent);
+  transition: opacity 220ms ease-out;
+}
+
+.exercise-highlight-shell[data-highlighted="true"]::after {
+  opacity: 1;
+}
+
 .dictation-feedback {
   display: grid;
   gap: 10px;
@@ -313,6 +334,7 @@ ins.du {
   color: color-mix(in srgb, var(--foreground) 62%, var(--primary));
   font-size: 12px;
   font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -378,6 +400,7 @@ ins.du {
   color: var(--foreground);
   font-size: 12px;
   font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 

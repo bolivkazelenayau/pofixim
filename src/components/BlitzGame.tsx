@@ -243,7 +243,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     const refresh = () => {
       void handleRefresh();
     };
-    const refreshTimer = window.setInterval(refresh, 5000);
+    const refreshTimer = window.setInterval(refresh, 90_000);
 
     window.addEventListener('focus', refresh);
     return () => {
@@ -255,8 +255,8 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   useEffect(() => {
     if (!currentCard?.sourceExerciseId) return;
 
-    return subscribeToExerciseUpdates((exerciseId) => {
-      if (exerciseId === currentCard.sourceExerciseId) {
+    return subscribeToExerciseUpdates((event) => {
+      if (event.exerciseId === currentCard.sourceExerciseId) {
         void handleRefresh();
       }
     });
