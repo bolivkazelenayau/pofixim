@@ -23,6 +23,10 @@ function changedFormKeys(current: Form, next: Form) {
   return [...keys].filter((key) => !Object.is(current[key], next[key]));
 }
 
+function shouldResetForm(current: Form, next: Form, changedKeys: Array<keyof Form>) {
+  return current.id !== next.id || changedKeys.length > 4;
+}
+
 export function useAdminTanStackForm(initialForm: Form) {
   const adminFormApi = useForm({
     defaultValues: initialForm,
@@ -45,6 +49,13 @@ export function useAdminTanStackForm(initialForm: Form) {
       const current = adminFormApi.state.values;
       const next = resolveNextForm(current, action);
       const keys = changedFormKeys(current, next);
+
+      if (keys.length === 0) return;
+
+      if (shouldResetForm(current, next, keys)) {
+        adminFormApi.reset(next);
+        return;
+      }
 
       for (const key of keys) {
         adminFormApi.setFieldValue(key as never, next[key] as never);
