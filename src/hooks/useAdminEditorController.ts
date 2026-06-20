@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDraftRecovery } from '@/hooks/useDraftRecovery';
 import { useExerciseLoader } from '@/hooks/useExerciseLoader';
 import { useExerciseSubmit } from '@/hooks/useExerciseSubmit';
@@ -43,9 +43,17 @@ export function useAdminEditorController({
   message,
   isError,
 }: UseAdminEditorControllerConfig) {
-  const [selectedId, setSelectedId] = useState<number | null>(
-    initialSelectedExercise ? (initialSelectedId ?? null) : null,
-  );
+  const initialSelectedState = initialSelectedExercise ? (initialSelectedId ?? null) : null;
+  const [selectedId, setSelectedIdState] = useState<number | null>(initialSelectedState);
+  const selectedIdRef = useRef<number | null>(initialSelectedState);
+  const setSelectedId = useCallback<React.Dispatch<React.SetStateAction<number | null>>>((value) => {
+    const next =
+      typeof value === 'function'
+        ? (value as (current: number | null) => number | null)(selectedIdRef.current)
+        : value;
+    selectedIdRef.current = next;
+    setSelectedIdState(next);
+  }, []);
   const [showFloatingSave, setShowFloatingSave] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -114,6 +122,7 @@ export function useAdminEditorController({
     form,
     isEdit,
     selectedId,
+    selectedIdRef,
     deleting,
     setForm,
     setSaving,

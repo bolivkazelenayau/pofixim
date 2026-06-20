@@ -96,8 +96,8 @@ export function useExerciseLoader({
     const nextForm = formFromExerciseItem(item);
     const loaded = loadFormState(id, nextForm);
     lastPersistedSnapshotRef.current = JSON.stringify(loaded);
-    setForm(loaded);
     setSelectedId(id);
+    setForm(loaded);
     logAdminDebug('loadExercise:applied', {
       id,
       requestSeq,

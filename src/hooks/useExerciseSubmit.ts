@@ -32,6 +32,7 @@ interface UseExerciseSubmitOptions {
   form: Form;
   isEdit: boolean;
   selectedId: number | null;
+  selectedIdRef: React.MutableRefObject<number | null>;
   deleting: boolean;
   setForm: React.Dispatch<React.SetStateAction<Form>>;
   setSaving: React.Dispatch<React.SetStateAction<boolean>>;
@@ -99,6 +100,7 @@ export function useExerciseSubmit({
   form,
   isEdit,
   selectedId,
+  selectedIdRef,
   deleting,
   setForm,
   setSaving,
@@ -162,6 +164,7 @@ export function useExerciseSubmit({
     const payload = buildPayloadFromForm(form);
 
     const wasEdit = isEdit;
+    let currentSelectedId = selectedIdRef.current;
     const optimisticListSnapshot =
       wasEdit && form.id ? snapshotAdminExerciseLists(queryClient) : null;
     const optimisticDetailSnapshot =
@@ -171,7 +174,7 @@ export function useExerciseSubmit({
     logAdminDebug('submit:start', {
       wasEdit,
       formId: form.id ?? null,
-      selectedId,
+      selectedId: currentSelectedId,
       url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
       payloadId: payload.id ?? null,
       seedKey: payload.seedKey ?? null,
@@ -180,19 +183,13 @@ export function useExerciseSubmit({
       promptLength: form.prompt.length,
       explanationLength: form.explanation.length,
     });
-    if (wasEdit && form.id !== selectedId) {
-      logAdminDebug('submit:blocked-id-mismatch', {
+    if (wasEdit && form.id !== currentSelectedId) {
+      logAdminDebug('submit:id-mismatch-reconciled', {
         formId: form.id ?? null,
-        selectedId,
+        selectedId: currentSelectedId,
       });
-      setSaving(false);
-      setDatabaseSaveState('local');
-      setIsError(true);
-      setMessage(
-        `Сохранение остановлено: открыта форма #${form.id ?? 'n/a'}, а выбранное задание #${selectedId ?? 'n/a'}. Обновите задание из списка и повторите сохранение.`,
-      );
-      storeLocalDraft(form);
-      return;
+      currentSelectedId = form.id ?? null;
+      setSelectedId(currentSelectedId);
     }
 
     if (wasEdit && form.id) {
