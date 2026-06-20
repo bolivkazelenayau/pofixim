@@ -45,6 +45,7 @@ export function useExerciseLoader({
 }: UseExerciseLoaderConfig) {
   const queryClient = useQueryClient();
   const loadExerciseSeqRef = useRef(0);
+  const openExerciseSeqRef = useRef(0);
 
   function cancelPendingExerciseLoad(reason: string) {
     loadExerciseSeqRef.current += 1;
@@ -118,22 +119,26 @@ export function useExerciseLoader({
   }
 
   async function openExerciseWithAutosave(id: number) {
+    const openRequestSeq = ++openExerciseSeqRef.current;
     if (switchingExerciseRef.current) {
-      logAdminDebug('openExerciseWithAutosave:skipped-switching', {
+      cancelPendingExerciseLoad('openExerciseWithAutosave:superseded');
+      logAdminDebug('openExerciseWithAutosave:superseded-switching', {
         nextId: id,
+        openRequestSeq,
         currentSelectedId: selectedId,
         currentFormId: form.id ?? null,
       });
-      return;
     }
     logDraftRecoveryDebug('openExerciseWithAutosave:start', {
       nextId: id,
+      openRequestSeq,
       currentSelectedId: selectedId,
       currentFormId: form.id ?? null,
       currentFormType: form.type,
     });
     logAdminDebug('openExerciseWithAutosave:start', {
       nextId: id,
+      openRequestSeq,
       currentSelectedId: selectedId,
       currentFormId: form.id ?? null,
     });
@@ -142,6 +147,7 @@ export function useExerciseLoader({
       const saved = await autosaveCurrentToDbIfNeeded(id);
       logDraftRecoveryDebug('openExerciseWithAutosave:autosaveResult', {
         nextId: id,
+        openRequestSeq,
         saved,
         currentSelectedId: selectedId,
         currentFormId: form.id ?? null,
@@ -149,6 +155,7 @@ export function useExerciseLoader({
       });
       logAdminDebug('openExerciseWithAutosave:autosaveResult', {
         nextId: id,
+        openRequestSeq,
         saved,
         currentSelectedId: selectedId,
         currentFormId: form.id ?? null,
@@ -158,13 +165,17 @@ export function useExerciseLoader({
     } finally {
       logDraftRecoveryDebug('openExerciseWithAutosave:done', {
         nextId: id,
+        openRequestSeq,
         selectedIdSnapshot: selectedId,
       });
       logAdminDebug('openExerciseWithAutosave:done', {
         nextId: id,
+        openRequestSeq,
         selectedIdSnapshot: selectedId,
       });
-      switchingExerciseRef.current = false;
+      if (openRequestSeq === openExerciseSeqRef.current) {
+        switchingExerciseRef.current = false;
+      }
     }
   }
 

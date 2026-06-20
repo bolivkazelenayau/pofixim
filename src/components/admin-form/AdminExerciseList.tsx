@@ -332,6 +332,7 @@ function ExerciseListButton({
 }) {
   return (
     <button
+      type="button"
       onClick={(event) => {
         if (event.detail > 1) {
           event.preventDefault();
@@ -345,6 +346,10 @@ function ExerciseListButton({
           ctrlKey: event.ctrlKey,
           metaKey: event.metaKey,
         });
+        if (!selectionMode && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+          onOpenExercise(item.id);
+          return;
+        }
         onToggleSelection(item.id, event);
       }}
       onMouseEnter={() => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useForm, useStore } from '@tanstack/react-form';
+import { batch } from '@tanstack/store';
 import type { Form } from '@/components/admin-form/types';
 import { validateAdminFormValues } from '@/components/admin-form/validation';
 import type { AdminFormValidation } from '@/components/admin-form/validation';
@@ -21,10 +22,6 @@ function changedFormKeys(current: Form, next: Form) {
   ]);
 
   return [...keys].filter((key) => !Object.is(current[key], next[key]));
-}
-
-function shouldResetForm(current: Form, next: Form, changedKeys: Array<keyof Form>) {
-  return current.id !== next.id || changedKeys.length > 4;
 }
 
 export function useAdminTanStackForm(initialForm: Form) {
@@ -52,14 +49,11 @@ export function useAdminTanStackForm(initialForm: Form) {
 
       if (keys.length === 0) return;
 
-      if (shouldResetForm(current, next, keys)) {
-        adminFormApi.reset(next);
-        return;
-      }
-
-      for (const key of keys) {
-        adminFormApi.setFieldValue(key as never, next[key] as never);
-      }
+      batch(() => {
+        for (const key of keys) {
+          adminFormApi.setFieldValue(key as never, next[key] as never);
+        }
+      });
     },
     [adminFormApi],
   );
