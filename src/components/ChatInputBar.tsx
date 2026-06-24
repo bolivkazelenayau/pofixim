@@ -157,7 +157,7 @@ export default function ChatInputBar({
               aria-label="Send"
               title="Отправить"
             >
-              <Send className="h-5 w-5 translate-x-0.5" aria-hidden="true" />
+              <Send className="h-5 w-5" aria-hidden="true" />
             </button>
           </form>
         </div>
