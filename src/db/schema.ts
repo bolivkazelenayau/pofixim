@@ -83,15 +83,19 @@ export const exerciseRevisions = pgTable(
   {
     id: serial('id').primaryKey(),
     exerciseId: integer('exercise_id').notNull(),
-    action: text('action').notNull(),
-    actorLabel: text('actor_label').notNull().default('admin'),
+    version: integer('version').notNull(),
+    source: text('source').notNull(),
+    actorLabel: text('actor_label'),
+    batchId: text('batch_id'),
+    snapshot: jsonb('snapshot').notNull(),
     changedFields: text('changed_fields').array().notNull(),
-    snapshotBefore: jsonb('snapshot_before'),
-    snapshotAfter: jsonb('snapshot_after'),
+    summary: text('summary'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => [
     index('exercise_revisions_exercise_created_idx').on(table.exerciseId, table.createdAt),
+    index('exercise_revisions_exercise_version_idx').on(table.exerciseId, table.version),
+    index('exercise_revisions_batch_idx').on(table.batchId),
     index('exercise_revisions_created_at_idx').on(table.createdAt),
   ],
 );

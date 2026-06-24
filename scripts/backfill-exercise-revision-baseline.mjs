@@ -36,18 +36,77 @@ try {
       create table if not exists exercise_revisions (
         id serial primary key,
         exercise_id integer not null,
-        action text not null,
-        actor_label text not null default 'admin',
+        version integer not null,
+        source text not null,
+        actor_label text,
+        batch_id text,
+        snapshot jsonb not null,
         changed_fields text[] not null default '{}',
-        snapshot_before jsonb,
-        snapshot_after jsonb,
+        summary text,
         created_at timestamp not null default now()
       )
     `);
 
+    await tx.unsafe(`alter table exercise_revisions add column if not exists version integer`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists source text`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists actor_label text`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists batch_id text`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists snapshot jsonb`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists changed_fields text[] not null default '{}'`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists summary text`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists action text`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists snapshot_before jsonb`);
+    await tx.unsafe(`alter table exercise_revisions add column if not exists snapshot_after jsonb`);
+    await tx.unsafe(`alter table exercise_revisions alter column action drop not null`);
+    await tx.unsafe(`alter table exercise_revisions alter column actor_label drop not null`);
+    await tx.unsafe(`
+      update exercise_revisions
+      set
+        source = coalesce(
+          source,
+          case action
+            when 'create' then 'create'
+            when 'baseline' then 'baseline'
+            when 'batch_update' then 'batch'
+            when 'delete' then 'delete'
+            else 'manual'
+          end
+        ),
+        snapshot = coalesce(snapshot, snapshot_after, snapshot_before),
+        summary = coalesce(summary, action)
+      where source is null or snapshot is null or summary is null
+    `);
+    await tx.unsafe(`
+      with numbered as (
+        select
+          id,
+          row_number() over (partition by exercise_id order by created_at asc, id asc)::integer as next_version
+        from exercise_revisions
+        where version is null
+      )
+      update exercise_revisions r
+      set version = numbered.next_version
+      from numbered
+      where r.id = numbered.id
+    `);
+    await tx.unsafe(`delete from exercise_revisions where snapshot is null`);
+    await tx.unsafe(`alter table exercise_revisions alter column version set not null`);
+    await tx.unsafe(`alter table exercise_revisions alter column source set not null`);
+    await tx.unsafe(`alter table exercise_revisions alter column snapshot set not null`);
+
     await tx.unsafe(`
       create index if not exists exercise_revisions_exercise_created_idx
       on exercise_revisions (exercise_id, created_at)
+    `);
+
+    await tx.unsafe(`
+      create index if not exists exercise_revisions_exercise_version_idx
+      on exercise_revisions (exercise_id, version)
+    `);
+
+    await tx.unsafe(`
+      create index if not exists exercise_revisions_batch_idx
+      on exercise_revisions (batch_id)
     `);
 
     await tx.unsafe(`
@@ -59,18 +118,20 @@ try {
       `
         insert into exercise_revisions (
           exercise_id,
-          action,
+          version,
+          source,
           actor_label,
+          batch_id,
+          snapshot,
           changed_fields,
-          snapshot_before,
-          snapshot_after,
+          summary,
           created_at
         )
         select
           e.id,
+          1,
           'baseline',
           'system',
-          $1::text[],
           null,
           jsonb_build_object(
             'id', e.id,
@@ -94,6 +155,8 @@ try {
             'visualHint', e.visual_hint,
             'isActive', e.is_active
           ),
+          $1::text[],
+          'Baseline snapshot',
           now()
         from exercises e
         where not exists (

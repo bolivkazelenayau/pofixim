@@ -1,6 +1,6 @@
 # Архитектура V2
 
-Обновлено: 2026-06-18
+Обновлено: 2026-06-24
 
 ## 1. Назначение проекта
 
@@ -43,6 +43,7 @@ PoFixim - платформа для хранения, проверки, реда
 - `exercise_attempts` - попытки пользователя.
 - `learning_sessions` - состояние тренировочной сессии, рейтинг, стрик.
 - `skill_progress` - задел под прогресс по навыкам.
+- `exercise_revisions` - audit/read layer истории изменений упражнений.
 - `questions` - старый/легаси банк простых вопросов.
 
 Ключевые поля `exercises`:
@@ -57,6 +58,17 @@ PoFixim - платформа для хранения, проверки, реда
 - `quality_status` - `draft`, `review`, `approved`, `archived`.
 - `is_active` - участвует ли задание в выдаче.
 - `search_blob`, `search_blob_normalized` - ускоренный поиск в админке.
+
+Ключевые поля `exercise_revisions`:
+
+- `exercise_id` - упражнение, к которому относится ревизия.
+- `version` - монотонный номер ревизии внутри упражнения.
+- `source` - источник изменения: `baseline`, `create`, `manual`, `batch`, `delete`, `autosave`, `import` или `generator`.
+- `actor_label` - необязательная подпись автора/системы.
+- `batch_id` - общий id batch-операции, если ревизия создана массовым изменением.
+- `snapshot` - полный JSONB-снимок упражнения после изменения или перед удалением.
+- `changed_fields` - список полей, которые отличаются от предыдущего снимка/исходной строки.
+- `summary` - короткое описание изменения для UI истории.
 
 Индексы, важные для текущей производительности:
 
@@ -428,7 +440,11 @@ Structured feedback diagnostics:
 - Diagnostics показывает target rows, извлечённые rows, missing target rows, unresolved gaps и warning codes.
 - Этот слой нужен админке и регрессиям, но не меняет поведение checker result для пользователя.
 
-История изменений упражнений реализована через таблицу `exercise_revisions`: `exercise_id`, `action`, `actor_label`, `changed_fields`, `snapshot_before`, `snapshot_after`, `created_at`. CRUD actions пишут ревизии в тех же транзакциях, что и create/update/delete, batch status/isActive updates пишут отдельную ревизию на каждое фактически изменённое упражнение. DB autosave идёт через `updateExerciseAction`, поэтому попадает в тот же audit trail; navigation local draft в историю не попадает, потому что не меняет БД. Для старых упражнений есть idempotent baseline backfill `db:backfill:exercise-revisions`: он создаёт `baseline`-ревизию только там, где истории ещё нет. UI истории находится в правой колонке редактора и читает последние ревизии через `listExerciseRevisionsAction` + TanStack Query. Restore UI пока не включён намеренно: сначала история работает как audit/read layer, затем откат можно добавить отдельным action с optimistic concurrency.
+История изменений упражнений реализована через таблицу `exercise_revisions` как append-only audit/read layer. Новая схема хранит не пару `snapshot_before`/`snapshot_after`, а версионированный полный `snapshot` (`version`, `source`, `actor_label`, `batch_id`, `changed_fields`, `summary`, `created_at`). Предыдущий снимок для просмотра diff поднимается при чтении ревизии по ближайшей меньшей `version`, поэтому UI может показывать readable before/after без дублирования двух больших JSONB-колонок в каждой записи.
+
+CRUD actions и batch status/isActive updates пишут ревизии best-effort после основной записи упражнения. Это важная граница: сбой history-layer не должен откатывать create/update/delete и не должен ломать POST. DDL и совместимость со старой схемой живут только в scripts (`db:apply:exercise-revisions` и `db:backfill:exercise-revisions`), а не в runtime Server Actions.
+
+DB autosave идёт через `updateExerciseAction`, поэтому может попасть в audit trail как `manual`-ревизия, если реально изменил snapshot. Navigation local draft в историю не попадает, потому что не меняет БД. Для старых упражнений есть idempotent baseline backfill `db:backfill:exercise-revisions`: он создаёт `baseline`-ревизию только там, где истории ещё нет, и совместим со старыми колонками `action`, `snapshot_before`, `snapshot_after`. UI истории находится в правой колонке редактора, читает список через `listExerciseRevisionsAction`, detail через `getExerciseRevisionDetailAction` и рендерит diff по группам полей через TanStack Query. Restore UI пока не включён намеренно: сначала история работает как audit/read layer, затем откат можно добавить отдельным action с optimistic concurrency.
 
 ## 10. TanStack Query в админке
 
@@ -612,6 +628,8 @@ npm.cmd run harvest:ege:parse-live
 npm.cmd run db:seed:ege-live
 npm.cmd run db:seed:ege9-21
 npm.cmd run db:apply:exercise-update-notifications
+npm.cmd run db:apply:exercise-revisions
+npm.cmd run db:backfill:exercise-revisions
 ```
 
 Live pipeline:

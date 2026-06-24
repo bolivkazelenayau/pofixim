@@ -1,10 +1,11 @@
 import { inArray } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { updateTag } from 'next/cache';
 import { db } from '@/db';
 import { exercises } from '@/db/schema';
 import { assertAdminAuthorized } from '@/lib/admin-auth';
 import type { ExerciseEditorInput } from './admin-types';
-import { recordExerciseRevision } from './admin-exercise-revisions';
+import { recordExerciseRevisionBestEffort } from './admin-exercise-revisions';
 
 export async function batchUpdateExercisesMeta(input: {
   ids: number[];
@@ -23,21 +24,25 @@ export async function batchUpdateExercisesMeta(input: {
     const patch: { qualityStatus?: ExerciseEditorInput['qualityStatus']; isActive?: boolean } = {};
     if (typeof input.qualityStatus !== 'undefined') patch.qualityStatus = input.qualityStatus;
     if (typeof input.isActive !== 'undefined') patch.isActive = input.isActive;
+    const batchId = randomUUID();
 
-    const updated = await db.transaction(async (tx) => {
+    const { beforeById, updated } = await db.transaction(async (tx) => {
       const beforeRows = await tx.select().from(exercises).where(inArray(exercises.id, ids));
       const beforeById = new Map(beforeRows.map((row) => [row.id, row]));
       const rows = await tx.update(exercises).set(patch).where(inArray(exercises.id, ids)).returning();
-      for (const row of rows) {
-        await recordExerciseRevision(tx, {
+      return { beforeById, updated: rows };
+    });
+    await Promise.all(
+      updated.map((row) =>
+        recordExerciseRevisionBestEffort({
           exerciseId: row.id,
-          action: 'batch_update',
+          source: 'batch',
           before: beforeById.get(row.id) ?? null,
           after: row,
-        });
-      }
-      return rows;
-    });
+          batchId,
+        }),
+      ),
+    );
     updateTag('admin:list');
     return { success: true, updated: updated.length };
   } catch (error) {

@@ -10,7 +10,7 @@ import { deleteExercise } from './admin-exercise-delete';
 import { getExerciseById } from './admin-exercise-get';
 import { getExerciseTypeOptions, listExercises } from './admin-exercise-list';
 import { batchUpdateExercisesMeta } from './admin-exercise-meta';
-import { listExerciseRevisions } from './admin-exercise-revisions';
+import { getExerciseRevisionDetail, listExerciseRevisions } from './admin-exercise-revisions';
 
 export async function createExerciseAction(input: ExerciseEditorInput) {
   return createExercise(input);
@@ -46,4 +46,8 @@ export async function getExerciseByIdAction(id: number) {
 
 export async function listExerciseRevisionsAction(id: number, limit?: number) {
   return listExerciseRevisions(id, limit);
+}
+
+export async function getExerciseRevisionDetailAction(id: number, revisionId: number) {
+  return getExerciseRevisionDetail(id, revisionId);
 }

@@ -8,7 +8,7 @@ import {
   prepareExerciseSave,
   refreshExerciseAdminCaches,
 } from './admin-exercise-save';
-import { recordExerciseRevision } from './admin-exercise-revisions';
+import { recordExerciseRevisionBestEffort } from './admin-exercise-revisions';
 
 export async function createExercise(input: ExerciseEditorInput) {
   try {
@@ -28,18 +28,15 @@ export async function createExercise(input: ExerciseEditorInput) {
       };
     }
 
-    const inserted = await db.transaction(async (tx) => {
-      const rows = await tx.insert(exercises).values(payload.values).returning();
-      const row = rows[0];
-      if (row) {
-        await recordExerciseRevision(tx, {
-          exerciseId: row.id,
-          action: 'create',
-          after: row,
-        });
-      }
-      return rows;
-    });
+    const inserted = await db.insert(exercises).values(payload.values).returning();
+    const insertedRow = inserted[0];
+    if (insertedRow) {
+      await recordExerciseRevisionBestEffort({
+        exerciseId: insertedRow.id,
+        source: 'create',
+        after: insertedRow,
+      });
+    }
 
     refreshExerciseAdminCaches();
     return { success: true, id: inserted[0]?.id };
@@ -67,7 +64,7 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
       };
     }
 
-    const updated = await db.transaction(async (tx) => {
+    const { before, updated } = await db.transaction(async (tx) => {
       const beforeRows = await tx.select().from(exercises).where(eq(exercises.id, input.id)).limit(1);
       const before = beforeRows[0] ?? null;
       const rows = await tx
@@ -109,17 +106,18 @@ export async function updateExercise(input: ExerciseEditorInput & { id: number }
           updatedAt: exercises.updatedAt,
           updatedAtText: sql<string>`${exercises.updatedAt}::text`,
         });
-      const updatedRow = rows[0];
-      if (updatedRow) {
-        await recordExerciseRevision(tx, {
-          exerciseId: updatedRow.id,
-          action: 'update',
-          before,
-          after: updatedRow,
-        });
-      }
-      return rows;
+      return { before, updated: rows };
     });
+
+    const updatedRow = updated[0];
+    if (updatedRow) {
+      await recordExerciseRevisionBestEffort({
+        exerciseId: updatedRow.id,
+        source: 'manual',
+        before,
+        after: updatedRow,
+      });
+    }
 
     if (updated.length === 0) {
       if (input.knownUpdatedAt) {

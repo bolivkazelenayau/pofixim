@@ -75,9 +75,12 @@ export default function Ege13QuickGame({
     ? `${currentCard.resolution.kind} · ${currentCard.resolution.confidence}`
     : '';
 
-  const tokenFontClass = currentCard && currentCard.token.length > 14
-    ? 'text-[clamp(1.5rem,7vw,2.4rem)] sm:text-[2.25rem]'
-    : 'text-[clamp(2rem,10vw,3.3rem)] sm:text-[3rem]';
+  const tokenLength = currentCard ? currentCard.token.replace(/\s+/g, '').length : 0;
+  const tokenFontClass = tokenLength > 18
+    ? 'text-[clamp(1.25rem,5.7vw,2rem)] sm:text-[2rem]'
+    : tokenLength > 12
+      ? 'text-[clamp(1.45rem,6.2vw,2.25rem)] sm:text-[2.15rem]'
+      : 'text-[clamp(2rem,9.5vw,3.05rem)] sm:text-[2.85rem]';
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
@@ -293,8 +296,10 @@ export default function Ege13QuickGame({
                 <div className="mx-auto mb-4 w-fit rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-primary">
                   Ряд {currentCard.rowIndex}
                 </div>
-                <div className={`${tokenFontClass} font-black leading-none text-foreground`}>
-                  {currentCard.token}
+                <div className="flex justify-center">
+                  <div className={`${tokenFontClass} max-w-full text-center font-black leading-none text-foreground [overflow-wrap:anywhere]`}>
+                    {currentCard.token}
+                  </div>
                 </div>
                 <p className="mx-auto mt-5 max-w-[440px] text-sm font-semibold leading-6 text-foreground/72 sm:text-base sm:leading-7">
                   {currentCard.context}
