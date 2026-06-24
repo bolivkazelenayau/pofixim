@@ -61,6 +61,7 @@ type AdminExerciseEditorProps = {
     onUndo: () => void;
     onRedo: () => void;
     onNewDraft: () => void;
+    onRevisionRestored: (id: number) => Promise<void>;
     onSubmit: (event: React.FormEvent) => Promise<void>;
     onTypeChange: (nextType: Form['type']) => void;
     onGenerateSeedClick: () => void;
@@ -463,7 +464,14 @@ export default function AdminExerciseEditor({
             ) : (
               <QualityInspectorShell />
             )}
-            {idleReady ? <AdminExerciseHistory exerciseId={form.id ?? null} /> : <HistoryShell />}
+            {idleReady ? (
+              <AdminExerciseHistory
+                exerciseId={form.id ?? null}
+                onRevisionRestored={actions.onRevisionRestored}
+              />
+            ) : (
+              <HistoryShell />
+            )}
           </aside>
         </div>
           </>

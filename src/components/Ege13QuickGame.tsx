@@ -191,6 +191,36 @@ export default function Ege13QuickGame({
     setIsRefreshing(false);
   }, [currentCard, isRefreshing]);
 
+  const refreshCardsForExercise = useCallback(async (exerciseId: number) => {
+    if (isRefreshing) return;
+    const cardsToRefresh = localCards.filter((card) => card.sourceExerciseId === exerciseId);
+    if (cardsToRefresh.length === 0) return;
+
+    setIsRefreshing(true);
+    try {
+      const results = await Promise.all(
+        cardsToRefresh.map((card) =>
+          refreshEge13QuickCardAction({
+            exerciseId,
+            cardId: card.id,
+            rowIndex: card.rowIndex,
+          }),
+        ),
+      );
+      const refreshedById = new Map(
+        results
+          .filter((result) => result.success && result.card)
+          .map((result) => [result.card!.id, result.card!]),
+      );
+
+      if (refreshedById.size > 0) {
+        setLocalCards((prev) => prev.map((card) => refreshedById.get(card.id) ?? card));
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, localCards]);
+
   useEffect(() => {
     if (!copyToast) return;
     const timer = window.setTimeout(() => setCopyToast(null), 1400);
@@ -217,10 +247,10 @@ export default function Ege13QuickGame({
 
     return subscribeToExerciseUpdates((event) => {
       if (event.exerciseId === currentCard.sourceExerciseId) {
-        void handleRefresh();
+        void refreshCardsForExercise(event.exerciseId);
       }
     });
-  }, [currentCard?.sourceExerciseId, handleRefresh]);
+  }, [currentCard?.sourceExerciseId, refreshCardsForExercise]);
 
   useEffect(() => {
     if (status !== 'running') return;

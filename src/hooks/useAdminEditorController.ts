@@ -264,6 +264,7 @@ export function useAdminEditorController({
     },
     actions: {
       onNewDraft: startNewDraft,
+      onRevisionRestored: loadExercise,
       onSubmit,
       onTypeChange: handleTypeChange,
       onGenerateSeedClick: handleGenerateSeedClick,

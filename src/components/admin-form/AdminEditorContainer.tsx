@@ -44,6 +44,7 @@ type AdminEditorContainerProps = {
   };
   actions: {
     onNewDraft: () => void;
+    onRevisionRestored: (id: number) => Promise<void>;
     onSubmit: (event: React.FormEvent) => Promise<void>;
     onTypeChange: (nextType: Form['type']) => void;
     onGenerateSeedClick: () => void;

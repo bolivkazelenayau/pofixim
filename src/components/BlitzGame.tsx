@@ -187,6 +187,37 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     setIsRefreshing(false);
   }, [currentCard, isRefreshing]);
 
+  const refreshCardsForExercise = useCallback(async (exerciseId: number) => {
+    if (isRefreshing) return;
+    const cardsToRefresh = localCards.filter((card) => card.sourceExerciseId === exerciseId);
+    if (cardsToRefresh.length === 0) return;
+
+    setIsRefreshing(true);
+    try {
+      const results = await Promise.all(
+        cardsToRefresh.map((card) =>
+          refreshEge9BlitzCardAction({
+            exerciseId,
+            cardId: card.id,
+            rowIndex: card.rowIndex,
+            wordIndex: card.wordIndex,
+          }),
+        ),
+      );
+      const refreshedById = new Map(
+        results
+          .filter((result) => result.success && result.card)
+          .map((result) => [result.card!.id, result.card!]),
+      );
+
+      if (refreshedById.size > 0) {
+        setLocalCards((prev) => prev.map((card) => refreshedById.get(card.id) ?? card));
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, localCards]);
+
   const answer = useCallback((choiceIndex: 0 | 1) => {
     if (status !== 'running' || !currentCard || answerLockedRef.current) return;
     answerLockedRef.current = true;
@@ -257,10 +288,10 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
 
     return subscribeToExerciseUpdates((event) => {
       if (event.exerciseId === currentCard.sourceExerciseId) {
-        void handleRefresh();
+        void refreshCardsForExercise(event.exerciseId);
       }
     });
-  }, [currentCard?.sourceExerciseId, handleRefresh]);
+  }, [currentCard?.sourceExerciseId, refreshCardsForExercise]);
 
   useEffect(() => {
     document.documentElement.classList.add('blitz-scroll-lock');
