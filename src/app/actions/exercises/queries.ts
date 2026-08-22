@@ -18,9 +18,18 @@ import {
 } from './domain';
 
 export type ExerciseCondition = NonNullable<ReturnType<typeof eq>>;
+type QueryExecutor = Pick<typeof db, 'select'>;
 
 export async function getOrCreateLearningSession(sessionId?: string) {
   const id = sessionId || crypto.randomUUID();
+
+  const created = await db
+    .insert(learningSessions)
+    .values({ id })
+    .onConflictDoNothing({ target: learningSessions.id })
+    .returning();
+
+  if (created[0]) return created[0];
 
   const existing = await db
     .select()
@@ -28,16 +37,11 @@ export async function getOrCreateLearningSession(sessionId?: string) {
     .where(eq(learningSessions.id, id))
     .limit(1);
 
-  if (existing[0]) {
-    return existing[0];
+  if (!existing[0]) {
+    throw new Error(`Learning session ${id} was not created or found`);
   }
 
-  const created = await db
-    .insert(learningSessions)
-    .values({ id })
-    .returning();
-
-  return created[0];
+  return existing[0];
 }
 
 export type LearningSessionRow = Awaited<ReturnType<typeof getOrCreateLearningSession>>;
@@ -47,14 +51,17 @@ export async function getNextExerciseForSession({
   category,
   forceType,
   seenExerciseIds,
+  executor = db,
 }: {
   session: LearningSessionRow;
   category?: ExerciseCategory;
   forceType?: ExerciseType;
   seenExerciseIds?: number[];
+  executor?: QueryExecutor;
 }) {
-  const recentAttempts = await getRecentAttempts(session.id);
+  const recentAttempts = await getRecentAttempts(executor, session.id);
   const recentFingerprints = await getRecentExerciseFingerprints(
+    executor,
     recentAttempts.map((attempt) => attempt.exerciseId),
   );
   const blockedExerciseIds = [
@@ -63,6 +70,7 @@ export async function getNextExerciseForSession({
   ];
   const targetDifficulty = targetDifficultyForSession(session);
   const candidates = await getExerciseCandidates({
+    executor,
     category,
     forceType,
     seenExerciseIds: blockedExerciseIds,
@@ -100,12 +108,14 @@ export async function getNextExerciseForSession({
 export async function sampleExerciseCandidateRows({
   conditions,
   limit,
+  executor = db,
 }: {
   conditions: ExerciseCondition[];
   limit: number;
+  executor?: QueryExecutor;
 }) {
   const whereExpr = and(...conditions);
-  const [bounds] = await db
+  const [bounds] = await executor
     .select({
       minId: sql<number | null>`min(${exercises.id})`,
       maxId: sql<number | null>`max(${exercises.id})`,
@@ -124,7 +134,7 @@ export async function sampleExerciseCandidateRows({
     const remaining = targetLimit - rowsById.size;
     const forwardLimit = Math.max(1, Math.ceil(remaining / 2));
 
-    const forwardRows = await db
+    const forwardRows = await executor
       .select()
       .from(exercises)
       .where(and(whereExpr, sql`${exercises.id} >= ${pivot}`))
@@ -135,7 +145,7 @@ export async function sampleExerciseCandidateRows({
     const backwardLimit = targetLimit - rowsById.size;
     if (backwardLimit <= 0) break;
 
-    const backwardRows = await db
+    const backwardRows = await executor
       .select()
       .from(exercises)
       .where(and(whereExpr, sql`${exercises.id} < ${pivot}`))
@@ -177,8 +187,8 @@ export async function getRandomFilteredExerciseRows({
   });
 }
 
-export async function getExerciseById(exerciseId: number) {
-  const rows = await db
+export async function getExerciseById(exerciseId: number, executor: QueryExecutor = db) {
+  const rows = await executor
     .select()
     .from(exercises)
     .where(eq(exercises.id, exerciseId))
@@ -187,8 +197,8 @@ export async function getExerciseById(exerciseId: number) {
   return dbExerciseToDomainExercise(rows[0]);
 }
 
-async function getRecentAttempts(sessionId: string) {
-  return db
+async function getRecentAttempts(executor: QueryExecutor, sessionId: string) {
+  return executor
     .select({
       exerciseId: exerciseAttempts.exerciseId,
       exerciseType: exerciseAttempts.exerciseType,
@@ -201,11 +211,13 @@ async function getRecentAttempts(sessionId: string) {
 }
 
 async function getExerciseCandidates({
+  executor,
   category,
   forceType,
   seenExerciseIds,
   recentFingerprints,
 }: {
+  executor: QueryExecutor;
   category?: ExerciseCategory;
   forceType?: ExerciseType;
   seenExerciseIds: number[];
@@ -232,6 +244,7 @@ async function getExerciseCandidates({
   }
 
   const rows = await sampleExerciseCandidateRows({
+    executor,
     conditions,
     limit: forceType ? 80 : 180,
   });
@@ -245,11 +258,11 @@ async function getExerciseCandidates({
     });
 }
 
-async function getRecentExerciseFingerprints(exerciseIds: number[]) {
+async function getRecentExerciseFingerprints(executor: QueryExecutor, exerciseIds: number[]) {
   const ids = [...new Set(exerciseIds)].filter((id) => Number.isInteger(id) && id > 0);
   if (!ids.length) return new Set<string>();
 
-  const rows = await db
+  const rows = await executor
     .select()
     .from(exercises)
     .where(inArray(exercises.id, ids))

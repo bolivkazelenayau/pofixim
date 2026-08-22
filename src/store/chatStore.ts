@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 import { createMessageId } from '@/lib/message-id';
+import {
+  normalizePendingExerciseSubmissions,
+  type PendingExerciseSubmission,
+  type PendingExerciseSubmissionStatus,
+} from '@/lib/exerciseSubmissionState';
 
 export type Message = {
   id: string;
@@ -21,7 +26,7 @@ export type Message = {
   createdAt?: number;
 };
 
-type ChatState = {
+export type ChatState = {
   messages: Message[];
   seenQuestionIds: number[];
   seenExerciseIds: number[];
@@ -31,6 +36,7 @@ type ChatState = {
   hasRequestedInitialExercise: boolean;
   score: number;
   streak: number;
+  pendingExerciseSubmissions: Record<string, PendingExerciseSubmission>;
   isTyping: boolean;
   addMessage: (msg: Message) => void;
   updateExerciseMessages: (exercises: Array<Exercise & { id: number }>) => void;
@@ -56,6 +62,15 @@ type ChatState = {
   resetProgress: () => void;
   isDemoMode: boolean;
   setDemoMode: (isDemo: boolean) => void;
+  setPendingExerciseSubmission: (
+    exerciseMessageId: string,
+    submission: PendingExerciseSubmission,
+  ) => void;
+  updatePendingExerciseSubmission: (
+    exerciseMessageId: string,
+    status: PendingExerciseSubmissionStatus,
+  ) => void;
+  clearPendingExerciseSubmission: (exerciseMessageId: string) => void;
 };
 
 type PersistedChatState = Pick<
@@ -69,6 +84,7 @@ type PersistedChatState = Pick<
   | 'hasRequestedInitialExercise'
   | 'score'
   | 'streak'
+  | 'pendingExerciseSubmissions'
   | 'isDemoMode'
 >;
 
@@ -130,6 +146,9 @@ function normalizePersistedChatState(
         : false,
     score: typeof state.score === 'number' ? state.score : 0,
     streak: typeof state.streak === 'number' ? state.streak : 0,
+    pendingExerciseSubmissions: normalizePendingExerciseSubmissions(
+      state.pendingExerciseSubmissions,
+    ),
     isDemoMode: typeof state.isDemoMode === 'boolean' ? state.isDemoMode : false,
   };
 }
@@ -153,9 +172,39 @@ export const useChatStore = create<ChatState>()(
       hasRequestedInitialExercise: false,
       score: 0,
       streak: 0,
+      pendingExerciseSubmissions: {},
       isTyping: false,
       isDemoMode: false,
       setDemoMode: (isDemoMode) => set({ isDemoMode }),
+      setPendingExerciseSubmission: (exerciseMessageId, submission) =>
+        set((state) => ({
+          pendingExerciseSubmissions: {
+            ...state.pendingExerciseSubmissions,
+            [exerciseMessageId]: submission,
+          },
+        })),
+      updatePendingExerciseSubmission: (exerciseMessageId, status) =>
+        set((state) => {
+          const submission = state.pendingExerciseSubmissions[exerciseMessageId];
+          if (!submission) return state;
+          return {
+            pendingExerciseSubmissions: {
+              ...state.pendingExerciseSubmissions,
+              [exerciseMessageId]: {
+                ...submission,
+                status,
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        }),
+      clearPendingExerciseSubmission: (exerciseMessageId) =>
+        set((state) => {
+          if (!state.pendingExerciseSubmissions[exerciseMessageId]) return state;
+          const pendingExerciseSubmissions = { ...state.pendingExerciseSubmissions };
+          delete pendingExerciseSubmissions[exerciseMessageId];
+          return { pendingExerciseSubmissions };
+        }),
       addMessage: (msg) =>
         set((state) => {
           const incomingExercise = msg.type === 'exercise' ? msg.exercise : undefined;
@@ -305,11 +354,12 @@ export const useChatStore = create<ChatState>()(
           hasRequestedInitialExercise: false,
           score: 0,
           streak: 0,
+          pendingExerciseSubmissions: {},
         }),
     }),
     {
       name: 'literacy-chat-storage-v2',
-      version: 3,
+      version: 4,
       skipHydration: true,
       partialize: (state): PersistedChatState => ({
         messages: state.messages,
@@ -321,6 +371,7 @@ export const useChatStore = create<ChatState>()(
         hasRequestedInitialExercise: state.hasRequestedInitialExercise,
         score: state.score,
         streak: state.streak,
+        pendingExerciseSubmissions: state.pendingExerciseSubmissions,
         isDemoMode: state.isDemoMode,
       }),
       merge: (persistedState, currentState) => ({

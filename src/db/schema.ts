@@ -8,6 +8,8 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
 } from 'drizzle-orm/pg-core';
 
 export const categoryEnum = pgEnum('category', ['orthography', 'punctuation', 'mixed']);
@@ -128,6 +130,8 @@ export const exerciseAttempts = pgTable(
     sessionId: text('session_id')
       .notNull()
       .references(() => learningSessions.id),
+    submissionId: uuid('submission_id').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
     userId: text('user_id'),
     exerciseId: integer('exercise_id')
       .notNull()
@@ -143,9 +147,18 @@ export const exerciseAttempts = pgTable(
     mistakeCode: text('mistake_code'),
     failedStepIds: text('failed_step_ids').array(),
     timeSpentMs: integer('time_spent_ms'),
+    checkResult: jsonb('check_result').notNull(),
+    sessionSnapshot: jsonb('session_snapshot').notNull(),
+    nextExercise: jsonb('next_exercise'),
+    noMoreExercises: boolean('no_more_exercises').notNull().default(false),
+    matchmaking: jsonb('matchmaking'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('exercise_attempts_session_submission_unique').on(
+      table.sessionId,
+      table.submissionId,
+    ),
     index('exercise_attempts_session_created_at_idx').on(
       table.sessionId,
       table.createdAt,

@@ -21,6 +21,8 @@ type ChatInputBarProps = {
   supportsGlobalInput: boolean | null;
   hasHydrated: boolean;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  hasPendingRetry?: boolean;
+  onRetryPending?: () => void;
 } & ChatCommandInputController;
 
 function getSlashCommandIcon(command: SlashCommand) {
@@ -51,6 +53,8 @@ export default function ChatInputBar({
   supportsGlobalInput,
   hasHydrated,
   onSubmit,
+  hasPendingRetry = false,
+  onRetryPending,
   inputRef,
   shellRef,
   value,
@@ -74,6 +78,16 @@ export default function ChatInputBar({
         </div>
       ) : (
         <div ref={shellRef} className="relative">
+          {hasPendingRetry && onRetryPending && (
+            <button
+              type="button"
+              onClick={onRetryPending}
+              className="mb-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Повторить отправку ответа
+            </button>
+          )}
           <AnimatePresence initial={false}>
             {showCommands && (
               <motion.div

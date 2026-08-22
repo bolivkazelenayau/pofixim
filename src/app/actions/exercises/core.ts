@@ -2,13 +2,9 @@
 
 import { db } from '@/db';
 import {
-  exerciseAttempts,
   exercises,
-  learningSessions,
 } from '@/db/schema';
-import { checkExerciseAnswer } from '@/features/exercises/checkers';
 import {
-  submittedAnswerSchema,
   type Exercise,
 } from '@/features/exercises/schemas';
 import {
@@ -25,7 +21,6 @@ import {
   buildEge15QuickCards,
   shuffleEge15QuickCards,
 } from '@/features/exercises/ege15Quick';
-import { ratingDeltaForAttempt } from '@/features/exercises/scoring';
 import type { ExerciseCategory, ExerciseType } from '@/features/exercises/types';
 import { logSlowServerAction } from '@/lib/slow-action-log';
 import { eq, inArray, notInArray, sql } from 'drizzle-orm';
@@ -37,6 +32,10 @@ import {
   getRandomFilteredExerciseRows,
   sampleExerciseCandidateRows,
 } from './queries';
+import {
+  submitExerciseAnswer,
+  type SubmitExerciseAnswerInput,
+} from './submit-service';
 
 type GetNextExerciseInput = {
   sessionId?: string;
@@ -65,16 +64,6 @@ type GetQuickCardsBySeedInput = {
   positionIndex?: number;
   wordIndex?: number;
   cardId?: string;
-};
-
-type SubmitExerciseAnswerInput = {
-  sessionId: string;
-  exerciseId: number;
-  submittedAnswer: unknown;
-  timeSpentMs?: number;
-  returnNextExercise?: boolean;
-  seenExerciseIds?: number[];
-  category?: ExerciseCategory;
 };
 
 type GetBlitzPoolInput = {
@@ -362,123 +351,27 @@ export async function getQuickCardsBySeedAction(input: GetQuickCardsBySeedInput)
 
 export async function submitExerciseAnswerAction(input: SubmitExerciseAnswerInput) {
   const startedAt = Date.now();
+  const sessionId = typeof input?.sessionId === 'string' ? input.sessionId.trim() : '';
+  const exerciseId = Number.isInteger(input?.exerciseId) && input.exerciseId > 0
+    ? input.exerciseId
+    : null;
+  const rawTimeSpentMs = input?.timeSpentMs;
+
   try {
-    const submittedAnswer = submittedAnswerSchema.parse(input.submittedAnswer);
-    const session = await getOrCreateLearningSession(input.sessionId);
-    const exercise = await getExerciseById(input.exerciseId);
-
-    if (!exercise) {
-      const dbRows = await db
-        .select({
-          id: exercises.id,
-          seedKey: exercises.seedKey,
-          type: exercises.type,
-          isActive: exercises.isActive,
-        })
-        .from(exercises)
-        .where(eq(exercises.id, input.exerciseId))
-        .limit(1);
-      console.error('submitExerciseAnswerAction: exercise lookup failed', {
-        requestedExerciseId: input.exerciseId,
-        dbRow: dbRows[0] ?? null,
-      });
-      return { success: false, error: 'Exercise not found' };
-    }
-
-    if (!exercise.isActive) {
-      return { success: false, error: 'Exercise is inactive' };
-    }
-
-    const result = checkExerciseAnswer(exercise, submittedAnswer, {
-      streak: session.currentStreak,
+    return await submitExerciseAnswer(input, {
+      db,
+      getExerciseById,
+      getNextExerciseForSession,
     });
-    const ratingDelta = ratingDeltaForAttempt({
-      isCorrect: result.isCorrect,
-      difficulty: exercise.difficulty,
-      streak: session.currentStreak,
-    });
-    const nextStreak = result.isCorrect ? session.currentStreak + 1 : 0;
-    const nextBestStreak = Math.max(session.bestStreak, nextStreak);
-
-    const updatedSession = {
-      ...session,
-      currentRating: Math.max(800, session.currentRating + ratingDelta),
-      currentStreak: nextStreak,
-      bestStreak: nextBestStreak,
-      totalScore: session.totalScore + result.scoreDelta,
-      completedCount: session.completedCount + 1,
-      correctCount: session.correctCount + (result.isCorrect ? 1 : 0),
-      lastCategory: exercise.category,
-      lastExerciseType: exercise.type,
-    };
-
-    await db.transaction(async (tx) => {
-      await tx.insert(exerciseAttempts).values({
-        sessionId: session.id,
-        userId: session.userId,
-        exerciseId: exercise.id!,
-        exerciseType: exercise.type,
-        category: exercise.category,
-        difficulty: exercise.difficulty,
-        skillTags: exercise.skillTags,
-        submittedAnswer: result.normalizedAnswer,
-        isCorrect: result.isCorrect,
-        scoreDelta: result.scoreDelta,
-        ratingDelta,
-        mistakeCode: result.mistakeCode,
-        failedStepIds: result.failedStepIds,
-        timeSpentMs: input.timeSpentMs,
-      });
-
-      await tx
-        .update(learningSessions)
-        .set({
-          currentRating: updatedSession.currentRating,
-          currentStreak: updatedSession.currentStreak,
-          bestStreak: updatedSession.bestStreak,
-          totalScore: updatedSession.totalScore,
-          completedCount: updatedSession.completedCount,
-          correctCount: updatedSession.correctCount,
-          lastCategory: updatedSession.lastCategory,
-          lastExerciseType: updatedSession.lastExerciseType,
-          updatedAt: sql`now()::timestamp`,
-        })
-        .where(eq(learningSessions.id, session.id));
-    });
-    const next = input.returnNextExercise
-      ? await getNextExerciseForSession({
-          session: updatedSession,
-          category: input.category,
-          seenExerciseIds: [...new Set([...(input.seenExerciseIds ?? []), exercise.id!])],
-        })
-      : null;
-
-    return {
-      success: true,
-      sessionId: session.id,
-      result,
-      session: {
-        currentRating: updatedSession.currentRating,
-        currentStreak: updatedSession.currentStreak,
-        bestStreak: updatedSession.bestStreak,
-        totalScore: updatedSession.totalScore,
-      },
-      nextExercise: next?.exercise ?? null,
-      noMoreExercises: next?.noMoreExercises ?? false,
-      matchmaking: next?.matchmaking,
-    };
-  } catch (error) {
-    console.error('Failed to submit exercise answer:', error);
-    return { success: false, error: 'Exercise answer submission failed' };
   } finally {
     logSlowServerAction('submitExerciseAnswerAction', startedAt, {
-      sessionId: input.sessionId,
-      exerciseId: input.exerciseId,
-      hasTimeSpentMs: typeof input.timeSpentMs === 'number',
+      sessionId,
+      exerciseId,
+      hasTimeSpentMs: typeof rawTimeSpentMs === 'number',
       submittedAnswerType:
-        input.submittedAnswer && typeof input.submittedAnswer === 'object'
+        input?.submittedAnswer && typeof input.submittedAnswer === 'object'
           ? String((input.submittedAnswer as { type?: unknown }).type ?? 'unknown')
-          : typeof input.submittedAnswer,
+          : typeof input?.submittedAnswer,
     });
   }
 }

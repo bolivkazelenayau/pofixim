@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:quick": "node scripts/run-quick-regression-tests.mjs",
+    "test:submit-concurrency": "node --test scripts/test-submit-concurrency.mjs",
+    "db:check-session-aggregate-drift": "node scripts/check-session-aggregate-drift.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "node scripts/seed-exercises.mjs",

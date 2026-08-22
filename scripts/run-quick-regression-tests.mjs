@@ -42,5 +42,7 @@ const require = Module.createRequire(import.meta.url);
 
 require('../src/features/exercises/ege9Blitz.test.ts').runEge9BlitzRegressionTests();
 require('../src/lib/chatCommands.test.ts').runChatCommandRegressionTests();
+require('../src/lib/exerciseSubmissionState.test.ts').runExerciseSubmissionStateRegressionTests();
+require('../src/lib/exerciseSubmissionOrchestration.test.ts').runExerciseSubmissionOrchestrationRegressionTests();
 
 console.log('quick regression tests passed');

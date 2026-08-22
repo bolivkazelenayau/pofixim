@@ -175,10 +175,13 @@ export default function ChatContainer() {
   const {
     handleExerciseSubmit,
     clearPendingNextExercise,
+    hasRetryablePendingSubmission,
+    retryPendingExerciseSubmission,
   } = useChatExerciseSubmit({
     sessionId,
     cooldownExerciseIds,
     seenExerciseIds,
+    messages,
     addMessage,
     setTyping,
     recordExerciseResult,
@@ -529,6 +532,8 @@ export default function ChatContainer() {
         supportsGlobalInput={supportsGlobalInput}
         hasHydrated={hasHydrated}
         onSubmit={handleGlobalSubmit}
+        hasPendingRetry={hasRetryablePendingSubmission}
+        onRetryPending={retryPendingExerciseSubmission}
       />
     </div>
   );

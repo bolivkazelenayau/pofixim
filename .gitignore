@@ -50,6 +50,7 @@ test_sources/parsed_live/
 /exports/
 /public/voice_memos/
 *.sql
+!drizzle/*.sql
 AUDIT_RECOMMENDATIONS.md
 # editors
 .vscode/

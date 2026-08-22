@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { submitExerciseAnswerAction } from '@/app/actions/exercises';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 import { buildFeedbackText } from '@/lib/chatFeedback';
+import {
+  reserveExerciseSubmission,
+  setExerciseSubmissionStatus,
+  type ExerciseSubmissionPayload,
+} from '@/lib/exerciseSubmissionState';
+import { findRetryableExerciseSubmission } from '@/lib/exerciseSubmissionOrchestration';
 import { createMessageId } from '@/lib/message-id';
-import type { Message } from '@/store/chatStore';
+import { useChatStore, type Message } from '@/store/chatStore';
 
 const NEXT_EXERCISE_DELAY_MS = 800;
 
@@ -12,6 +18,7 @@ type UseChatExerciseSubmitOptions = {
   sessionId: string | undefined;
   cooldownExerciseIds: number[];
   seenExerciseIds: number[];
+  messages: Message[];
   addMessage: (message: Message) => void;
   setTyping: (isTyping: boolean) => void;
   recordExerciseResult: (input: {
@@ -28,6 +35,7 @@ export function useChatExerciseSubmit({
   sessionId,
   cooldownExerciseIds,
   seenExerciseIds,
+  messages,
   addMessage,
   setTyping,
   recordExerciseResult,
@@ -35,6 +43,7 @@ export function useChatExerciseSubmit({
   fetchNextExercise,
 }: UseChatExerciseSubmitOptions) {
   const nextExerciseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingExerciseSubmissions = useChatStore((state) => state.pendingExerciseSubmissions);
 
   const clearNextExerciseTimer = useCallback(() => {
     if (!nextExerciseTimerRef.current) return;
@@ -61,26 +70,76 @@ export function useChatExerciseSubmit({
         return;
       }
 
-      addMessage({
-        id: createMessageId('answer'),
-        isBot: false,
-        content: answerLabel,
-        type: 'text',
-      });
+      const pendingKey = exerciseMessageId ?? `exercise:${exercise.id}`;
+      const payload: ExerciseSubmissionPayload = {
+        exerciseId: exercise.id,
+        sessionId,
+        submittedAnswer,
+      };
+      const currentState = useChatStore.getState();
+      const reservation = reserveExerciseSubmission(
+        currentState.pendingExerciseSubmissions[pendingKey],
+        payload,
+      );
+
+      if (reservation.kind === 'blocked') {
+        if (reservation.reason === 'uncertain-payload') {
+          addMessage({
+            id: createMessageId('submit-pending'),
+            isBot: true,
+            content: reservation.message,
+            type: 'text',
+          });
+        }
+        return;
+      }
+
+      const submission = reservation.submission;
+      currentState.setPendingExerciseSubmission(pendingKey, submission);
+
+      if (!reservation.isRetry) {
+        addMessage({
+          id: createMessageId('answer'),
+          isBot: false,
+          content: answerLabel,
+          type: 'text',
+        });
+      }
 
       setTyping(true);
 
-      const res = await submitExerciseAnswerAction({
-        sessionId,
-        exerciseId: exercise.id,
-        submittedAnswer,
-        returnNextExercise: true,
-        seenExerciseIds: [...new Set([...cooldownExerciseIds, ...seenExerciseIds, exercise.id])],
-      });
+      let res: Awaited<ReturnType<typeof submitExerciseAnswerAction>>;
+      try {
+        res = await submitExerciseAnswerAction({
+          sessionId: submission.payload.sessionId,
+          submissionId: submission.submissionId,
+          exerciseId: submission.payload.exerciseId,
+          submittedAnswer: submission.payload.submittedAnswer,
+          returnNextExercise: true,
+          seenExerciseIds: [...new Set([...cooldownExerciseIds, ...seenExerciseIds, exercise.id])],
+        });
+      } catch {
+        useChatStore.getState().setPendingExerciseSubmission(
+          pendingKey,
+          setExerciseSubmissionStatus(submission, 'uncertain'),
+        );
+        setTyping(false);
+        addMessage({
+          id: createMessageId('submit-error'),
+          isBot: true,
+          content: 'Ответ не удалось сохранить. Попробуйте ещё раз.',
+          type: 'text',
+        });
+        return;
+      }
 
       setTyping(false);
 
       if (!res.success || !res.result) {
+        useChatStore.getState().setPendingExerciseSubmission(
+          pendingKey,
+          setExerciseSubmissionStatus(submission, 'failed'),
+        );
         addMessage({
           id: createMessageId('submit-error'),
           isBot: true,
@@ -90,6 +149,11 @@ export function useChatExerciseSubmit({
         });
         return;
       }
+
+      useChatStore.getState().setPendingExerciseSubmission(
+        pendingKey,
+        setExerciseSubmissionStatus(submission, 'applied'),
+      );
 
       recordExerciseResult({
         exerciseId: exercise.id,
@@ -151,5 +215,32 @@ export function useChatExerciseSubmit({
     ],
   );
 
-  return { handleExerciseSubmit, clearPendingNextExercise: clearNextExerciseTimer };
+  const retryableExerciseSubmission = useMemo(
+    () => findRetryableExerciseSubmission(pendingExerciseSubmissions, messages, sessionId),
+    [messages, pendingExerciseSubmissions, sessionId],
+  );
+
+  const retryPendingExerciseSubmission = useCallback(() => {
+    const currentRetryableSubmission = findRetryableExerciseSubmission(
+      useChatStore.getState().pendingExerciseSubmissions,
+      messages,
+      sessionId,
+    );
+    if (!currentRetryableSubmission) return false;
+
+    void handleExerciseSubmit(
+      currentRetryableSubmission.exercise,
+      currentRetryableSubmission.submission.payload.submittedAnswer,
+      '',
+      currentRetryableSubmission.exerciseMessageId,
+    );
+    return true;
+  }, [handleExerciseSubmit, messages, sessionId]);
+
+  return {
+    handleExerciseSubmit,
+    clearPendingNextExercise: clearNextExerciseTimer,
+    hasRetryablePendingSubmission: Boolean(retryableExerciseSubmission),
+    retryPendingExerciseSubmission,
+  };
 }
