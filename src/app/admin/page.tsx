@@ -77,26 +77,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : null;
 
   return (
-    <main className="min-h-dvh bg-background px-4 py-8">
-      <div className="mx-auto mb-5 flex w-full max-w-[1400px] items-center justify-between rounded-[28px] border border-stroke bg-surface-strong px-5 py-4 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Панель администратора</h1>
+    <main className="min-h-dvh overflow-x-hidden bg-background px-3 py-4 sm:px-4 sm:py-8">
+      <div className="mx-auto mb-5 flex w-full max-w-[1400px] min-w-0 flex-wrap items-center justify-between gap-3 rounded-[28px] border border-stroke bg-surface-strong px-4 py-4 shadow-sm sm:px-5">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold text-foreground sm:text-2xl">Панель администратора</h1>
           <p className="mt-1 text-sm text-foreground/70">
             Конструктор заданий и проверка по требованиям ФИПИ
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <ThemeToggle />
           <Link
             href="/"
-            className="inline-flex h-10 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="inline-flex min-h-10 shrink-0 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             Назад к боту
           </Link>
           <form action={logoutAdminAction}>
             <button
               type="submit"
-              className="inline-flex h-10 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="inline-flex min-h-10 shrink-0 items-center rounded-lg border border-stroke bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               Выйти
             </button>

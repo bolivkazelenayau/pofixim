@@ -44,5 +44,7 @@ require('../src/features/exercises/ege9Blitz.test.ts').runEge9BlitzRegressionTes
 require('../src/lib/chatCommands.test.ts').runChatCommandRegressionTests();
 require('../src/lib/exerciseSubmissionState.test.ts').runExerciseSubmissionStateRegressionTests();
 require('../src/lib/exerciseSubmissionOrchestration.test.ts').runExerciseSubmissionOrchestrationRegressionTests();
+require('../src/components/quickGameSemantics.test.ts').runQuickGameSemanticsRegressionTests();
+require('../src/components/admin-form/utils.test.ts').runDatabaseIndicatorRegressionTests();
 
 console.log('quick regression tests passed');

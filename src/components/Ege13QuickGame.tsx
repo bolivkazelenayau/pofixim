@@ -7,6 +7,7 @@ import type { Ege13QuickCard } from '@/features/exercises/ege13Quick';
 import { refreshEge13QuickCardAction } from '@/app/actions/exercises';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { subscribeToExerciseUpdates } from '@/lib/exercise-update-events';
+import { shouldScoreQuickGameFinish, type QuickGameFinishReason } from './quickGameSemantics';
 import {
   QuickChoiceButton,
   QuickFinishedPanel,
@@ -82,9 +83,13 @@ export default function Ege13QuickGame({
       ? 'text-[clamp(1.45rem,6.2vw,2.25rem)] sm:text-[2.15rem]'
       : 'text-[clamp(2rem,9.5vw,3.05rem)] sm:text-[2.85rem]';
 
-  const finish = useCallback(() => {
+  const finish = useCallback((reason: QuickGameFinishReason) => {
     if (finishedRef.current) return;
     if (isInspectMode) {
+      onClose();
+      return;
+    }
+    if (!shouldScoreQuickGameFinish(reason)) {
       onClose();
       return;
     }
@@ -99,13 +104,8 @@ export default function Ege13QuickGame({
   }, [bestCombo, correctCount, isInspectMode, onClose, onFinish, scoreDelta, wrongCount]);
 
   const closeFromBackdrop = useCallback(() => {
-    if (status === 'running' && !isInspectMode) {
-      finish();
-      return;
-    }
-
     onClose();
-  }, [finish, isInspectMode, onClose, status]);
+  }, [onClose]);
 
   function start() {
     if (localCards.length === 0) return;
@@ -265,19 +265,22 @@ export default function Ege13QuickGame({
         if (event.key === 'ArrowLeft') answer(0);
         if (event.key === 'ArrowRight') answer(1);
       }
-      if (event.key === 'Escape') finish();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [answer, finish, nextCard, status]);
+  }, [answer, nextCard, onClose, status]);
 
   return (
     <QuickGameModalShell
       ariaLabel="Быстрый тип 13"
       copyToast={copyToast}
       isCloseOffsetForRunning={status === 'running'}
-      onClose={status === 'running' && !isInspectMode ? finish : onClose}
+      onClose={onClose}
       onCloseFromBackdrop={closeFromBackdrop}
     >
 
@@ -391,6 +394,15 @@ export default function Ege13QuickGame({
                 <Copy className="size-3.5" aria-hidden="true" />
               </button>
             </div>
+            {!isInspectMode ? (
+              <button
+                type="button"
+                onClick={() => finish('explicit')}
+                className="mt-3 min-h-10 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-foreground/70 transition-[background-color,border-color,color] duration-150 ease-out hover:border-primary/50 hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
+                Завершить раунд и сохранить результат
+              </button>
+            ) : null}
             {isInspectMode && (
               <div className="mt-1 min-w-0 truncate font-mono text-[10px] text-foreground/45 sm:text-[11px]">
                 {resolutionLabel}

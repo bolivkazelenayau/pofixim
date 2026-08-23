@@ -121,6 +121,21 @@ function formatDictationExplanation(explanation: string | undefined) {
   return `<div class="dictation-feedback__explanation"><div class="dictation-feedback__explanation-title">Разбор</div>${paragraphs}</div>`;
 }
 
+function displayItemDescription(item: Exclude<DictationDisplayItem, { kind: 'equal' }>) {
+  switch (item.kind) {
+    case 'missing':
+      return `Пропущено: ${item.label}`;
+    case 'missing_punctuation':
+      return `Пропущен знак препинания: ${item.label}`;
+    case 'extra':
+      return `Лишнее: ${item.label}`;
+    case 'replace':
+      return `Заменено «${item.label}», нужно «${item.expected}»`;
+    case 'replace_phrase':
+      return `Заменена фраза «${item.label}», нужно «${item.expected}»`;
+  }
+}
+
 export function buildDictationFeedbackText(
   normalizedAnswer: unknown,
   explanation?: string,
@@ -144,20 +159,25 @@ export function buildDictationFeedbackText(
       const space = needsLeadingSpace(previous, label) ? ' ' : '';
       if (item.kind === 'equal') return `${space}${escapeHtml(label)}`;
       if (item.kind === 'missing') {
-        return `${space}<span class="dictation-diff__token dictation-diff__token--missing">${escapeHtml(label)}</span>`;
+        const description = escapeHtml(displayItemDescription(item));
+        return `${space}<span class="dictation-diff__token dictation-diff__token--missing" title="${description}" aria-label="${description}">${escapeHtml(label)}</span>`;
       }
       if (item.kind === 'missing_punctuation') {
-        return `${space}<span class="dictation-diff__punctuation-missing" title="Пропущен знак: ${escapeHtml(label)}">${escapeHtml(label)}</span>`;
+        const description = escapeHtml(displayItemDescription(item));
+        return `${space}<span class="dictation-diff__punctuation-missing" title="${description}" aria-label="${description}">${escapeHtml(label)}</span>`;
       }
       if (item.kind === 'extra') {
-        return `${space}<span class="dictation-diff__token dictation-diff__token--extra">${escapeHtml(label)}</span>`;
+        const description = escapeHtml(displayItemDescription(item));
+        return `${space}<span class="dictation-diff__token dictation-diff__token--extra" title="${description}" aria-label="${description}">${escapeHtml(label)}</span>`;
       }
+      const description = escapeHtml(displayItemDescription(item));
       if (item.kind === 'replace_phrase') {
-        return `${space}<span class="dictation-diff__token dictation-diff__token--replace-phrase" title="Должно быть: ${escapeHtml(item.expected)}">${escapeHtml(label)}</span>`;
+        return `${space}<span class="dictation-diff__token dictation-diff__token--replace-phrase" title="${description}" aria-label="${description}">${escapeHtml(label)}</span>`;
       }
-      return `${space}<span class="dictation-diff__token dictation-diff__token--replace" title="Должно быть: ${escapeHtml(item.expected)}">${escapeHtml(label)}</span>`;
+      return `${space}<span class="dictation-diff__token dictation-diff__token--replace" title="${description}" aria-label="${description}">${escapeHtml(label)}</span>`;
     })
     .join('');
 
-  return `<div class="dictation-feedback"><div class="dictation-diff"><div class="dictation-diff__title">Ошибок: ${mistakeCount}</div>${body}</div>${formatDictationExplanation(explanation)}</div>`;
+  const legend = '<div class="dictation-diff__legend" role="list" aria-label="Типы ошибок"><span role="listitem"><strong>Пропущено</strong> — нужного нет</span><span role="listitem"><strong>Лишнее</strong> — добавлено в ответ</span><span role="listitem"><strong>Заменено</strong> — показано исправление</span></div>';
+  return `<div class="dictation-feedback"><div class="dictation-diff"><div class="dictation-diff__title">Ошибок: ${mistakeCount}</div>${legend}${body}</div>${formatDictationExplanation(explanation)}</div>`;
 }

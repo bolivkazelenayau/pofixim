@@ -1,22 +1,23 @@
 import type { MouseEvent, RefObject } from 'react';
-import { CheckSquare, RefreshCw, XSquare } from 'lucide-react';
+import { CheckSquare, RefreshCw, X, XSquare } from 'lucide-react';
 import AdminBatchActions from './AdminBatchActions';
 import AdminExerciseList from './AdminExerciseList';
 import AdminSidebarFilters from './AdminSidebarFilters';
-import DatabaseSaveIndicator, { type DatabaseIndicator } from './DatabaseSaveIndicator';
 import { qualityStatuses } from './constants';
 import type { ListItem, RawPreviewItem } from './types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type AdminExerciseSidebarProps = {
   sidebarRef: RefObject<HTMLElement | null>;
-  databaseIndicator: DatabaseIndicator;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
   stats: {
     hasActiveListFilter: boolean;
     matchingItems: number | null;
     totalItems: number | null;
     initialListPending: boolean;
     shownCount: number;
+    selectedOutsideFilter: boolean;
   };
   selection: {
     enabled: boolean;
@@ -75,13 +76,15 @@ type AdminExerciseSidebarProps = {
     onPrefetchExercise: (id: number) => void;
     onOpenExercise: (id: number) => void;
     onLoadMore: () => void;
+    onClearFilters: () => void;
     formatUpdatedAt: (value: string) => string;
   };
 };
 
 export default function AdminExerciseSidebar({
   sidebarRef,
-  databaseIndicator,
+  mobileOpen,
+  onCloseMobile,
   stats,
   selection,
   batch,
@@ -98,7 +101,8 @@ export default function AdminExerciseSidebar({
   return (
     <aside
       ref={sidebarRef}
-      className="flex h-[60vh] flex-col rounded-3xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
+      id="admin-exercise-sidebar"
+      className={`${mobileOpen ? 'fixed inset-y-2 left-2 z-[60] flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[360px]' : 'hidden'} min-w-0 flex-col overflow-hidden rounded-3xl border border-stroke bg-surface-strong p-4 text-foreground shadow-sm lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:w-auto`}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
@@ -116,13 +120,21 @@ export default function AdminExerciseSidebar({
                 : `Показано: ${stats.shownCount}`}
           </p>
         </div>
-        <TooltipProvider>
         <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            aria-label="Закрыть список заданий"
+            className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] lg:hidden"
+            onClick={onCloseMobile}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label="Refresh exercise list"
+            aria-label="Обновить список заданий"
             className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
             onClick={list.onRefresh}
           >
@@ -136,7 +148,7 @@ export default function AdminExerciseSidebar({
               <TooltipTrigger asChild>
             <button
               type="button"
-              aria-label="Enable exercise selection"
+              aria-label="Включить выбор заданий"
               className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-stroke hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] dark:hover:bg-stroke"
               onClick={selection.onEnable}
             >
@@ -150,7 +162,7 @@ export default function AdminExerciseSidebar({
               <TooltipTrigger asChild>
             <button
               type="button"
-              aria-label="Clear exercise selection"
+              aria-label="Снять выбор заданий"
               className="flex size-10 items-center justify-center rounded-xl border border-transparent text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-stroke hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
               onClick={selection.onClear}
             >
@@ -160,10 +172,21 @@ export default function AdminExerciseSidebar({
               <TooltipContent side="bottom">Отмена выбора</TooltipContent>
             </Tooltip>
           )}
+          </TooltipProvider>
         </div>
-        </TooltipProvider>
       </div>
-      <DatabaseSaveIndicator indicator={databaseIndicator} className="mb-4" />
+      {stats.selectedOutsideFilter && list.selectedId !== null ? (
+        <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/75" role="status">
+          <span>Открытое задание #{list.selectedId} не видно среди загруженных результатов текущего фильтра.</span>
+          <button
+            type="button"
+            className="min-h-10 shrink-0 rounded-lg px-2 font-semibold text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            onClick={list.onClearFilters}
+          >
+            Показать все
+          </button>
+        </div>
+      ) : null}
       {selection.enabled && (
         <button
           type="button"
@@ -220,12 +243,7 @@ export default function AdminExerciseSidebar({
         onOpenExercise={list.onOpenExercise}
         onLoadMore={list.onLoadMore}
         formatUpdatedAt={list.formatUpdatedAt}
-        onClearFilters={() => {
-          filters.onQueryChange('');
-          filters.onTypeChange('all');
-          filters.onExamTypeChange('all');
-          filters.onStatusChange('all');
-        }}
+        onClearFilters={list.onClearFilters}
       />
     </aside>
   );

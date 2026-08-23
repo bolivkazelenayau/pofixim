@@ -48,14 +48,14 @@ type AdminExerciseHistoryProps = {
 };
 
 const SOURCE_LABELS: Record<string, string> = {
-  baseline: 'снимок',
+  baseline: 'стартовый снимок',
   create: 'создание',
   manual: 'сохранение',
   autosave: 'автосейв',
   delete: 'удаление',
-  batch: 'batch',
+  batch: 'массовое изменение',
   import: 'импорт',
-  generator: 'генератор',
+  generator: 'генерация',
   restore: 'восстановление',
 };
 
@@ -71,7 +71,7 @@ const FIELD_LABELS: Record<string, string> = {
   qualityStatus: 'Статус',
   seedKey: 'Seed key',
   skillTags: 'Теги',
-  sourceAlignment: 'Source alignment',
+  sourceAlignment: 'Сопоставление с источником',
   mistakeModel: 'Модель ошибки',
   transferGroup: 'Группа переноса',
   typicalMistake: 'Типичная ошибка',
@@ -283,31 +283,6 @@ function getNestedEntries(before: unknown, after: unknown) {
   }];
 }
 
-function RawValueBlock({ value, tone = 'neutral' }: { value: unknown; tone?: 'neutral' | 'before' | 'after' }) {
-  const empty = isEmptyValue(value);
-  const toneClass = {
-    neutral: 'border-stroke bg-surface text-foreground/78',
-    before: 'border-red-200/70 bg-red-50/60 text-red-950 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-100',
-    after: 'border-emerald-200/70 bg-emerald-50/70 text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100',
-  }[tone];
-
-  if (empty) {
-    return (
-      <div className={`rounded-[12px] border px-3 py-2 text-[11px] italic leading-5 text-foreground/45 ${toneClass}`}>
-        пусто
-      </div>
-    );
-  }
-
-  return (
-    <div className={`max-h-72 overflow-auto rounded-[12px] border px-3 py-2 ${toneClass}`}>
-      <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-4">
-        {formatValue(value)}
-      </pre>
-    </div>
-  );
-}
-
 function TextValueBlock({ value, tone = 'neutral' }: { value: unknown; tone?: 'neutral' | 'before' | 'after' }) {
   const empty = isEmptyValue(value);
   const markdown = typeof value === 'string' && !empty;
@@ -349,7 +324,7 @@ function KeyValueSummary({ value }: { value: unknown }) {
           </div>
         ))}
         {value.length > 6 ? (
-          <div className="text-[11px] leading-4 text-foreground/45">+{value.length - 6} элементов в Raw</div>
+          <div className="text-[11px] leading-4 text-foreground/45">+{value.length - 6} элементов в структуре</div>
         ) : null}
       </div>
     );
@@ -367,7 +342,7 @@ function KeyValueSummary({ value }: { value: unknown }) {
         ))}
         {entries.length > 10 ? (
           <div className="rounded-[12px] border border-dashed border-stroke bg-surface px-3 py-2 text-xs leading-5 text-foreground/45">
-            +{entries.length - 10} ключей в Raw
+            +{entries.length - 10} ключей в структуре
           </div>
         ) : null}
       </div>
@@ -553,11 +528,9 @@ function OverviewFieldValue({
 function SnapshotField({
   field,
   item,
-  mode,
 }: {
   field: string;
   item: RevisionDetail;
-  mode: 'overview' | 'raw';
 }) {
   const before = item.previousSnapshot?.[field];
   const after = item.snapshot?.[field];
@@ -566,7 +539,7 @@ function SnapshotField({
   const summary = getFieldChangeSummary(field, before, after, baseline);
 
   return (
-    <div className="rounded-[24px] border border-stroke bg-surface-strong p-3">
+    <div className="border-t border-stroke pt-4 first:border-t-0 first:pt-0">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           {structured ? (
@@ -583,53 +556,22 @@ function SnapshotField({
             ) : null}
           </div>
         </div>
-        <div className="shrink-0 rounded-md bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-foreground/40">
+        <div className="shrink-0 font-mono text-[10px] text-foreground/40">
           {field}
         </div>
       </div>
 
-      {baseline ? (
-        mode === 'raw' ? (
-          <RawValueBlock value={after} />
-        ) : (
-          <OverviewFieldValue after={after} baseline={baseline} before={before} field={field} />
-        )
-      ) : (
-        mode === 'raw' ? (
-          <div className="grid gap-2 lg:grid-cols-2">
-            <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase text-foreground/45">
-                Было
-              </div>
-              <RawValueBlock value={before} tone="before" />
-            </div>
-            <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase text-foreground/45">
-                Стало
-              </div>
-              <RawValueBlock value={after} tone="after" />
-            </div>
-          </div>
-        ) : (
-          <OverviewFieldValue after={after} baseline={baseline} before={before} field={field} />
-        )
-      )}
+      <OverviewFieldValue after={after} baseline={baseline} before={before} field={field} />
     </div>
   );
 }
 
-function RevisionSnapshotDiff({
-  item,
-  mode,
-}: {
-  item: RevisionDetail;
-  mode: 'overview' | 'raw';
-}) {
-  const fields = mode === 'raw' ? item.changedFields : getHumanFields(item.changedFields);
+function RevisionSnapshotDiff({ item }: { item: RevisionDetail }) {
+  const fields = getHumanFields(item.changedFields);
   if (fields.length === 0) {
     return (
       <p className="rounded-[14px] border border-dashed border-stroke bg-surface px-3 py-3 text-xs leading-5 text-foreground/60">
-        В обзорных полях изменений нет. Полный технический diff доступен в Raw.
+        В обзорных полях изменений нет. Технические поля этой ревизии скрыты.
       </p>
     );
   }
@@ -658,7 +600,7 @@ function RevisionSnapshotDiff({
           </div>
           <div className="space-y-3">
             {group.fields.map((field) => (
-              <SnapshotField key={field} field={field} item={item} mode={mode} />
+              <SnapshotField key={field} field={field} item={item} />
             ))}
           </div>
         </div>
@@ -669,30 +611,31 @@ function RevisionSnapshotDiff({
 
 function RevisionDetailDialog({
   item,
+  isCurrent,
   isPending,
   error,
-  mode,
   isDeleting,
   isRestoring,
+  onCloseAutoFocus,
   onDeleteRequest,
-  onModeChange,
   onRestoreRequest,
 }: {
   item: RevisionDetail | null;
+  isCurrent: boolean;
   isPending: boolean;
   error: string | null;
-  mode: 'overview' | 'raw';
   isDeleting: boolean;
   isRestoring: boolean;
+  onCloseAutoFocus: (event: Event) => void;
   onDeleteRequest: (item: RevisionDetail) => void;
-  onModeChange: (mode: 'overview' | 'raw') => void;
   onRestoreRequest: (item: RevisionDetail) => void;
 }) {
   const canDelete = item ? DELETABLE_REVISION_SOURCES.has(item.source) : false;
+  const canRestore = Boolean(item && !isCurrent);
   const actionDisabled = isPending || isDeleting || isRestoring || !item;
 
   return (
-    <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden rounded-[22px] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] duration-200 ease-out sm:max-w-[960px]" showCloseButton>
+    <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="flex max-h-[88vh] flex-col overflow-hidden rounded-[22px] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] duration-200 ease-out sm:max-w-[960px]" showCloseButton>
       <DialogHeader className="border-b border-stroke px-5 py-4">
         <div className="grid gap-4 pr-9 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
           <div className="min-w-0">
@@ -703,50 +646,27 @@ function RevisionDetailDialog({
               {item ? getVisibleFieldLabels(item.changedFields, 5) || 'без diff полей' : 'История изменений задания'}
             </DialogDescription>
           </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-            <div className="flex flex-wrap gap-2 sm:justify-end">
+            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] sm:justify-end">
               {item ? (
                 <>
-                  <span className="rounded-md bg-foreground/5 px-2 py-1 text-[11px] font-medium leading-4 text-foreground/60">
+                  <span className="font-medium text-foreground/70">
                     {SOURCE_LABELS[item.source] ?? item.source}
                   </span>
-                  <span className="rounded-md bg-foreground/5 px-2 py-1 text-[11px] leading-4 text-foreground/50">
+                  <span className="text-foreground/50">
                     {formatDate(item.createdAt)}
                   </span>
-                  <span className="rounded-md bg-foreground/5 px-2 py-1 text-[11px] leading-4 text-foreground/50">
-                    {item.actorLabel ?? 'system'}
+                  <span className="text-foreground/50">
+                    {item.actorLabel ?? 'система'}
                   </span>
+                  {isCurrent ? <span className="font-semibold text-primary">текущая ревизия</span> : null}
                 </>
               ) : null}
               {item?.batchId ? (
-                <span className="rounded-md bg-foreground/5 px-2 py-1 font-mono text-[10px] leading-4 text-foreground/45">
+                <span className="font-mono text-[10px] text-foreground/45">
                   batch {item.batchId.slice(0, 8)}
                 </span>
               ) : null}
-            </div>
-            <div className="inline-flex shrink-0 rounded-lg border border-stroke bg-surface p-0.5 shadow-sm">
-              <button
-                type="button"
-                aria-pressed={mode === 'overview'}
-                onClick={() => onModeChange('overview')}
-                className={cn(
-                  'h-7 rounded-md px-2.5 text-xs font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.96]',
-                  mode === 'overview' ? 'bg-primary text-white' : 'text-foreground/60 hover:bg-surface-muted',
-                )}
-              >
-                Обзор
-              </button>
-              <button
-                type="button"
-                aria-pressed={mode === 'raw'}
-                onClick={() => onModeChange('raw')}
-                className={cn(
-                  'h-7 rounded-md px-2.5 text-xs font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.96]',
-                  mode === 'raw' ? 'bg-primary text-white' : 'text-foreground/60 hover:bg-surface-muted',
-                )}
-              >
-                Raw
-              </button>
             </div>
           </div>
         </div>
@@ -764,7 +684,7 @@ function RevisionDetailDialog({
             {error}
           </div>
         ) : item ? (
-          <RevisionSnapshotDiff item={item} mode={mode} />
+          <RevisionSnapshotDiff item={item} />
         ) : null}
       </div>
       {item ? (
@@ -780,15 +700,17 @@ function RevisionDetailDialog({
               Удалить ревизию
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => onRestoreRequest(item)}
-            disabled={actionDisabled}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary px-3 text-sm font-semibold text-white shadow-sm transition-[background-color,transform,opacity] duration-150 ease-out hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            Восстановить
-          </button>
+          {canRestore ? (
+            <button
+              type="button"
+              onClick={() => onRestoreRequest(item)}
+              disabled={actionDisabled}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary px-3 text-sm font-semibold text-white shadow-sm transition-[background-color,transform,opacity] duration-150 ease-out hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Восстановить как новую ревизию
+            </button>
+          ) : null}
         </div>
       ) : null}
     </DialogContent>
@@ -822,7 +744,7 @@ function RevisionConfirmDialog({
           </AlertDialogPrimitive.Title>
           <AlertDialogPrimitive.Description className="mt-2 text-sm leading-5 text-foreground/75">
             {isRestore
-              ? 'Текущее состояние задания будет заменено снимком этой ревизии. Само действие запишется новой ревизией восстановления.'
+              ? 'Снимок станет содержимым новой текущей ревизии. История не переписывается: восстановление добавит отдельную копию в конец timeline.'
               : 'Текущее упражнение не изменится. Из истории исчезнет только эта рабочая ревизия.'}
           </AlertDialogPrimitive.Description>
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -878,7 +800,7 @@ export default function AdminExerciseHistory({
   } | null>(null);
   const [closingHighlightedRevisionId, setClosingHighlightedRevisionId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<RevisionConfirmation>(null);
-  const [detailMode, setDetailMode] = useState<'overview' | 'raw'>('overview');
+  const revisionTriggerRef = useRef<HTMLButtonElement | null>(null);
   const closingHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openedRevisionId =
     openedRevision?.exerciseId === normalizedExerciseId ? openedRevision.revisionId : null;
@@ -912,6 +834,7 @@ export default function AdminExerciseHistory({
     if (!query.data?.success) return [];
     return query.data.items as RevisionItem[];
   }, [query.data]);
+  const currentRevisionId = revisions[0]?.id ?? null;
   const detailItem = detailQuery.data?.success ? detailQuery.data.item as RevisionDetail : null;
   const detailError = detailQuery.data && !detailQuery.data.success
     ? detailQuery.data.error || 'Ревизию не удалось загрузить.'
@@ -1000,7 +923,7 @@ export default function AdminExerciseHistory({
           type="button"
           onClick={() => void query.refetch()}
           disabled={!enabled || query.isFetching}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stroke bg-surface text-foreground/70 transition-colors duration-150 ease-out hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-stroke bg-surface text-foreground/70 transition-colors duration-150 ease-out hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Обновить историю"
         >
           <RotateCw
@@ -1031,23 +954,24 @@ export default function AdminExerciseHistory({
         <div className="space-y-2">
           {revisions.map((item) => {
             const isOpen = openedRevisionId === item.id || closingHighlightedRevisionId === item.id;
+            const isCurrent = item.id === currentRevisionId;
             return (
               <button
                 type="button"
                 key={item.id}
-                onClick={() => {
+                onClick={(event) => {
                   if (closingHighlightTimerRef.current) {
                     clearTimeout(closingHighlightTimerRef.current);
                     closingHighlightTimerRef.current = null;
                   }
                   setClosingHighlightedRevisionId(null);
-                  setDetailMode('overview');
+                  revisionTriggerRef.current = event.currentTarget;
                   setOpenedRevision({ exerciseId: item.exerciseId, revisionId: item.id });
                 }}
-                className={`w-full rounded-[18px] border p-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                className={`w-full border-b border-stroke px-1 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out last:border-b-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                   isOpen
-                    ? 'border-foreground/30 bg-foreground/5 shadow-[0_0_0_1px_color-mix(in_srgb,var(--foreground)_10%,transparent)]'
-                    : 'border-stroke bg-surface-strong hover:border-stroke hover:bg-foreground/5'
+                    ? 'bg-foreground/5'
+                    : 'hover:bg-foreground/5'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1056,6 +980,7 @@ export default function AdminExerciseHistory({
                       <span className="tabular-nums">v{item.version}</span>
                       <span className="text-foreground/35">/</span>
                       <span>{SOURCE_LABELS[item.source] ?? item.source}</span>
+                      {isCurrent ? <span className="font-semibold text-primary">· текущая ревизия</span> : null}
                     </div>
                     <p className="mt-1 text-xs leading-5 text-foreground/65">
                       {item.changedFields.length > 0
@@ -1063,15 +988,15 @@ export default function AdminExerciseHistory({
                         : item.summary ?? 'без diff полей'}
                     </p>
                     <div className="mt-1 text-[11px] leading-4 text-foreground/45">
-                      {formatDate(item.createdAt)} · {item.actorLabel ?? 'system'}
+                      {formatDate(item.createdAt)} · {item.actorLabel ?? 'система'}
                     </div>
                   </div>
                   <span
-                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-stroke bg-surface px-2 text-[11px] font-medium text-foreground/65"
+                    className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-foreground/65"
                     aria-hidden="true"
                   >
                     <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                    Открыть
+                    Просмотреть
                   </span>
                 </div>
               </button>
@@ -1102,13 +1027,16 @@ export default function AdminExerciseHistory({
       >
         <RevisionDetailDialog
           error={detailError}
+          isCurrent={detailItem?.id === currentRevisionId}
           isDeleting={deleteMutation.isPending}
           isPending={detailQuery.isPending}
           isRestoring={restoreMutation.isPending}
           item={detailItem}
-          mode={detailMode}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            revisionTriggerRef.current?.focus();
+          }}
           onDeleteRequest={(item) => setConfirmation({ action: 'delete', item })}
-          onModeChange={setDetailMode}
           onRestoreRequest={(item) => setConfirmation({ action: 'restore', item })}
         />
       </Dialog>

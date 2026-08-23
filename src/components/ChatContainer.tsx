@@ -396,7 +396,7 @@ export default function ChatContainer() {
   };
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-sm sm:h-[calc(100dvh-2rem)]">
+    <div className="relative mx-auto flex min-h-0 h-[calc(100dvh-0.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--stroke)] bg-[var(--surface-strong)] shadow-sm sm:h-[calc(100dvh-2rem)]">
       <AnimatePresence initial={false}>
         {blitz.isOpen && (
           <BlitzGame
@@ -427,7 +427,7 @@ export default function ChatContainer() {
         )}
       </AnimatePresence>
 
-      <div className="z-sticky grid min-h-[68px] shrink-0 grid-cols-[1fr_auto] items-center gap-4 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-4 py-3 sm:px-5">
+      <div className="z-sticky grid min-h-[68px] shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[var(--stroke)] bg-[var(--surface-strong)] px-3 py-3 sm:gap-4 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-base font-bold text-white">
             П
@@ -439,7 +439,7 @@ export default function ChatContainer() {
             <p className="truncate text-xs font-medium text-primary">Тренируемся вместе</p>
           </div>
         </div>
-        <div className="grid min-w-[212px] grid-cols-[52px_1px_52px_28px] items-center justify-items-center gap-x-3 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] py-1.5 pl-3 pr-2.5 shadow-sm sm:min-w-[224px] sm:grid-cols-[56px_1px_56px_28px] sm:gap-x-4 sm:pl-3.5 sm:pr-3">
+        <div className="grid min-w-0 grid-cols-[40px_1px_40px] items-center justify-items-center gap-x-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] py-1.5 pl-2 pr-1.5 shadow-sm sm:min-w-[224px] sm:grid-cols-[56px_1px_56px_28px] sm:gap-x-4 sm:pl-3.5 sm:pr-3">
           <div className="grid w-full gap-0.5 text-center tabular-nums">
             <span className="text-[10px] font-semibold uppercase leading-none text-foreground/70">Очки</span>
             {hasHydrated ? (
@@ -460,7 +460,7 @@ export default function ChatContainer() {
           <button
             onClick={handleResetProgress}
             disabled={!hasHydrated}
-            className="hidden size-7 items-center justify-center rounded-lg text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:inline-flex"
+            className="hidden size-10 items-center justify-center rounded-lg text-foreground/70 transition-colors duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 sm:inline-flex"
             aria-label="Сбросить прогресс"
             title="Начать заново"
           >

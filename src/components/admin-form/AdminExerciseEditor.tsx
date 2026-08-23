@@ -12,6 +12,7 @@ import DeleteExerciseConfirmModal from '@/components/admin-form/DeleteExerciseCo
 import FloatingSaveButton from '@/components/admin-form/FloatingSaveButton';
 import SeedRegenerateConfirmModal from '@/components/admin-form/SeedRegenerateConfirmModal';
 import type { DraftRecoveryState, FeedbackSections, Form, PreviewCheckResult } from '@/components/admin-form/types';
+import type { DatabaseIndicator } from '@/components/admin-form/DatabaseSaveIndicator';
 import type { AdminFormValidation } from '@/components/admin-form/validation';
 import type { Exercise, SubmittedAnswer } from '@/features/exercises/schemas';
 
@@ -19,6 +20,7 @@ type AdminExerciseEditorProps = {
   status: {
     isEdit: boolean;
     hasUnsavedChanges: boolean;
+    databaseIndicator: DatabaseIndicator;
     message: string;
     isError: boolean;
     saving: boolean;
@@ -194,7 +196,7 @@ function QualityInspectorShell() {
     <section className="rounded-3xl border border-stroke bg-surface-strong p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
+          <h3 className="text-sm font-semibold text-foreground">Проверка качества</h3>
           <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/70">
             Блокеры, предупреждения и разбор quick-слоя.
           </p>
@@ -356,7 +358,7 @@ export default function AdminExerciseEditor({
           <>
         <AdminEditorHeader
           isEdit={status.isEdit}
-          hasUnsavedChanges={status.hasUnsavedChanges}
+          databaseIndicator={status.databaseIndicator}
           formMeta={{
             id: form.id,
             type: form.type,
@@ -399,7 +401,7 @@ export default function AdminExerciseEditor({
                 aria-live="polite"
                 className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
               >
-                <div className="font-semibold">Form needs attention</div>
+                <div className="font-semibold">Проверьте форму</div>
                 <ul className="mt-1 list-disc space-y-0.5 pl-5">
                   {visibleValidationSummary.slice(0, 5).map((message) => (
                     <li key={message}>{message}</li>

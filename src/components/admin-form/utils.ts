@@ -48,29 +48,29 @@ export function buildDatabaseIndicator(
   switch (state) {
     case 'saved':
       return {
-        label: 'В БД',
-        detail: savedAt ? `сохранено ${formatAdminTime(savedAt)}` : 'актуальная версия',
+        label: 'Сохранено',
+        detail: savedAt ? `последняя запись ${formatAdminTime(savedAt)}` : 'актуальная запись в БД',
         box: 'border-emerald-200 bg-emerald-50/80 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200',
         dot: 'bg-emerald-500',
       };
     case 'saving':
       return {
-        label: 'Сохранение...',
-        detail: 'запись в БД',
+        label: 'Сохраняется...',
+        detail: 'запись в БД выполняется',
         box: 'border-sky-200 bg-sky-50/80 text-sky-800 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200',
         dot: 'bg-sky-500 motion-safe:animate-pulse',
       };
     case 'local':
       return {
-        label: 'Только локально',
-        detail: 'ждёт записи в БД',
+        label: 'Есть локальные изменения',
+        detail: 'ещё не записаны в БД',
         box: 'border-amber-200 bg-amber-50/80 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200',
         dot: 'bg-amber-500',
       };
     default:
       return {
-        label: 'Новый черновик',
-        detail: 'ещё не в БД',
+        label: 'Черновик',
+        detail: 'ещё не записан в БД',
         box: 'border-stroke bg-surface text-foreground/65 dark:bg-foreground/5',
         dot: 'bg-foreground/25',
       };

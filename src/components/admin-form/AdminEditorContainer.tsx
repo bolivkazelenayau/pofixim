@@ -4,6 +4,7 @@ import AdminExerciseEditor from '@/components/admin-form/AdminExerciseEditor';
 import { useExercisePreview } from '@/hooks/useExercisePreview';
 import { useFormHistory } from '@/hooks/useFormHistory';
 import type { DraftRecoveryState, Form } from './types';
+import type { DatabaseIndicator } from './DatabaseSaveIndicator';
 import type { AnyFormApi } from '@tanstack/react-form';
 import type { AdminFormValidation } from './validation';
 
@@ -11,6 +12,7 @@ type AdminEditorContainerProps = {
   status: {
     isEdit: boolean;
     hasUnsavedChanges: boolean;
+    databaseIndicator: DatabaseIndicator;
     message: string;
     isError: boolean;
     saving: boolean;

@@ -5,8 +5,17 @@ export const categories: ExerciseCategory[] = ['orthography', 'punctuation', 'mi
 
 export const qualityStatuses = ['draft', 'review', 'approved', 'archived'] as const;
 
+export function qualityStatusLabel(status: string) {
+  return {
+    draft: 'черновик',
+    review: 'на проверке',
+    approved: 'одобрено',
+    archived: 'в архиве',
+  }[status] ?? status;
+}
+
 export const inputClass =
-  'w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
+  'min-h-10 w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
 export function Field({
   id,

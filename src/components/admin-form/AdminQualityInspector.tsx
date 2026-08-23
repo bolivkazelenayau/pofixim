@@ -64,7 +64,7 @@ export default function AdminQualityInspector({
     <section className="rounded-3xl border border-stroke bg-surface-strong p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Quality inspector</h3>
+          <h3 className="text-sm font-semibold text-foreground">Проверка качества</h3>
           <p className="mt-0.5 text-pretty text-xs leading-5 text-foreground/70">
             Блокеры, предупреждения и разбор quick-слоя.
           </p>
@@ -433,7 +433,7 @@ function buildQualityChecks(
   } else {
     checks.push({
       level: 'info',
-      label: 'Approved gate не активен',
+      label: 'Проверка одобрения не активна',
       detail: 'Полный чеклист включится при статусе approved.',
     });
   }

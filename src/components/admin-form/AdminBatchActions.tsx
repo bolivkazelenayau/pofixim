@@ -1,4 +1,4 @@
-import { inputClass, qualityStatuses } from './constants';
+import { inputClass, qualityStatusLabel, qualityStatuses } from './constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Tooltip,
@@ -45,7 +45,7 @@ export default function AdminBatchActions({
           <TooltipTrigger asChild>
           <button
             type="button"
-            className="inline-flex size-8 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="inline-flex size-10 items-center justify-center rounded-lg border border-stroke bg-surface-strong text-[11px] font-bold text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             aria-label="Подсказка по массовым действиям"
           >
             i
@@ -63,7 +63,7 @@ export default function AdminBatchActions({
             type="button"
             onClick={onApplyStatus}
             disabled={batchSaving}
-            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
+            className="min-h-10 h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Применить статус
           </button>
@@ -78,7 +78,7 @@ export default function AdminBatchActions({
             type="button"
             onClick={onApplyActivity}
             disabled={batchSaving}
-            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
+            className="min-h-10 h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Применить активность
           </button>
@@ -94,7 +94,7 @@ export default function AdminBatchActions({
           <button
             type="button"
             onClick={onToggleMore}
-            className="h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
+            className="min-h-10 h-full w-full rounded-lg border border-stroke bg-surface-strong px-2 py-1.5 text-xs font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60"
           >
             Параметры
           </button>
@@ -125,13 +125,13 @@ export default function AdminBatchActions({
             value={batchStatus}
             onValueChange={(value) => onBatchStatusChange(value as typeof batchStatus)}
           >
-            <SelectTrigger className={inputClass} aria-label="Batch quality status">
+            <SelectTrigger className={inputClass} aria-label="Массовый статус качества">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {qualityStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {status}
+                  {qualityStatusLabel(status)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -141,7 +141,7 @@ export default function AdminBatchActions({
             value={batchIsActive}
             onValueChange={(value) => onBatchIsActiveChange(value as typeof batchIsActive)}
           >
-            <SelectTrigger className={inputClass} aria-label="Batch activity">
+            <SelectTrigger className={inputClass} aria-label="Массовая активность заданий">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

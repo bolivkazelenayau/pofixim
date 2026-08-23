@@ -40,7 +40,7 @@ export default function AdminOrthographyRepairFields({
       }))
      }
     >
-     <SelectTrigger className={inputClass} aria-label="Orthography repair mode">
+     <SelectTrigger className={inputClass} aria-label="Режим исправления орфографии">
       <SelectValue />
      </SelectTrigger>
      <SelectContent>
@@ -85,7 +85,7 @@ export default function AdminOrthographyRepairFields({
      placeholder={'Ошибка в устойчивом сочетании.\nПравильно: иметь в виду.'}
     />
    </Field>
-   <Field label="Правильный текст целиком (optional)">
+   <Field label="Правильный текст целиком (необязательно)">
     <textarea
      name="orthographyRepairCorrectText"
      className={inputClass}

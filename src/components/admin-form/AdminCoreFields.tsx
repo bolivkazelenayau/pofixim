@@ -117,7 +117,7 @@ export default function AdminCoreFields({
       value={form.type}
       onValueChange={(value) => onTypeChange(value as Form['type'])}
      >
-      <SelectTrigger className={inputClass} aria-label="Exercise type">
+      <SelectTrigger className={inputClass} aria-label="Тип задания">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -140,7 +140,7 @@ export default function AdminCoreFields({
        }))
       }
      >
-      <SelectTrigger className={inputClass} aria-label="Exercise category">
+      <SelectTrigger className={inputClass} aria-label="Категория задания">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -160,7 +160,7 @@ export default function AdminCoreFields({
        setForm((current) => ({ ...current, difficulty: Number(value) as 1 | 2 }))
       }
      >
-      <SelectTrigger className={inputClass} aria-label="Exercise difficulty">
+      <SelectTrigger className={inputClass} aria-label="Сложность задания">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -197,7 +197,7 @@ export default function AdminCoreFields({
       </button>
      </div>
     </Field>
-    <Field id="admin-field-skill-tags" label="Skill tags" error={fieldErrors.skillTags}>
+    <Field id="admin-field-skill-tags" label="Теги навыков" error={fieldErrors.skillTags}>
      <input
       id="admin-field-skill-tags-control"
       name="skillTags"

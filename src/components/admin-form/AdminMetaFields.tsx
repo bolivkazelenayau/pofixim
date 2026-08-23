@@ -79,13 +79,13 @@ export default function AdminMetaFields({
        }))
       }
      >
-      <SelectTrigger className={inputClass} aria-label="Quality status">
+      <SelectTrigger className={inputClass} aria-label="Статус качества">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>
        {qualityStatuses.map((status) => (
         <SelectItem key={status} value={status}>
-         {status}
+         {status === 'draft' ? 'черновик' : status === 'review' ? 'на проверке' : status === 'approved' ? 'одобрено' : 'в архиве'}
         </SelectItem>
        ))}
       </SelectContent>
@@ -99,7 +99,7 @@ export default function AdminMetaFields({
        setForm((current) => ({ ...current, isActive: value === 'active' }))
       }
      >
-      <SelectTrigger className={inputClass} aria-label="Exercise activity">
+      <SelectTrigger className={inputClass} aria-label="Активность задания">
        <SelectValue />
       </SelectTrigger>
       <SelectContent>

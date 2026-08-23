@@ -326,7 +326,6 @@ ins.du {
   padding: 12px;
   font-size: 14px;
   line-height: 2;
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
 .dictation-diff__title {
@@ -336,6 +335,21 @@ ins.du {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.dictation-diff__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+  color: color-mix(in srgb, var(--foreground) 66%, var(--primary));
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.dictation-diff__legend strong {
+  color: var(--foreground);
+  font-weight: 800;
 }
 
 .dictation-diff__token {
@@ -416,7 +430,6 @@ ins.du {
   border-color: rgba(245, 158, 11, 0.42);
   background: color-mix(in srgb, var(--surface-strong) 82%, #f59e0b 18%);
   color: #f8f3ea;
-  box-shadow: inset 3px 0 0 #d69a18;
 }
 
 .dark .dictation-diff__title {

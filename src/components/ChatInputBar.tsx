@@ -143,7 +143,7 @@ export default function ChatInputBar({
               type="button"
               onClick={handleSlashButtonClick}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/50 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:bg-[var(--stroke)] hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96]"
-              aria-label="Open command menu"
+              aria-label="Открыть меню команд"
               aria-expanded={showCommands}
               aria-controls="slash-command-list"
               title="Меню команд"
@@ -161,14 +161,14 @@ export default function ChatInputBar({
               onKeyDown={handleInputKeyDown}
               placeholder={supportsGlobalInput ? 'Ваш ответ...' : 'Написать сообщение...'}
               className="max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-pretty text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-foreground/45 focus:border-primary focus:ring-1 focus:ring-primary"
-              aria-label={supportsGlobalInput ? 'Exercise answer' : 'Message or command'}
+              aria-label={supportsGlobalInput ? 'Ответ на упражнение' : 'Сообщение или команда'}
               autoFocus
             />
             <button
               type="submit"
               disabled={!value.trim()}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-[background-color,opacity,transform] duration-150 ease-out hover:bg-primary-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] disabled:opacity-50 disabled:active:scale-100"
-              aria-label="Send"
+              aria-label="Отправить"
               title="Отправить"
             >
               <Send className="h-5 w-5" aria-hidden="true" />

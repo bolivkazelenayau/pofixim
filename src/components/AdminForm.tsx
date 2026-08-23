@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminEditorContainer from '@/components/admin-form/AdminEditorContainer';
 import AdminSidebarContainer from '@/components/admin-form/AdminSidebarContainer';
 import { EMPTY } from '@/components/admin-form/defaults';
@@ -49,6 +49,16 @@ export default function AdminForm({
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileSidebarOpen]);
 
   const {
     setItems,
@@ -107,6 +117,21 @@ export default function AdminForm({
     isError,
   });
 
+  const openExerciseFromList = useCallback(
+    async (id: number) => {
+      setMobileSidebarOpen(false);
+      await editor.openExerciseWithAutosave(id);
+    },
+    [editor],
+  );
+
+  const clearListFilters = useCallback(() => {
+    setListQuery('');
+    setListTypeFilter('all');
+    setListExamTypeFilter('all');
+    setListStatusFilter('all');
+  }, [setListExamTypeFilter, setListQuery, setListStatusFilter, setListTypeFilter]);
+
   const openAdjacentExercise = useCallback((direction: 1 | -1) => {
     if (flatFilteredItems.length === 0) return;
     const currentIndex = flatFilteredItems.findIndex((item) => item.id === editor.selectedId);
@@ -148,7 +173,7 @@ export default function AdminForm({
           selectedId={editor.selectedId}
           items={flatFilteredItems}
           onOpenChange={setCommandOpen}
-          onOpenExercise={(id) => void editor.openExerciseWithAutosave(id)}
+          onOpenExercise={(id) => void openExerciseFromList(id)}
           onSave={() => editor.formRef.current?.requestSubmit()}
           onNewDraft={editor.actions.onNewDraft}
           onNext={() => openAdjacentExercise(1)}
@@ -157,10 +182,33 @@ export default function AdminForm({
           onSetStatusView={setStatusView}
         />
       ) : null}
-      <div className="mx-auto grid w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+        <button
+          type="button"
+          className="min-h-10 rounded-xl border border-stroke bg-surface-strong px-3 text-sm font-semibold text-foreground shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          onClick={() => setMobileSidebarOpen(true)}
+          aria-expanded={mobileSidebarOpen}
+          aria-controls="admin-exercise-sidebar"
+        >
+          Список заданий
+        </button>
+        <span className="min-w-0 truncate text-xs text-foreground/60">
+          {totalItems === null ? 'Загрузка списка…' : `${totalItems} заданий`}
+        </span>
+      </div>
+      {mobileSidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Закрыть список заданий"
+          className="fixed inset-0 z-[59] bg-black/35 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      ) : null}
+      <div className="mx-auto grid min-w-0 w-full max-w-[1400px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <AdminSidebarContainer
           sidebarRef={editor.sidebarRef}
-          databaseIndicator={editor.databaseIndicator}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
           selectedId={editor.selectedId}
           list={{
             totalItems,
@@ -188,7 +236,8 @@ export default function AdminForm({
             refresh: refreshList,
             loadMore,
           }}
-          onOpenExercise={editor.openExerciseWithAutosave}
+          onOpenExercise={openExerciseFromList}
+          onClearFilters={clearListFilters}
           setIsError={setIsError}
           setMessage={setMessage}
         />

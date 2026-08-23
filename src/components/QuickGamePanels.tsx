@@ -50,7 +50,7 @@ export function QuickGameModalShell({
           className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
             isCloseOffsetForRunning ? 'top-3' : 'top-[22px] sm:top-[26px]'
           }`}
-          aria-label="Close quick game"
+          aria-label="Закрыть быстрый режим без сохранения результата"
           title="Закрыть"
         >
           <X className="h-4 w-4" aria-hidden="true" />

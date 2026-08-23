@@ -5,7 +5,6 @@ import type { RefObject } from 'react';
 import { fetchExerciseById } from '@/components/admin-form/api';
 import AdminExerciseSidebar from '@/components/admin-form/AdminExerciseSidebar';
 import { adminExerciseKeys } from '@/components/admin-form/queryKeys';
-import type { DatabaseIndicator } from '@/components/admin-form/DatabaseSaveIndicator';
 import { formatUpdatedAt } from '@/components/admin-form/utils';
 import { useBatchActions } from '@/hooks/useBatchActions';
 import { EXERCISE_TYPES } from '@/features/exercises/types';
@@ -16,7 +15,8 @@ const LIST_EXAM_TYPES = ['all', ...Array.from({ length: 13 }, (_, i) => String(i
 
 type AdminSidebarContainerProps = {
   sidebarRef: RefObject<HTMLElement | null>;
-  databaseIndicator: DatabaseIndicator;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
   selectedId: number | null;
   list: {
     totalItems: number | null;
@@ -45,16 +45,19 @@ type AdminSidebarContainerProps = {
     loadMore: () => Promise<void>;
   };
   onOpenExercise: (id: number) => Promise<void>;
+  onClearFilters: () => void;
   setIsError: (value: boolean) => void;
   setMessage: (value: string) => void;
 };
 
 export default function AdminSidebarContainer({
   sidebarRef,
-  databaseIndicator,
+  mobileOpen,
+  onCloseMobile,
   selectedId,
   list,
   onOpenExercise,
+  onClearFilters,
   setIsError,
   setMessage,
 }: AdminSidebarContainerProps) {
@@ -103,13 +106,18 @@ export default function AdminSidebarContainer({
   return (
     <AdminExerciseSidebar
       sidebarRef={sidebarRef}
-      databaseIndicator={databaseIndicator}
+      mobileOpen={mobileOpen}
+      onCloseMobile={onCloseMobile}
       stats={{
         hasActiveListFilter: list.hasActiveListFilter,
         matchingItems: list.matchingItems,
         totalItems: list.totalItems,
         initialListPending: list.initialListPending,
         shownCount: list.flatFilteredItems.length,
+        selectedOutsideFilter:
+          list.hasActiveListFilter &&
+          selectedId !== null &&
+          !list.flatFilteredItems.some((item) => item.id === selectedId),
       }}
       selection={{
         enabled: selectionMode,
@@ -168,6 +176,7 @@ export default function AdminSidebarContainer({
         onPrefetchExercise: prefetchExercise,
         onOpenExercise: (id) => void onOpenExercise(id),
         onLoadMore: () => void list.loadMore(),
+        onClearFilters,
         formatUpdatedAt,
       }}
     />

@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { inputClass, qualityStatuses } from './constants';
+import { inputClass, qualityStatusLabel, qualityStatuses } from './constants';
 
 type AdminSidebarFiltersProps = {
   listQuery: string;
@@ -30,7 +30,7 @@ function examTypeLabel(value: string) {
 }
 
 function statusLabel(value: string) {
-  return value === 'all' ? 'Все статусы' : value;
+  return value === 'all' ? 'Все статусы' : qualityStatusLabel(value);
 }
 
 function sortByLabel(value: AdminSidebarFiltersProps['listSortBy']) {
@@ -73,7 +73,7 @@ export default function AdminSidebarFilters({
 }: AdminSidebarFiltersProps) {
   const savedViews = [
     {
-      label: 'Review',
+      label: 'На проверке',
       active: listStatusFilter === 'review' && listExamTypeFilter === 'all',
       onClick: () => {
         onListStatusFilterChange(listStatusFilter === 'review' ? 'all' : 'review');
@@ -81,7 +81,7 @@ export default function AdminSidebarFilters({
       },
     },
     {
-      label: 'Draft',
+      label: 'Черновики',
       active: listStatusFilter === 'draft' && listExamTypeFilter === 'all',
       onClick: () => {
         onListStatusFilterChange(listStatusFilter === 'draft' ? 'all' : 'draft');
@@ -89,7 +89,7 @@ export default function AdminSidebarFilters({
       },
     },
     {
-      label: 'Approved',
+      label: 'Одобрено',
       active: listStatusFilter === 'approved',
       onClick: () => {
         onListStatusFilterChange(listStatusFilter === 'approved' ? 'all' : 'approved');
@@ -107,7 +107,7 @@ export default function AdminSidebarFilters({
             key={view.label}
             type="button"
             onClick={view.onClick}
-            className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-[background-color,border-color,color,transform] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] ${
+            className={`min-h-10 rounded-md border px-2 py-1 text-[11px] font-semibold transition-[background-color,border-color,color,transform] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.96] ${
               view.active
                 ? 'border-foreground/20 bg-foreground text-background'
                 : 'border-stroke bg-surface-strong text-foreground/65 hover:bg-stroke hover:text-foreground'
@@ -132,7 +132,7 @@ export default function AdminSidebarFilters({
             type="button"
             onClick={() => onListQueryChange('')}
             aria-label="Очистить поиск"
-            className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-foreground/45 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="absolute right-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-md text-foreground/45 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <X className="size-3.5" aria-hidden="true" />
           </button>
@@ -140,7 +140,7 @@ export default function AdminSidebarFilters({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Select name="listTypeFilter" value={listTypeFilter} onValueChange={onListTypeFilterChange}>
-          <SelectTrigger className={inputClass} aria-label="Filter by exercise type">
+          <SelectTrigger className={inputClass} aria-label="Фильтр по типу задания">
             <StableSelectLabel>{typeLabel(listTypeFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
@@ -152,7 +152,7 @@ export default function AdminSidebarFilters({
           </SelectContent>
         </Select>
         <Select name="listExamTypeFilter" value={listExamTypeFilter} onValueChange={onListExamTypeFilterChange}>
-          <SelectTrigger className={inputClass} aria-label="Filter by exam type">
+          <SelectTrigger className={inputClass} aria-label="Фильтр по номеру ЕГЭ">
             <StableSelectLabel>{examTypeLabel(listExamTypeFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
@@ -166,14 +166,14 @@ export default function AdminSidebarFilters({
       </div>
       <div className="grid grid-cols-1 gap-2">
         <Select name="listStatusFilter" value={listStatusFilter} onValueChange={onListStatusFilterChange}>
-          <SelectTrigger className={inputClass} aria-label="Filter by quality status">
+          <SelectTrigger className={inputClass} aria-label="Фильтр по статусу качества">
             <StableSelectLabel>{statusLabel(listStatusFilter)}</StableSelectLabel>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Все статусы</SelectItem>
             {qualityStatuses.map((status) => (
               <SelectItem key={status} value={status}>
-                {status}
+                {qualityStatusLabel(status)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -211,7 +211,7 @@ export default function AdminSidebarFilters({
                   onListSortByChange(value as typeof listSortBy)
                 }
               >
-                <SelectTrigger className={inputClass} aria-label="Sort exercise list by">
+                <SelectTrigger className={inputClass} aria-label="Сортировать список заданий по">
                   <StableSelectLabel>{sortByLabel(listSortBy)}</StableSelectLabel>
                 </SelectTrigger>
                 <SelectContent>
@@ -226,8 +226,8 @@ export default function AdminSidebarFilters({
               <button
                 type="button"
                 onClick={() => onListSortDirChange(listSortDir === 'asc' ? 'desc' : 'asc')}
-                aria-label="Toggle sort direction"
-                className="flex w-8 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Изменить направление сортировки"
+                className="flex min-h-10 w-10 self-stretch items-center justify-center rounded-lg border border-stroke bg-surface-strong text-foreground/70 transition-colors duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 {listSortDir === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
               </button>

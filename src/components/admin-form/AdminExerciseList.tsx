@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type M
 import type { VirtualItem } from '@tanstack/react-virtual';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { logAdminDebug } from './debug';
+import { qualityStatusLabel } from './constants';
 import type { ListItem } from './types';
 
 type AdminExerciseListProps = {
@@ -276,7 +277,7 @@ export default function AdminExerciseList({
             <button
               type="button"
               onClick={onClearFilters}
-              className="mt-3 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-xs font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
+              className="mt-3 min-h-10 rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-xs font-semibold text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke"
             >
               Сбросить фильтры
             </button>
@@ -292,7 +293,7 @@ export default function AdminExerciseList({
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
+            className="min-h-10 w-full rounded-lg border border-stroke bg-surface-strong px-3 py-2 text-sm font-medium text-foreground/80 transition-colors duration-150 ease-out hover:bg-stroke focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-surface-strong dark:hover:bg-stroke dark:disabled:hover:bg-surface-strong"
           >
             {loadingMore ? 'Загрузка...' : 'Загрузить еще'}
           </button>
@@ -375,7 +376,7 @@ function ExerciseListButton({
       {selectionMode ? (
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[10px] font-medium text-foreground/65">
-            multi-select
+            Множественный выбор
           </span>
           <span
             className={`flex size-4 items-center justify-center rounded border ${
@@ -395,11 +396,11 @@ function ExerciseListButton({
             #{item.id}
           </span>
           <ListBadge tone={statusTone(item.qualityStatus)}>
-            {item.qualityStatus}
+            {qualityStatusLabel(item.qualityStatus)}
           </ListBadge>
           <ListBadge>{examLabel(item.skillTags)}</ListBadge>
           <ListBadge>{item.type}</ListBadge>
-          {!item.isActive ? <ListBadge tone="muted">inactive</ListBadge> : null}
+          {!item.isActive ? <ListBadge tone="muted">неактивно</ListBadge> : null}
         </div>
         <span className="whitespace-nowrap pt-0.5 text-[10px] text-foreground/65">
           {formatUpdatedAt(item.updatedAt)}
@@ -443,5 +444,5 @@ function statusTone(status: string): 'green' | 'amber' | 'red' | 'muted' {
 
 function examLabel(skillTags: string[]) {
   const tag = skillTags.find((item) => /^ege\.\d{1,2}$/u.test(item));
-  return tag ? tag.replace('ege.', 'ЕГЭ ') : 'no exam';
+  return tag ? tag.replace('ege.', 'ЕГЭ ') : 'без номера ЕГЭ';
 }

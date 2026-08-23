@@ -18,6 +18,7 @@ import {
   type BlitzDuration,
   type BlitzResult,
 } from './blitzGameModel';
+import { shouldScoreQuickGameFinish, type QuickGameFinishReason } from './quickGameSemantics';
 
 type BlitzGameProps = {
   cards: Ege9BlitzCard[];
@@ -102,9 +103,13 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
   const dragRotateY = useTransform(dragX, [-180, 0, 180], [18, 0, -18]);
   const dragOpacity = useTransform(dragX, [-170, -96, 0, 96, 170], [0.38, 0.78, 1, 0.78, 0.38]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback((reason: QuickGameFinishReason) => {
     if (finishedRef.current) return;
     if (isInspectMode) {
+      onClose();
+      return;
+    }
+    if (!shouldScoreQuickGameFinish(reason)) {
       onClose();
       return;
     }
@@ -316,7 +321,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
 
   useEffect(() => {
     if (!isInspectMode && status === 'running' && timeLeftMs <= 0) {
-      const id = window.setTimeout(finish, 0);
+      const id = window.setTimeout(() => finish('timer'), 0);
       return () => window.clearTimeout(id);
     }
   }, [finish, isInspectMode, status, timeLeftMs]);
@@ -327,19 +332,18 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft') answer(0);
       if (event.key === 'ArrowRight') answer(1);
-      if (event.key === 'Escape') finish();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [answer, finish, status]);
+  }, [answer, onClose, status]);
 
   const handleDialogOpenChange = (open: boolean) => {
     if (open) return;
-    if (status === 'running' && !isInspectMode) {
-      finish();
-      return;
-    }
     onClose();
   };
 
@@ -363,7 +367,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
         >
           <DialogPrimitive.Title className="sr-only">Блиц</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Быстрый режим тренировки: выберите длительность, отвечайте стрелками или кнопками, Escape завершает раунд.
+            Быстрый режим тренировки: выберите длительность, отвечайте стрелками или кнопками. Escape и закрытие прерывают раунд без начисления очков.
           </DialogPrimitive.Description>
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -382,11 +386,11 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
 
         <button
           type="button"
-          onClick={status === 'running' && !isInspectMode ? finish : onClose}
+          onClick={onClose}
           className={`absolute right-5 z-sticky flex size-10 items-center justify-center rounded-xl border border-[var(--stroke)] bg-[var(--surface)] text-foreground/70 transition-[background-color,border-color,box-shadow,color] duration-150 ease-out hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-stroke sm:right-6 ${
             status === 'running' ? 'top-3' : 'top-[22px] sm:top-[26px]'
           }`}
-          aria-label="Close blitz"
+          aria-label="Закрыть блиц без сохранения результата"
           title="Закрыть"
         >
           <X className="h-4 w-4" aria-hidden="true" />
@@ -437,6 +441,7 @@ export default function BlitzGame({ cards, mode = 'normal', onClose, onFinish }:
             answer={answer}
             copyQuickSeedCommand={copyQuickSeedCommand}
             copySeedKey={copySeedKey}
+            onFinishRound={() => finish('explicit')}
             setIsDraggingCard={setIsDraggingCard}
           />
         )}

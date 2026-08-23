@@ -41,6 +41,7 @@ type BlitzGameRunningPanelProps = {
   answer: (choiceIndex: 0 | 1) => void;
   copyQuickSeedCommand: () => Promise<void>;
   copySeedKey: () => Promise<void>;
+  onFinishRound: () => void;
   setIsDraggingCard: (value: boolean) => void;
 };
 
@@ -79,6 +80,7 @@ export function BlitzGameRunningPanel({
   answer,
   copyQuickSeedCommand,
   copySeedKey,
+  onFinishRound,
   setIsDraggingCard,
 }: BlitzGameRunningPanelProps) {
   function stopCopyInteraction(
@@ -285,6 +287,15 @@ export function BlitzGameRunningPanel({
           {resolutionLabel}
         </div>
       )}
+      {!isInspectMode ? (
+        <button
+          type="button"
+          onClick={onFinishRound}
+          className="mt-3 min-h-10 w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-foreground/70 transition-[background-color,border-color,color] duration-150 ease-out hover:border-primary/50 hover:bg-stroke hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          Завершить раунд и сохранить результат
+        </button>
+      ) : null}
     </div>
   );
 }

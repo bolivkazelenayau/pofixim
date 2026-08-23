@@ -228,16 +228,19 @@ export function useAdminEditorController({
     loadExercise,
   });
 
+  const databaseIndicator = buildDatabaseIndicator(databaseSaveState, databaseSavedAt);
+
   return {
     selectedId,
     sidebarRef,
     formRef,
     mainSaveAnchorRef,
-    databaseIndicator: buildDatabaseIndicator(databaseSaveState, databaseSavedAt),
+    databaseIndicator,
     openExerciseWithAutosave: guardedOpenExerciseWithAutosave,
     status: {
       isEdit,
       hasUnsavedChanges,
+      databaseIndicator,
       message,
       isError,
       saving,

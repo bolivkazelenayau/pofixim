@@ -55,15 +55,15 @@ export default function AdminCommandPalette({
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Admin command palette"
-      description="Run admin actions and open exercises."
+      title="Панель команд администратора"
+      description="Запускайте действия и открывайте задания."
       className="max-w-xl"
     >
       <Command>
-        <CommandInput placeholder="Search commands or exercises..." />
+        <CommandInput placeholder="Поиск команд или заданий..." />
         {selectedItem ? (
           <div className="border-b border-stroke px-3 py-2 text-xs text-foreground/55">
-            <span className="font-semibold text-foreground/75">Current:</span>{' '}
+            <span className="font-semibold text-foreground/75">Текущее:</span>{' '}
             <span className="font-mono text-xs font-semibold text-foreground">#{selectedItem.id}</span>
             <CompactMarkdown inline className="text-pretty mt-0.5">
               {selectedItem.prompt}
@@ -73,53 +73,53 @@ export default function AdminCommandPalette({
         <CommandList>
           <CommandEmpty>
             <div className="py-6 text-center">
-              <div className="text-sm font-semibold text-foreground">Nothing matched</div>
+              <div className="text-sm font-semibold text-foreground">Ничего не найдено</div>
               <p className="mt-1 text-xs text-foreground/55">
-                Try an exercise id, seed key, status, or action name.
+                Попробуйте номер задания, seed key, статус или название действия.
               </p>
             </div>
           </CommandEmpty>
-          <CommandGroup heading="Actions">
+          <CommandGroup heading="Действия">
             <CommandItem value="save current exercise" onSelect={() => run(onSave)}>
-              Save current exercise
+              Сохранить текущее задание
               <CommandShortcut>Ctrl S</CommandShortcut>
             </CommandItem>
             <CommandItem value="new draft create exercise" onSelect={() => run(onNewDraft)}>
-              New draft
+              Новый черновик
               <CommandShortcut>N</CommandShortcut>
             </CommandItem>
             <CommandItem value="focus sidebar search" onSelect={() => run(onFocusSearch)}>
-              Focus list search
+              Перейти к поиску списка
               <CommandShortcut>/</CommandShortcut>
             </CommandItem>
             <CommandItem value="next exercise" onSelect={() => run(onNext)}>
-              Open next exercise
+              Открыть следующее задание
               <CommandShortcut>Alt ↓</CommandShortcut>
             </CommandItem>
             <CommandItem value="previous exercise" onSelect={() => run(onPrevious)}>
-              Open previous exercise
+              Открыть предыдущее задание
               <CommandShortcut>Alt ↑</CommandShortcut>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
-          <CommandGroup heading="Views">
+          <CommandGroup heading="Представления">
             <CommandItem value="view all exercises clear filters" onSelect={() => run(() => onSetStatusView('all'))}>
-              All statuses
+              Все статусы
             </CommandItem>
             <CommandItem value="view review exercises" onSelect={() => run(() => onSetStatusView('review'))}>
-              Review queue
+              Очередь проверки
             </CommandItem>
             <CommandItem value="view draft exercises" onSelect={() => run(() => onSetStatusView('draft'))}>
-              Draft queue
+              Очередь черновиков
             </CommandItem>
             <CommandItem value="view approved exercises" onSelect={() => run(() => onSetStatusView('approved'))}>
-              Approved queue
+              Очередь одобренных
             </CommandItem>
           </CommandGroup>
           {visibleItems.length > 0 ? (
             <>
               <CommandSeparator />
-              <CommandGroup heading="Open exercise">
+              <CommandGroup heading="Открыть задание">
                 {visibleItems.map((item, index) => (
                   <CommandItem
                     key={item.id}
@@ -135,7 +135,7 @@ export default function AdminCommandPalette({
                       </CompactMarkdown>
                     </span>
                     <CommandShortcut>
-                      {selectedId === item.id ? 'open' : item.qualityStatus}
+                      {selectedId === item.id ? 'открыто' : item.qualityStatus}
                     </CommandShortcut>
                   </CommandItem>
                 ))}
